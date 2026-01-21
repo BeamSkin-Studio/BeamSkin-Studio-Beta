@@ -1098,6 +1098,42 @@ def load_project():
                 show_notification("Invalid project file", "error", 3000)
                 return
             
+            # Check if all DDS files still exist
+            missing_files = []
+            for car_id, car_info in loaded_data["cars"].items():
+                for skin in car_info.get("skins", []):
+                    dds_path = skin.get("dds_path", "")
+                    if dds_path and not os.path.exists(dds_path):
+                        # Get car name for better error message
+                        base_carid = car_info.get("base_carid", car_id)
+                        car_name = VEHICLE_IDS.get(base_carid, base_carid)
+                        for cid, cname in car_id_list:
+                            if cid == base_carid:
+                                car_name = cname
+                                break
+                        
+                        missing_files.append({
+                            "car": car_name,
+                            "car_id": car_id,
+                            "skin": skin.get("name", "Unknown"),
+                            "path": dds_path
+                        })
+            
+            # If there are missing files, show error and don't load
+            if missing_files:
+                error_message = "Cannot load project - Missing DDS files:\n\n"
+                for missing in missing_files:
+                    error_message += f"• {missing['car']} - Skin '{missing['skin']}':\n  {missing['path']}\n\n"
+                
+                messagebox.showerror(
+                    "Missing Files",
+                    error_message.strip()
+                )
+                print(f"Project load failed - Missing files:")
+                for missing in missing_files:
+                    print(f"  {missing['car']} ({missing['car_id']}) - {missing['skin']}: {missing['path']}")
+                return
+            
             # Load the project
             project_data = loaded_data
             selected_car_for_skin = None
