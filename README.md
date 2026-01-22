@@ -2,22 +2,15 @@
 
 ## Installation
 
-1. **Clone or download this repository**
+1. **Download the repository**
 
-2. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. Run the file Run.bat file
+- if anythyng is missing from the requirments it download that for you
 
-3. **Run the application**
-   ```bash
-   python main.py
-   ```
 
 ## Requirements
 
-- Python 3.8 or higher
-- See `requirements.txt` for package dependencies
+- See `requirements.txt` for what is required to run 
 
 ## Features
 
@@ -26,7 +19,6 @@
 
 ## Troubleshooting
 
-If you get a `ModuleNotFoundError`, make sure you've installed all dependencies:
-```bash
-pip install -r requirements.txt
-```
+If you get a `ModuleNotFoundError`, make sure everything was installed correctly,
+
+if u get errors, please submit what error u are getting on github > issues and telll me how I can  replicate it
