@@ -15,7 +15,7 @@
   
 
 4. after everything is installed
-- after the install is done it will launch BeamSkin Studio, but use the BeamSkin Studio.bat to launch the program afterward for a quicker lauch
+- after the install is done it will launch BeamSkin Studio, but use the BeamSkin Studio.bat to launch the program afterward for a quicker launch
 
 
 ## Features
