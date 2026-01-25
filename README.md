@@ -5,7 +5,7 @@
 1. **Download the repository**
 
 2. Run the Install.bat file
-- It will install everything that is required to run BeamSkin St
+- It will install everything that is required to run BeamSkin Studio
 
 3. after everything is installed
 - when using install.bat it will launch BeamSkin Studio, but use the BeamSkin Studio.bat to launch the program afterward for a quicker lauch
