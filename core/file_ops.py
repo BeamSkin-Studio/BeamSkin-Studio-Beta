@@ -29,20 +29,36 @@ def sanitize_mod_name(name):
 
 def get_beamng_mods_path():
     """
-    Get the default BeamNG.drive mods folder path.
-    Returns: C:\\Users\\{username}\\AppData\\Local\\BeamNG\\BeamNG.drive\\current\\mods
+    Get the BeamNG.drive mods folder path from settings.
+    Falls back to default path if not configured.
+    
+    Returns: Path to BeamNG mods folder
     """
+    # Try to get configured path from settings
+    try:
+        from core.settings import get_mods_folder_path
+        configured_path = get_mods_folder_path()
+        if configured_path and os.path.exists(configured_path):
+            print(f"[DEBUG] Using configured mods path: {configured_path}")
+            return configured_path
+        else:
+            print(f"[DEBUG] Configured mods path not set or doesn't exist")
+    except ImportError:
+        print(f"[DEBUG] Could not import settings module")
+    
+    # Fallback to default path
     username = getpass.getuser()
-    return os.path.join(
+    default_path = os.path.join(
         "C:\\Users",
         username,
         "AppData",
         "Local",
-        "BeamNG",
         "BeamNG.drive",
-        "current",
+        "0.33",
         "mods"
     )
+    print(f"[DEBUG] Using default mods path: {default_path}")
+    return default_path
 
 def zip_folder(source_dir, zip_path):
     """

@@ -109,7 +109,14 @@ if __name__ == "__main__":
         # First remove topmost attribute (after 500ms to ensure window is visible)
         app.attributes('-topmost', False)
         
-        app.after(200, app.show_startup_warning)
+        # Check if setup is complete
+        from core.settings import is_setup_complete
+        if not is_setup_complete():
+            print("[DEBUG] First-time setup not complete, showing setup wizard...")
+            app.after(200, app.show_setup_wizard)
+        else:
+            print("[DEBUG] Setup complete, showing WIP warning...")
+            app.after(200, app.show_startup_warning)
         
         # Start update check thread after dialogs
         app.after(500, lambda: threading.Thread(target=check_for_updates, daemon=True).start())

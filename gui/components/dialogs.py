@@ -4,6 +4,7 @@ Dialog Components - Reusable dialog windows and notifications
 import customtkinter as ctk
 import webbrowser
 from gui.state import state
+from gui.components.setup_wizard import show_setup_wizard
 
 
 def show_notification(app, message, type="info", duration=3000):

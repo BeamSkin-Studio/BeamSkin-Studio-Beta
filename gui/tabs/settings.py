@@ -9,6 +9,7 @@ import os
 from gui.state import state
 from core.settings import reset_theme_colors, update_theme_color, DEFAULT_THEMES
 from utils.debug import toggle_debug_mode
+from gui.components.path_configuration import PathConfigurationSection
 
 
 print(f"[DEBUG] Loading class: SettingsTab")
@@ -18,7 +19,7 @@ class SettingsTab(ctk.CTkFrame):
     """Settings tab with theme customization and developer mode"""
     
     def __init__(self, parent: ctk.CTk, main_container: ctk.CTkFrame, menu_frame: ctk.CTkFrame,
-                 menu_buttons: Dict[str, ctk.CTkButton], switch_view_callback):
+                 menu_buttons: Dict[str, ctk.CTkButton], switch_view_callback, notification_callback=None):
     
         print(f"[DEBUG] __init__ called")
         super().__init__(parent, fg_color=state.colors["app_bg"])
@@ -27,6 +28,7 @@ class SettingsTab(ctk.CTkFrame):
         self.menu_frame = menu_frame
         self.menu_buttons = menu_buttons
         self.switch_view_callback = switch_view_callback
+        self.notification_callback = notification_callback
         
         # FIXED: Get the actual root window, not the parent frame
         # Walk up the widget hierarchy to find the CTk root window
@@ -90,6 +92,20 @@ class SettingsTab(ctk.CTkFrame):
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=state.colors["text"]
         ).pack(anchor="w", padx=10, pady=(10, 5))
+        
+        # === PATH CONFIGURATION SECTION ===
+        self.path_config = PathConfigurationSection(
+            self.settings_scrollable_frame,
+            notification_callback=self.show_notification
+        )
+        self.path_config.pack(fill="x", padx=10, pady=(10, 15))
+        
+        # Separator after path config
+        ctk.CTkLabel(
+            self.settings_scrollable_frame,
+            text="─" * 60,
+            text_color=state.colors["border"]
+        ).pack(pady=10)
         
         # Theme toggle
         theme_frame = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
@@ -766,3 +782,23 @@ class SettingsTab(ctk.CTkFrame):
             "Colors Applied",
             "Light theme colors have been saved!\n\nRestart the application to see changes."
         )
+    
+    def show_notification(self, message: str, type: str = "info", duration: int = 3000):
+        """
+        Show notification - uses callback if available, otherwise shows messagebox
+        
+        Args:
+            message: Notification message
+            type: Notification type ("info", "success", "error", "warning")
+            duration: Duration in milliseconds (ignored for messagebox)
+        """
+        if self.notification_callback:
+            self.notification_callback(message, type, duration)
+        else:
+            # Fallback to messagebox if no callback provided
+            if type == "error":
+                messagebox.showerror("Error", message)
+            elif type == "warning":
+                messagebox.showwarning("Warning", message)
+            else:
+                messagebox.showinfo("Info", message)

@@ -257,8 +257,8 @@ class GeneratorTab(ctk.CTkFrame):
             offvalue=False,
             fg_color="#3A3A3A",
             progress_color=state.colors["accent"],
-            button_color=state.colors["card_bg"],
-            button_hover_color=state.colors["card_hover"]
+            button_color=state.colors["text"],
+            button_hover_color=state.colors["border"]
         )
         config_toggle.pack(side="right")
         
@@ -1195,6 +1195,9 @@ class GeneratorTab(ctk.CTkFrame):
                     print(f"[DEBUG]       Creating skin row {skin_idx + 1}: {skin['name']}")
                     row_color = state.colors["app_bg"]
                     
+                    # Check if skin has config data
+                    has_config = "config_data" in skin
+                    
                     skin_row = ctk.CTkFrame(
                         skins_container,
                         fg_color=row_color,
@@ -1204,6 +1207,7 @@ class GeneratorTab(ctk.CTkFrame):
                     skin_row.pack(fill="x", padx=4, pady=2)
                     skin_row.pack_propagate(False)
                     
+                    # Left side: icon
                     icon_label = ctk.CTkLabel(
                         skin_row,
                         text="🎨",
@@ -1211,15 +1215,26 @@ class GeneratorTab(ctk.CTkFrame):
                     )
                     icon_label.pack(side="left", padx=(8, 6))
                     
+                    # Build display text with config info inline
+                    display_text = f"{skin_idx + 1}. {skin['name']}"
+                    
+                    if has_config:
+                        config_data = skin["config_data"]
+                        config_type = config_data.get('config_type', 'Unknown')
+                        config_name = config_data.get('config_name', 'Unknown')
+                        print(f"[DEBUG]       Config data: Type='{config_type}', Name='{config_name}'")
+                        display_text += f"  |  Type: {config_type}  |  Config Name: {config_name}"
+                    
                     skin_label = ctk.CTkLabel(
                         skin_row,
-                        text=f"{skin_idx + 1}. {skin['name']}",
+                        text=display_text,
                         text_color=state.colors["text"],
                         anchor="w",
                         font=ctk.CTkFont(size=13, weight="bold")
                     )
                     skin_label.pack(side="left", fill="x", expand=True, padx=(0, 8))
                     
+                    # Right side: remove button
                     remove_skin_btn = ctk.CTkButton(
                         skin_row,
                         text="✕",
@@ -1308,7 +1323,38 @@ class GeneratorTab(ctk.CTkFrame):
             self.show_notification(f"Please add skins to: {', '.join(cars_without_skins)}", "error", 4000)
             return
         
-        output_path = custom_output_var.get() if output_mode_var.get() == "custom" else None
+        # Determine output path based on output mode
+        output_mode = output_mode_var.get()
+        
+        if output_mode == "custom":
+            # Custom mode - use the custom path from sidebar
+            output_path = custom_output_var.get()
+            if not output_path:
+                self.show_notification("Please select a custom output location", "error")
+                return
+            print(f"[DEBUG] Output mode: Custom - {output_path}")
+        elif output_mode == "steam":
+            # Steam mode - use configured mods folder from settings
+            try:
+                from core.settings import get_mods_folder_path
+                output_path = get_mods_folder_path()
+                
+                if not output_path:
+                    self.show_notification("Mods folder not configured. Please set it in Settings.", "error", 4000)
+                    return
+                
+                if not os.path.exists(output_path):
+                    self.show_notification(f"Mods folder does not exist: {output_path}", "error", 4000)
+                    return
+                
+                print(f"[DEBUG] Output mode: Steam - {output_path}")
+            except ImportError:
+                self.show_notification("Could not load settings. Please configure mods folder path.", "error", 4000)
+                return
+        else:
+            # Unknown mode - should not happen
+            output_path = None
+            print(f"[DEBUG] Output mode: Default/Unknown")
         
         self.project_data["mod_name"] = mod_name
         self.project_data["author"] = author_name if author_name else "Unknown"

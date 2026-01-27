@@ -11,7 +11,10 @@ SETTINGS_FILE = "data/app_settings.json"
 # Default settings
 app_settings = {
     "theme": "dark",  # "dark" or "light"
-    "first_launch": True  # Show WIP warning on first launch
+    "first_launch": True,  # Show WIP warning on first launch
+    "setup_complete": False,  # Track if first-time setup is complete
+    "beamng_install": "",  # BeamNG.drive installation path
+    "mods_folder": ""  # BeamNG mods folder path
 }
 
 # Ensure data directory exists
@@ -418,3 +421,48 @@ def set_theme(theme_name, app_instance=None):
             print(f"[DEBUG] Could not update app state: {e}")
     
     return True
+
+
+def set_beamng_paths(beamng_install: str = None, mods_folder: str = None):
+    """
+    Set BeamNG.drive installation and/or mods folder paths
+    
+    Args:
+        beamng_install: Path to BeamNG.drive installation (optional)
+        mods_folder: Path to mods folder (optional)
+    
+    Returns:
+        True if successful
+    """
+    if beamng_install is not None:
+        app_settings["beamng_install"] = beamng_install
+        print(f"[DEBUG] BeamNG install path set to: {beamng_install}")
+    
+    if mods_folder is not None:
+        app_settings["mods_folder"] = mods_folder
+        print(f"[DEBUG] Mods folder path set to: {mods_folder}")
+    
+    save_settings()
+    return True
+
+
+def get_beamng_install_path() -> str:
+    """Get the BeamNG.drive installation path"""
+    return app_settings.get("beamng_install", "")
+
+
+def get_mods_folder_path() -> str:
+    """Get the BeamNG mods folder path"""
+    return app_settings.get("mods_folder", "")
+
+
+def is_setup_complete() -> bool:
+    """Check if first-time setup has been completed"""
+    return app_settings.get("setup_complete", False)
+
+
+def mark_setup_complete():
+    """Mark first-time setup as complete"""
+    app_settings["setup_complete"] = True
+    save_settings()
+    print("[DEBUG] First-time setup marked as complete")

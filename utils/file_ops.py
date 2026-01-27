@@ -1,5 +1,6 @@
 # file_ops.py
 # Complete file operations module for BeamNG Skin Studio
+# edits the attached files in developer tab when user add cars
 
 import os
 import shutil
@@ -311,7 +312,8 @@ def edit_material_json(source_json_path, target_folder, carid):
 
 def edit_jbeam_material(source_jbeam_path, target_folder, carid):
     """
-    Copy and process the JBeam file for a custom vehicle
+    Copy and process the JBeam file for a custom vehicle.
+    Replaces ALL skin entries with a single template entry using placeholders.
     
     Args:
         source_jbeam_path: Path to source JBeam file
@@ -330,15 +332,26 @@ def edit_jbeam_material(source_jbeam_path, target_folder, carid):
         output_name = os.path.basename(source_jbeam_path)
         target_path = os.path.join(target_folder, output_name)
         
-        # Read source JBeam
-        with open(source_jbeam_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Create the template entry with placeholders
+        # This replaces ALL existing skin entries with a single template
+        template = '''{
+    "ccf_skin_skinname": {
+        "information":{
+            "authors":"author",
+            "name":"skinname",
+            "value":1350
+        },
+        "slotType" : "paint_design",
+        "globalSkin" : "skinname"
+    }
+}'''
         
-        # Write to target (could add processing here if needed)
+        # Write the template to target (replaces all content)
         with open(target_path, 'w', encoding='utf-8') as f:
-            f.write(content)
+            f.write(template)
         
-        print(f"[DEBUG] Copied JBeam file to: {target_path}")
+        print(f"[DEBUG] Created template JBeam file at: {target_path}")
+        print(f"[DEBUG] All skin entries replaced with placeholder template")
         return True
         
     except Exception as e:

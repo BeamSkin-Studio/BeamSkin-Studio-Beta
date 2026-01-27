@@ -259,7 +259,8 @@ class BeamSkinStudioApp(ctk.CTk):
             self.main_container,
             self.topbar.menu_frame,
             self.topbar.menu_buttons,
-            self.switch_view
+            self.switch_view,
+            notification_callback=self.show_notification
         )
         
         # About tab
@@ -390,6 +391,52 @@ class BeamSkinStudioApp(ctk.CTk):
         print(f"[DEBUG] show_startup_warning called")
         """Show WIP warning dialog"""
         show_wip_warning(self)
+    
+    def show_setup_wizard(self):
+        """Show first-time setup wizard"""
+        print("[DEBUG] Showing first-time setup wizard...")
+        
+        from gui.components.setup_wizard import show_setup_wizard
+        from core.settings import set_beamng_paths, mark_setup_complete
+        
+        def on_setup_complete(paths: dict):
+            print(f"[DEBUG] Setup wizard completed with paths: {paths}")
+            
+            # Save paths to settings
+            set_beamng_paths(
+                beamng_install=paths.get("beamng_install", ""),
+                mods_folder=paths.get("mods_folder", "")
+            )
+            
+            # Mark setup as complete
+            mark_setup_complete()
+            
+            # Reload paths in settings tab if it exists
+            if "settings" in self.tabs:
+                settings_tab = self.tabs["settings"]
+                try:
+                    if hasattr(settings_tab, 'path_config'):
+                        settings_tab.path_config.reload_paths()
+                        print("[DEBUG] Reloaded paths in settings tab")
+                    else:
+                        print("[DEBUG] Settings tab doesn't have path_config attribute")
+                except Exception as e:
+                    print(f"[DEBUG] Could not reload paths in settings tab: {e}")
+            else:
+                print("[DEBUG] Settings tab not found in self.tabs")
+            
+            # Show success notification
+            if paths.get("beamng_install") or paths.get("mods_folder"):
+                self.show_notification(
+                    "Setup complete! Paths saved successfully.",
+                    type="success",
+                    duration=3000
+                )
+            
+            # Show WIP warning after setup
+            self.after(500, self.show_startup_warning)
+        
+        show_setup_wizard(self, state.colors, on_setup_complete)
     
     def prompt_update(self, new_version: str):
     
