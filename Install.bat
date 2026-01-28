@@ -59,50 +59,49 @@ if %errorlevel% neq 0 (
     
     echo [OK] Python installer downloaded successfully
     echo.
-    echo Installing Python...
+    echo Installing Python with automatic PATH configuration...
     echo This will take a few minutes...
     echo.
     
-    :: Install Python silently with PATH
-    start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    :: Install Python silently with PATH and all users
+    :: Using more reliable installation parameters
+    start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0 Include_pip=1 Include_launcher=1
     
-    if %errorlevel% neq 0 (
-        echo [WARNING] Silent installation may have failed.
-        echo Trying interactive installation...
-        echo.
-        echo IMPORTANT: Make sure to check "Add Python to PATH" during installation!
-        echo.
-        pause
-        start /wait python_installer.exe
-    )
+    set INSTALL_EXIT_CODE=%errorlevel%
     
-    :: Clean up
+    :: Clean up installer
     del python_installer.exe
     
-    echo.
-    echo [OK] Python installation completed
-    echo.
-    echo Refreshing environment...
-    :: Refresh PATH without restarting
-    for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path') do set "syspath=%%b"
-    for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path') do set "userpath=%%b"
-    set "PATH=%syspath%;%userpath%"
-    
-    echo.
-    echo Verifying Python installation...
-    python --version >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo [WARNING] Python may not be in PATH yet.
+    if !INSTALL_EXIT_CODE! neq 0 (
+        echo [WARNING] Automated installation encountered an issue.
         echo.
-        echo Please close this window and run the installer again.
-        echo If the issue persists, restart your computer.
+        echo Please install Python manually:
+        echo 1. Download from: https://www.python.org/downloads/
+        echo 2. Run the installer
+        echo 3. CHECK the box "Add Python to PATH"
+        echo 4. Complete the installation
+        echo 5. Run this installer again
         echo.
         pause
         exit /b 1
     )
     
-    echo [OK] Python is now available!
+    echo [OK] Python installation completed
     echo.
+    
+    :: Python was just installed - need to restart the script to pick up new PATH
+    echo ============================================================
+    echo Python has been installed successfully!
+    echo ============================================================
+    echo.
+    echo The installer needs to restart to detect the new Python installation.
+    echo.
+    echo Press any key to restart the installer...
+    pause >nul
+    
+    :: Restart this script in a new command prompt (which will have the updated PATH)
+    start "" "%~f0"
+    exit
 )
 
 python --version
@@ -130,10 +129,11 @@ echo.
 
 :: Upgrade pip
 echo [3/6] Upgrading pip to latest version...
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip --quiet
 if %errorlevel% neq 0 (
     echo [WARNING] Failed to upgrade pip, continuing anyway...
 )
+echo [OK] pip upgraded
 echo.
 
 :: Install required packages
@@ -144,46 +144,46 @@ echo.
 
 :: Core GUI framework
 echo Installing CustomTkinter (GUI framework)...
-python -m pip install customtkinter
+python -m pip install customtkinter --quiet
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install customtkinter!
     pause
     exit /b 1
 )
+echo [OK] CustomTkinter installed
 
 :: Image processing
 echo Installing Pillow (image processing)...
-python -m pip install Pillow
+python -m pip install Pillow --quiet
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install Pillow!
     pause
     exit /b 1
 )
+echo [OK] Pillow installed
 
 :: HTTP requests for update checker
 echo Installing requests (HTTP library)...
-python -m pip install requests
+python -m pip install requests --quiet
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install requests!
     pause
     exit /b 1
 )
+echo [OK] requests installed
 
-:: Verify installations
+:: Optional dependencies
 echo.
 echo [5/6] Installing optional dependencies...
 echo.
 
-:: Optional: Windows-specific dependencies
-echo Installing optional Windows dependencies...
-echo (pywin32 for better Windows integration)
-echo.
-
 :: pywin32 for window manipulation (optional)
 echo Installing pywin32 (Windows integration)...
-python -m pip install pywin32
+python -m pip install pywin32 --quiet
 if %errorlevel% neq 0 (
     echo [WARNING] pywin32 installation failed (optional dependency)
+) else (
+    echo [OK] pywin32 installed
 )
 
 :: Verify installations
@@ -216,8 +216,6 @@ if %errorlevel% neq 0 (
 python -c "import win32gui; print('[OK] pywin32 installed')" 2>nul
 if %errorlevel% neq 0 (
     echo [INFO] pywin32 not available (optional)
-) else (
-    echo [OK] pywin32 available
 )
 
 echo.
