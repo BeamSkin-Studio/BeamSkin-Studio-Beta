@@ -61,7 +61,7 @@ class ConfirmationDialog:
             text_color=colors["text"],
             anchor="center"
         )
-        icon_label.pack(pady=(15, 10), anchor="center")  # Added anchor="center"
+        icon_label.pack(fill="x", pady=(15, 10), padx=(67, 0))
         
         # Title
         title_label = ctk.CTkLabel(
@@ -212,7 +212,7 @@ class InfoDialog:
             text_color=colors["text"],
             anchor="center"
         )
-        icon_label.pack(pady=(15, 10), anchor="center")  # Added anchor="center"
+        icon_label.pack(fill="x", pady=(15, 10), padx=(40, 0))  # Added left padding to shift right
         
         # Title color based on type
         if type == "error":

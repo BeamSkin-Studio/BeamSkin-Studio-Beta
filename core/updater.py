@@ -9,7 +9,6 @@ import os
 import sys
 
 def get_base_path():
-
     print(f"[DEBUG] get_base_path called")
     """Get the base path for resources (works in dev and PyInstaller)"""
     if getattr(sys, 'frozen', False):
@@ -20,9 +19,8 @@ def get_base_path():
         return os.path.dirname(os.path.abspath(__file__))
 
 def read_version():
-
     print(f"[DEBUG] read_version called")
-    """Read version from version.txt"""
+    """Read version from version.txt and return formatted version string"""
     print(f"[DEBUG] ========== READING VERSION FILE ==========")
     
     # Try multiple paths to find version.txt
@@ -37,12 +35,47 @@ def read_version():
             try:
                 with open(version_path, 'r') as f:
                     content = f.read().strip()
+                    print(f"[DEBUG] Raw version content: {content}")
+                    
+                    # Parse the version number (supports multiple formats)
+                    # Format 1: "0.5.4.0" (4 components)
+                    # Format 2: "0.5.4" (3 components)
+                    # Format 3: "Version: 0.5.4.0"
+                    
+                    # Remove "Version:" prefix if present
                     if "Version:" in content:
-                        version = content.replace("Version:", "").strip()
+                        content = content.replace("Version:", "").strip()
+                    
+                    # Split by dots and validate
+                    parts = content.split('.')
+                    
+                    # Convert to version string with status
+                    if len(parts) >= 3:
+                        major, minor, patch = parts[0], parts[1], parts[2]
+                        
+                        # Check if there's a 4th component or status indicator
+                        if len(parts) >= 4:
+                            # If 4th part is a number (like 0), it's a build number - treat as Beta
+                            try:
+                                build = int(parts[3])
+                                if build == 0:
+                                    status = "Beta"
+                                else:
+                                    status = f"Build {build}"
+                            except ValueError:
+                                # If 4th part is text (like "Beta"), use it as status
+                                status = parts[3].capitalize()
+                        else:
+                            # No 4th component = stable release
+                            status = "Stable"
+                        
+                        version = f"{major}.{minor}.{patch}.{status}"
                     else:
+                        # Fallback for malformed version
                         version = content
+                    
                     print(f"[DEBUG] Version loaded from: {version_path}")
-                    print(f"[DEBUG] Version: {version}")
+                    print(f"[DEBUG] Formatted version: {version}")
                     return version
             except Exception as e:
                 print(f"[DEBUG] Failed to read {version_path}: {e}")
@@ -61,7 +94,6 @@ _app_instance = None
 _colors = None
 
 def set_app_instance(app, colors):
-
     print(f"[DEBUG] set_app_instance called")
     """Set the app instance and colors for update prompts"""
     global _app_instance, _colors
@@ -69,14 +101,13 @@ def set_app_instance(app, colors):
     _colors = colors
 
 def parse_version(version_string):
-
     print(f"[DEBUG] parse_version called")
     """
     Parse version string into comparable tuple.
     Examples:
         "0.3.6.Beta" -> (0, 3, 6, 'beta')
         "0.4.0.Beta" -> (0, 4, 0, 'beta')
-        "1.0.0" -> (1, 0, 0, 'stable')
+        "1.0.0.Stable" -> (1, 0, 0, 'stable')
     """
     # Remove common prefixes
     version_string = version_string.lower().strip()
@@ -107,7 +138,6 @@ def parse_version(version_string):
     return (0, 0, 0, 999)
 
 def is_newer_version(remote_version, current_version):
-
     print(f"[DEBUG] is_newer_version called")
     """
     Compare two version strings to see if remote is newer.
@@ -134,7 +164,6 @@ def is_newer_version(remote_version, current_version):
         return remote_version != current_version
 
 def prompt_update(new_version):
-
     print(f"[DEBUG] prompt_update called")
     """Show custom update notification window"""
     print(f"\n[DEBUG] ========== UPDATE PROMPT ==========")
@@ -224,7 +253,6 @@ def prompt_update(new_version):
     button_frame.pack(pady=10, fill="x", padx=20)
     
     def download_update():
-    
         print(f"[DEBUG] download_update called")
         """Open GitHub releases page"""
         print(f"[DEBUG] Opening GitHub releases page...")
@@ -232,7 +260,6 @@ def prompt_update(new_version):
         update_window.destroy()
     
     def maybe_later():
-    
         print(f"[DEBUG] maybe_later called")
         """Close update window"""
         print(f"[DEBUG] User chose maybe later")
@@ -267,7 +294,6 @@ def prompt_update(new_version):
     skip_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
 
 def check_for_updates():
-
     print(f"[DEBUG] check_for_updates called")
     """Check for updates from GitHub repository"""
     print(f"\n[DEBUG] ========== UPDATE CHECK STARTED ==========")
@@ -280,7 +306,25 @@ def check_for_updates():
         
         if response.status_code == 200:
             content = response.text.strip()
-            latest_version = content.replace("Version:", "").strip() if "Version:" in content else content
+            
+            # Parse remote version using same logic
+            if "Version:" in content:
+                content = content.replace("Version:", "").strip()
+            
+            parts = content.split('.')
+            if len(parts) >= 3:
+                major, minor, patch = parts[0], parts[1], parts[2]
+                if len(parts) >= 4:
+                    try:
+                        build = int(parts[3])
+                        status = "Beta" if build == 0 else f"Build {build}"
+                    except ValueError:
+                        status = parts[3].capitalize()
+                else:
+                    status = "Stable"
+                latest_version = f"{major}.{minor}.{patch}.{status}"
+            else:
+                latest_version = content
             
             print(f"[DEBUG] Latest version from GitHub: {latest_version}")
             

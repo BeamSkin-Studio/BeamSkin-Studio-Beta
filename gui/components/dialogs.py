@@ -339,15 +339,15 @@ def show_wip_warning(app):
         print(f"[DEBUG] First launch detected - showing WIP warning dialog")
         dialog = ctk.CTkToplevel(app)
         dialog.title("Welcome to BeamSkin Studio")
-        dialog.geometry("500x650")
+        dialog.geometry("550x700")
         dialog.transient(app)
         dialog.grab_set()
         print(f"[DEBUG] Dialog created")
         
         dialog.update_idletasks()
-        dialog_x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
-        dialog_y = (dialog.winfo_screenheight() // 2) - (650 // 2)
-        dialog.geometry(f"500x650+{dialog_x}+{dialog_y}")
+        dialog_x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
+        dialog_y = (dialog.winfo_screenheight() // 2) - (700 // 2)
+        dialog.geometry(f"550x700+{dialog_x}+{dialog_y}")
         print(f"[DEBUG] Dialog centered at ({dialog_x}, {dialog_y})")
         
         dialog.configure(fg_color=state.colors["frame_bg"])
@@ -376,27 +376,29 @@ def show_wip_warning(app):
         message_frame.pack(fill="both", expand=True, pady=(0, 20))
         
         message_text = (
-            "BeamSkin Studio is in active development.\n\n"
-            "Please be aware that:\n\n"
-            "• Bugs and errors should be expected\n"
-            "• Some features may not work as intended\n"
-            "• Data loss or unexpected behavior may occur\n"
-            "• Regular updates and changes are being made\n\n"
-            "Known Limitations:\n\n"
-            "• Car variations are NOT supported yet\n"
-            "  (e.g., Ambulance, Box Truck, Sedan, Wagon)\n"
-            "• Modded cars added via Developer tab\n"
-            "  most likely won't work properly\n\n"
-            "Thank you for your patience and understanding!"
+            "Welcome to BeamSkin Studio!\n"
+            "This application is currently in active development.\n"
+            "While I strive to provide a stable experience, some features may not work\n\n" 
+            "Please note:\n"
+            "Some features may be incomplete\n"
+            "Occasional bugs or unexpected behavior may occur\n"
+            "Updates and improvements are being made\n\n"
+            "Your feedback helps me improve the software!\n"
+            "If you encounter any issues, please report them on my GitHub page. "
+            "Your bug reports and feature suggestions are valuable to making "
+            "BeamSkin Studio better!\n\n"
+            " I appreciate your understanding and support as I continue "
+            "to enhance BeamSkin Studio."
         )
         
         ctk.CTkLabel(
             message_frame,
             text=message_text,
-            font=ctk.CTkFont(size=17),
+            font=ctk.CTkFont(size=18),
             text_color=state.colors["text"],
-            justify="left"
-        ).pack(padx=20, pady=20)
+            justify="center",
+            wraplength=480
+        ).pack(padx=20, pady=20, fill="both", expand=True)
         
         dont_show_var = ctk.BooleanVar(value=False)
         checkbox = ctk.CTkCheckBox(

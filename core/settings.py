@@ -246,17 +246,12 @@ def show_wip_warning(app=None, force=False):
 
         message_label = ctk.CTkLabel(
             message_frame,
-            text="BeamSkin Studio is currently in active development.\n\n"
+            text="BeamSkin Studio is in active development.\n\n"
                  "Please be aware that:\n"
                  "• Bugs and errors should be expected\n"
                  "• Some features may not work as intended\n"
                  "• Data loss or unexpected behavior may occur\n"
                  "• Regular updates and changes are being made\n\n"
-                 "Known Limitations:\n"
-                 "• Car variations are NOT supported yet\n"
-                 "  (e.g., Ambulance, Box Truck, Sedan, Wagon)\n"
-                 "• Modded cars added via Developer tab\n"
-                 "  won't work properly\n\n"
                  "Thank you for your patience and understanding!",
             font=ctk.CTkFont(size=20),
             text_color=colors["text"],

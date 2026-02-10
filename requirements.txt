@@ -1,14 +1,30 @@
 # BeamSkin Studio - Python Dependencies
+# Cross-platform: Windows, Linux, macOS
 # Install with: pip install -r requirements.txt
 
 # Core GUI Framework
-customtkinter>=5.0.0
+customtkinter>=5.2.0
 
 # Image Processing
-Pillow>=9.0.0
+Pillow>=10.0.0
 
 # HTTP Requests (for update checker)
-requests>=2.28.0
+requests>=2.31.0
 
 # Windows-specific (optional, for better Windows integration)
-pywin32>=300; sys_platform == 'win32'
+pywin32>=306; sys_platform == 'win32'
+
+# Note for Linux users:
+# You may need to install tkinter separately using your package manager:
+#   Ubuntu/Debian: sudo apt install python3-tk
+#   Fedora: sudo dnf install python3-tkinter
+#   Arch: sudo pacman -S tk
+#
+# For file dialog support on Linux, you may also want:
+#   Ubuntu/Debian: sudo apt install python3-tk zenity
+#   Fedora: sudo dnf install python3-tkinter zenity
+
+# Optional: wmctrl for better window management on Linux
+# Install on Linux: sudo apt install wmctrl (Ubuntu/Debian)
+#                   sudo dnf install wmctrl (Fedora)
+#                   sudo pacman -S wmctrl (Arch)

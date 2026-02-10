@@ -1,5 +1,5 @@
 """
-Settings Tab - Theme editor and developer toggles
+Settings Tab - Theme editor and debug mode
 """
 from typing import Dict, Tuple, Optional
 import customtkinter as ctk
@@ -16,7 +16,7 @@ print(f"[DEBUG] Loading class: SettingsTab")
 
 
 class SettingsTab(ctk.CTkFrame):
-    """Settings tab with theme customization and developer mode"""
+    """Settings tab with theme customization and debug mode"""
     
     def __init__(self, parent: ctk.CTk, main_container: ctk.CTkFrame, menu_frame: ctk.CTkFrame,
                  menu_buttons: Dict[str, ctk.CTkButton], switch_view_callback, notification_callback=None):
@@ -35,7 +35,6 @@ class SettingsTab(ctk.CTkFrame):
         self.root_app = self._get_root_window()
         
         # State variables
-        self.developer_mode_var = ctk.BooleanVar(value=False)
         self.debug_mode_var = ctk.BooleanVar(value=False)
         
         # Theme editor frames
@@ -43,9 +42,6 @@ class SettingsTab(ctk.CTkFrame):
         self.light_theme_edit_frame: Optional[ctk.CTkFrame] = None
         self.dark_color_entries: Dict[str, Tuple[ctk.CTkEntry, ctk.CTkLabel]] = {}
         self.light_color_entries: Dict[str, Tuple[ctk.CTkEntry, ctk.CTkLabel]] = {}
-        
-        # Developer tab reference (created dynamically)
-        self.developer_tab: Optional[ctk.CTkFrame] = None
         
         self._setup_ui()
     
@@ -120,35 +116,15 @@ class SettingsTab(ctk.CTkFrame):
         self.theme_switch.pack(side="left", padx=5)
         ctk.CTkLabel(theme_frame, text="Light Mode", text_color=state.colors["text"]).pack(side="left")
         
-        # --- Developer Section ---
-        # Create a container frame to keep developer items together
-        self.dev_container = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
-        self.dev_container.pack(anchor="w", padx=10, pady=(0, 5), fill="x")
-        
-        # Developer Mode Checkbox (now inside dev_container)
-        developer_checkbox = ctk.CTkCheckBox(
-            self.dev_container,
-            text="Developer Mode",
-            variable=self.developer_mode_var,
-            command=self._toggle_developer_mode
-        )
-        developer_checkbox.pack(anchor="w", pady=(0, 5))
-        
-        # Debug mode frame (now inside dev_container)
-        self.debug_mode_frame = ctk.CTkFrame(self.dev_container, fg_color="transparent")
-        
-        # If developer mode is already enabled (e.g. on refresh), show the debug toggle immediately
-        if self.developer_mode_var.get():
-            self.debug_mode_frame.pack(anchor="w", padx=20, pady=(0, 5))
-        
-        # FIXED: Pass the actual root window, not self.parent_app
+        # --- Debug Mode Section ---
+        # Debug mode checkbox (standalone, no developer mode needed)
         debug_checkbox = ctk.CTkCheckBox(
-            self.debug_mode_frame,
+            self.settings_scrollable_frame,
             text="Debug Mode (Opens debug console)",
             variable=self.debug_mode_var,
-            command=self._toggle_debug_mode  # Use wrapper method
+            command=self._toggle_debug_mode
         )
-        debug_checkbox.pack(anchor="w")
+        debug_checkbox.pack(anchor="w", padx=10, pady=(0, 10))
         
         # Separator
         ctk.CTkLabel(
@@ -366,92 +342,6 @@ class SettingsTab(ctk.CTkFrame):
             if self.root_app:
                 self.root_app.quit()
     
-    def _toggle_developer_mode(self):
-        """Toggle developer mode and show/hide developer tab"""
-        print(f"[DEBUG] Developer mode toggled: {self.developer_mode_var.get()}")
-        
-        if self.developer_mode_var.get():
-            print("[DEBUG] Developer mode enabled")
-            
-            # Show debug mode checkbox (it will now appear directly under the developer toggle)
-            self.debug_mode_frame.pack(anchor="w", padx=20, pady=(0, 5))
-            
-            # Create developer tab if it doesn't exist
-            if self.developer_tab is None:
-                from gui.tabs.developer import DeveloperTab
-                
-                # Get notification callback from root app
-                notification_callback = None
-                if self.root_app and hasattr(self.root_app, 'show_notification'):
-                    notification_callback = self.root_app.show_notification
-                    print(f"[DEBUG] Found notification callback from root app")
-                else:
-                    print(f"[DEBUG] Warning: No notification callback found in root app")
-                
-                self.developer_tab = DeveloperTab(self.main_container, notification_callback)
-                print(f"[DEBUG] Developer tab created successfully")
-            
-            # Add Developer button to menu - get current references from topbar
-            if "developer" not in self.menu_buttons:
-                try:
-                    # Get current topbar from root app
-                    current_menu_frame = None
-                    current_menu_buttons = None
-                    
-                    if self.root_app and hasattr(self.root_app, 'topbar'):
-                        current_menu_frame = self.root_app.topbar.menu_frame
-                        current_menu_buttons = self.root_app.topbar.menu_buttons
-                        print(f"[DEBUG] Got current menu_frame and menu_buttons from topbar")
-                    else:
-                        # Fallback to stored references
-                        current_menu_frame = self.menu_frame
-                        current_menu_buttons = self.menu_buttons
-                        print(f"[DEBUG] Using stored menu_frame reference")
-                    
-                    # Verify the menu_frame still exists
-                    if current_menu_frame and current_menu_frame.winfo_exists():
-                        dev_button = ctk.CTkButton(
-                            current_menu_frame,
-                            text="Developer",
-                            fg_color="transparent",
-                            text_color=state.colors["text_secondary"],
-                            hover_color=state.colors["card_hover"],
-                            font=ctk.CTkFont(size=12),
-                            command=lambda: self.switch_view_callback("developer")
-                        )
-                        dev_button.pack(side="left", padx=5)
-                        current_menu_buttons["developer"] = dev_button
-                        
-                        # Update stored reference
-                        self.menu_buttons = current_menu_buttons
-                        print(f"[DEBUG] Developer menu button added successfully")
-                    else:
-                        print(f"[ERROR] menu_frame no longer exists or is invalid")
-                        self.developer_mode_var.set(False)  # Revert the toggle
-                        
-                except Exception as e:
-                    print(f"[ERROR] Failed to add Developer button: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    self.developer_mode_var.set(False)  # Revert the toggle
-        else:
-            print("[DEBUG] Developer mode disabled")
-            
-            # Hide debug mode checkbox and uncheck it
-            self.debug_mode_frame.pack_forget()
-            self.debug_mode_var.set(False)
-            
-            # Remove Developer button from menu
-            if "developer" in self.menu_buttons:
-                try:
-                    self.menu_buttons["developer"].destroy()
-                    del self.menu_buttons["developer"]
-                    print(f"[DEBUG] Developer menu button removed successfully")
-                except Exception as e:
-                    print(f"[ERROR] Failed to remove Developer button: {e}")
-                    # Still remove from dict even if destroy failed
-                    if "developer" in self.menu_buttons:
-                        del self.menu_buttons["developer"]
     
     def _toggle_dark_theme_editor(self):
         """Toggle dark theme editor visibility"""

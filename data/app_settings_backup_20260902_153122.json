@@ -1,0 +1,53 @@
+{
+    "theme": "dark",
+    "first_launch": false,
+    "setup_complete": true,
+    "beamng_install": "C:/Program Files (x86)/Steam/steamapps/common/BeamNG.drive",
+    "mods_folder": "C:/Users/Kevin/AppData/Local/BeamNG/BeamNG.drive/current/mods",
+    "custom_themes": {
+        "dark": {
+            "app_bg": "#0a0a0a",
+            "frame_bg": "#141414",
+            "card_bg": "#1e1e1e",
+            "card_hover": "#282828",
+            "text": "#f5f5f5",
+            "text_secondary": "#999999",
+            "accent": "#39E09B",
+            "accent_hover": "#2fc97f",
+            "accent_text": "#0a0a0a",
+            "tab_selected": "#1e1e1e",
+            "tab_selected_hover": "#282828",
+            "tab_unselected": "#141414",
+            "tab_unselected_hover": "#1e1e1e",
+            "border": "#2a2a2a",
+            "error": "#ff4444",
+            "error_hover": "#cc3636",
+            "success": "#39E09B",
+            "warning": "#ffa726",
+            "topbar_bg": "#181818",
+            "sidebar_bg": "#121212"
+        },
+        "light": {
+            "app_bg": "#fafafa",
+            "frame_bg": "#f0f0f0",
+            "card_bg": "#ffffff",
+            "card_hover": "#f5f5f5",
+            "text": "#1a1a1a",
+            "text_secondary": "#888888",
+            "accent": "#39E09B",
+            "accent_hover": "#2fc97f",
+            "accent_text": "#0a0a0a",
+            "tab_selected": "#ffffff",
+            "tab_selected_hover": "#f5f5f5",
+            "tab_unselected": "#f0f0f0",
+            "tab_unselected_hover": "#ffffff",
+            "border": "#e0e0e0",
+            "error": "#ff4444",
+            "error_hover": "#cc3636",
+            "success": "#39E09B",
+            "warning": "#ffa726",
+            "topbar_bg": "#f5f5f5",
+            "sidebar_bg": "#eeeeee"
+        }
+    }
+}

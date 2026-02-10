@@ -23,25 +23,7 @@ def process_custom_vehicle(
     jbeam_path: str,
     image_path: Optional[str] = None
 ) -> bool:
-    """
-    Process vehicle files and integrate them into the application
-    
-    This function:
-    1. Creates the vehicle folder structure (vehicles/<carid>/SKINNAME)
-    2. Copies and processes the JSON file (using edit_material_json)
-    3. Copies and processes the JBEAM file (using edit_jbeam_material)
-    4. Copies the preview image if provided
-    
-    Args:
-        carid: Vehicle ID (e.g., 'ccf')
-        carname: Display name (e.g., 'Hirochi CCF - MOD')
-        json_path: Path to the skin.materials.json file
-        jbeam_path: Path to the JBEAM file with skin definitions
-        image_path: Optional path to preview image (JPG)
-    
-    Returns:
-        True if successful, False otherwise
-    """
+
     print(f"[DEBUG] process_custom_vehicle called")
     print(f"[DEBUG] \n{'='*60}")
     print(f"[DEBUG] PROCESSING VEHICLE: {carname} ({carid})")

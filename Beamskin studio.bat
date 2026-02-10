@@ -1,12 +1,25 @@
 @echo off
-:: BeamSkin Studio - Silent Quick Launcher
-:: No checks, no console windows, just shows loading GUI and launches
+:: BeamSkin Studio - Quick Launcher with Loading Screen
+:: This version shows a loading GUI while the main app starts
 
+:: Check if quick_launcher.py exists
 if exist "launchers-scripts\quick_launcher.py" (
     start "" pythonw "launchers-scripts\quick_launcher.py"
     exit
 ) else (
     echo Error: quick_launcher.py not found in launchers-scripts folder!
-    echo Please make sure the launchers-scripts folder exists with quick_launcher.py inside.
-    pause
+    echo.
+    echo Expected path: %CD%\launchers-scripts\quick_launcher.py
+    echo.
+    echo Falling back to direct launch...
+    
+    if exist "main.py" (
+        start "" pythonw main.py
+        exit
+    ) else (
+        echo main.py also not found!
+        echo Please run this batch file from the BeamSkin Studio root folder.
+        pause
+        exit /b 1
+    )
 )

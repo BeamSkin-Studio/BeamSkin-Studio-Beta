@@ -1,12 +1,15 @@
 import os
 import sys
 import threading
+import platform
 
 # Change working directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print(f"[DEBUG] Working directory: {os.getcwd()}")
+print(f"[DEBUG] Platform: {platform.system()}")
 
+# Windows-specific taskbar icon setup
 if sys.platform == 'win32':
     try:
         import ctypes
@@ -17,7 +20,6 @@ if sys.platform == 'win32':
         print(f"[DEBUG] Failed to set AppUserModelID: {e}")
 
 def center_window(window):
-
     print(f"[DEBUG] center_window called")
     """Centers the window on the screen"""
     window.geometry("1600x1200")
@@ -66,6 +68,7 @@ if __name__ == "__main__":
         print(f"\n[DEBUG] ========================================")
         print(f"[DEBUG] BeamSkin Studio Starting...")
         print(f"[DEBUG] Version: {CURRENT_VERSION}")
+        print(f"[DEBUG] Platform: {platform.system()} {platform.release()}")
         print(f"[DEBUG] ========================================\n")
         
     except ImportError as e:
@@ -95,19 +98,31 @@ if __name__ == "__main__":
     print(f"[DEBUG] Bringing window to front...")
     app.lift()
     app.focus_force()
-    app.attributes('-topmost', True)  # Set on top
+    
+    # Platform-specific window management
+    if sys.platform == 'win32':
+        app.attributes('-topmost', True)  # Set on top (Windows)
+    elif sys.platform == 'darwin':
+        # macOS
+        try:
+            app.attributes('-topmost', True)
+        except:
+            pass
+    # Linux/X11 - handled differently, focus_force() is usually sufficient
     
     # CRITICAL: Initialize universal scroll handler BEFORE showing dialogs
     print(f"[DEBUG] Initializing scroll handler...")
     app.after(100, lambda: setup_universal_scroll_handler(app))
     
     # Show WIP warning AFTER a proper delay to ensure window is visible and focused
-    # The key is to wait until the window has finished rendering
     def show_startup_sequence():
         print(f"[DEBUG] show_startup_sequence called")
         """Show startup dialogs in sequence after window is ready"""
         # First remove topmost attribute (after 500ms to ensure window is visible)
-        app.attributes('-topmost', False)
+        try:
+            app.attributes('-topmost', False)
+        except:
+            pass
         
         # Check if setup is complete
         from core.settings import is_setup_complete

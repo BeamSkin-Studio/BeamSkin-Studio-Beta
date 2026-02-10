@@ -1,9 +1,11 @@
 """
 Settings Tab - Application settings and configuration
+Cross-platform path configuration with Linux support
 """
 import customtkinter as ctk
 from tkinter import filedialog
 import os
+import platform
 from gui.state import state
 from core.settings import (
     set_beamng_paths, 
@@ -11,10 +13,11 @@ from core.settings import (
     get_mods_folder_path,
     save_settings
 )
+from utils.config_helper import get_beamng_default_install_paths, get_beamng_mods_default_paths
 
 
 class PathConfigurationSection:
-    """Section for configuring BeamNG.drive paths"""
+    """Section for configuring BeamNG.drive paths - Cross-platform"""
     
     def __init__(self, parent, notification_callback=None):
         """
@@ -25,6 +28,7 @@ class PathConfigurationSection:
             notification_callback: Optional callback for showing notifications
         """
         self.notification_callback = notification_callback
+        self.system = platform.system()
         
         # Main section frame
         self.frame = ctk.CTkFrame(parent, fg_color=state.colors["card_bg"], corner_radius=12)
@@ -40,6 +44,21 @@ class PathConfigurationSection:
             text_color=state.colors["text"],
             anchor="w"
         ).pack(side="left")
+        
+        # Platform indicator
+        platform_emoji = {
+            "Windows": "🪟",
+            "Linux": "🐧",
+            "Darwin": "🍎"
+        }.get(self.system, "💻")
+        
+        ctk.CTkLabel(
+            header_frame,
+            text=f"{platform_emoji} {self.system}",
+            font=ctk.CTkFont(size=12),
+            text_color=state.colors["text_secondary"],
+            anchor="e"
+        ).pack(side="right", padx=(10, 0))
         
         # Description
         ctk.CTkLabel(
@@ -235,11 +254,19 @@ class PathConfigurationSection:
         """Browse for BeamNG.drive installation folder"""
         print("[DEBUG] PathConfiguration._browse_beamng called")
         
+        # Try to get a good initial directory
         initial_dir = get_beamng_install_path()
+        
         if not initial_dir or not os.path.exists(initial_dir):
-            initial_dir = "C:/Program Files (x86)/Steam/steamapps/common" if os.name == 'nt' else "~"
+            # Get platform-specific default paths
+            default_paths = get_beamng_default_install_paths()
+            if default_paths:
+                initial_dir = default_paths[0]
+            else:
+                initial_dir = os.path.expanduser("~")
         
         print(f"[DEBUG] Initial directory: {initial_dir}")
+        print(f"[DEBUG] Platform: {self.system}")
         
         path = filedialog.askdirectory(
             title="Select BeamNG.drive Installation Folder",
@@ -269,14 +296,27 @@ class PathConfigurationSection:
     
     def _browse_mods(self):
         """Browse for BeamNG mods folder"""
+        print("[DEBUG] PathConfiguration._browse_mods called")
+        
+        # Try to get a good initial directory
         initial_dir = get_mods_folder_path()
+        
         if not initial_dir or not os.path.exists(initial_dir):
-            initial_dir = os.path.expanduser("~/AppData/Local/BeamNG.drive") if os.name == 'nt' else "~"
+            # Get platform-specific default paths
+            default_paths = get_beamng_mods_default_paths()
+            if default_paths:
+                initial_dir = default_paths[0]
+            else:
+                initial_dir = os.path.expanduser("~")
+        
+        print(f"[DEBUG] Initial mods directory: {initial_dir}")
         
         path = filedialog.askdirectory(
             title="Select BeamNG Mods Folder",
             initialdir=initial_dir
         )
+        
+        print(f"[DEBUG] User selected mods path: {path}")
         
         if path:
             if self._validate_mods_path(path):
@@ -289,6 +329,7 @@ class PathConfigurationSection:
                         "Mods folder path updated successfully",
                         type="success"
                     )
+                print(f"[DEBUG] Mods path saved successfully")
     
     def _clear_beamng(self):
         """Clear BeamNG installation path"""
@@ -315,7 +356,7 @@ class PathConfigurationSection:
             )
     
     def _validate_beamng_path(self, path: str, show_success: bool = True) -> bool:
-        """Validate BeamNG.drive installation path"""
+        """Validate BeamNG.drive installation path - Cross-platform"""
         if not os.path.exists(path):
             self.beamng_status.configure(
                 text="✗ Path does not exist",
@@ -323,12 +364,36 @@ class PathConfigurationSection:
             )
             return False
         
-        # Check for executable
-        exe_path_64 = os.path.join(path, "Bin64", "BeamNG.drive.x64.exe")
-        exe_path = os.path.join(path, "Bin64", "BeamNG.drive.exe")
-        has_exe = os.path.exists(exe_path_64) or os.path.exists(exe_path)
+        # Platform-specific validation
+        if self.system == "Windows":
+            # Check for executable
+            exe_path_64 = os.path.join(path, "Bin64", "BeamNG.drive.x64.exe")
+            exe_path = os.path.join(path, "Bin64", "BeamNG.drive.exe")
+            has_exe = os.path.exists(exe_path_64) or os.path.exists(exe_path)
         
-        # Check for content folder
+        elif self.system == "Linux":
+            # On Linux, check for BeamNG or BeamNG.drive binary
+            exe_path = os.path.join(path, "BeamNG.drive.x64")
+            exe_path_alt = os.path.join(path, "Bin64", "BeamNG.drive.x64")
+            exe_path_alt2 = os.path.join(path, "BeamNG")
+            has_exe = (os.path.exists(exe_path) or 
+                      os.path.exists(exe_path_alt) or
+                      os.path.exists(exe_path_alt2))
+        
+        elif self.system == "Darwin":
+            # On macOS, it could be a .app bundle
+            if path.endswith(".app"):
+                has_exe = os.path.isdir(path)
+            else:
+                exe_path = os.path.join(path, "BeamNG.drive")
+                exe_path_alt = os.path.join(path, "Bin64", "BeamNG.drive")
+                has_exe = os.path.exists(exe_path) or os.path.exists(exe_path_alt)
+        
+        else:
+            # Unknown platform - just check if directory exists
+            has_exe = True
+        
+        # Check for content folder (common across all platforms)
         content_path = os.path.join(path, "content")
         has_content = os.path.exists(content_path) and os.path.isdir(content_path)
         

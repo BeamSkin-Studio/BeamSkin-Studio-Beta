@@ -538,6 +538,7 @@ class Topbar(ctk.CTkFrame):
             ("Project", "generator"),
             ("How to Use", "howto"),
             ("Car List", "carlist"),
+            ("Add Vehicles", "add_vehicles"),
             ("Settings", "settings"),
             ("About", "about")
         ]

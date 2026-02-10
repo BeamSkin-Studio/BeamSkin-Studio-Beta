@@ -27,6 +27,9 @@ class AboutTab(ctk.CTkFrame):
         # Load logo
         self.logo_image = self._load_logo()
         
+        # Load PayPal logo
+        self.paypal_logo = self._load_paypal_logo()
+        
         self._setup_ui()
     
     def _load_logo(self):
@@ -54,6 +57,27 @@ class AboutTab(ctk.CTkFrame):
                 return None
         except Exception as e:
             print(f"[DEBUG] Failed to load About tab logo: {e}")
+            return None
+    
+    def _load_paypal_logo(self):
+        """Load the PayPal logo"""
+        logo_path = os.path.join("gui", "Icons", "paypal_logo.png")
+        
+        try:
+            if os.path.exists(logo_path):
+                pil_image = Image.open(logo_path)
+                paypal_logo = ctk.CTkImage(
+                    light_image=pil_image,
+                    dark_image=pil_image,
+                    size=(100, 30)  # Logo size to replace button text
+                )
+                print(f"[DEBUG] Loaded PayPal logo from: {logo_path}")
+                return paypal_logo
+            else:
+                print(f"[DEBUG] PayPal logo not found at: {logo_path}")
+                return None
+        except Exception as e:
+            print(f"[DEBUG] Failed to load PayPal logo: {e}")
             return None
     
     def _setup_ui(self):
@@ -121,7 +145,22 @@ class AboutTab(ctk.CTkFrame):
             command=self._open_linktree
         ).pack(pady=5)
         
-        # Version label at bottom
+        # PayPal donate button - Always visible, separate from socials
+        paypal_btn = ctk.CTkButton(
+            about_frame,
+            text="" if self.paypal_logo else "Donate via PayPal",
+            width=140,
+            height=40,
+            font=ctk.CTkFont(size=15),
+            fg_color="#0070BA",  # PayPal blue
+            hover_color="#005EA6",
+            text_color="white",
+            command=self._open_paypal,
+            image=self.paypal_logo if self.paypal_logo else None
+        )
+        paypal_btn.pack(pady=(20, 10))
+        
+        # Version label at bottom - NOW WITH "Version:" PREFIX
         ctk.CTkLabel(
             about_frame,
             text=f"Version: {state.current_version}",
@@ -164,3 +203,7 @@ class AboutTab(ctk.CTkFrame):
         """Open Linktree URL and collapse socials"""
         webbrowser.open("https://linktr.ee/burzt_yt")
         self._toggle_socials()
+    
+    def _open_paypal(self):
+        """Open PayPal donation URL"""
+        webbrowser.open("https://www.paypal.com/paypalme/thedriveryt")

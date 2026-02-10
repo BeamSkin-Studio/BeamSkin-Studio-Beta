@@ -14,7 +14,7 @@ from gui.tabs.settings import SettingsTab
 from gui.tabs.car_list import CarListTab
 from gui.tabs.generator import GeneratorTab
 from gui.tabs.howto import HowToTab
-from gui.tabs.developer import DeveloperTab, load_added_vehicles_at_startup
+from gui.tabs.add_vehicles import AddVehiclesTab, load_added_vehicles_at_startup
 from gui.tabs.about import AboutTab
 
 from utils.debug import setup_universal_scroll_handler
@@ -253,6 +253,12 @@ class BeamSkinStudioApp(ctk.CTk):
         # Car List tab - pass app reference for notifications
         self.tabs["carlist"] = CarListTab(self.main_container, self.preview_manager, self)
         
+        # Add Vehicles tab - pass notification callback
+        self.tabs["add_vehicles"] = AddVehiclesTab(
+            self.main_container,
+            notification_callback=self.show_notification
+        )
+        
         # Settings tab
         self.tabs["settings"] = SettingsTab(
             self.main_container,
@@ -271,8 +277,6 @@ class BeamSkinStudioApp(ctk.CTk):
         print(f"[DEBUG] switch_view called")
         """Switch between main views"""
         print(f"[DEBUG] Switching to view: {view_name}")
-        
-        settings_tab = self.tabs.get("settings")
         
         # Update menu button colors
         for btn_name, btn in self.topbar.menu_buttons.items():
@@ -297,12 +301,6 @@ class BeamSkinStudioApp(ctk.CTk):
         for tab_name, tab in self.tabs.items():
             tab.pack_forget()
         
-        # Hide developer tab if it exists
-        if settings_tab and isinstance(settings_tab, SettingsTab):
-            if settings_tab.developer_tab:
-                settings_tab.developer_tab.pack_forget()
-                print("[DEBUG] Hid developer tab")
-        
         # Hide sidebar for non-generator views
         if view_name != "generator":
             self.sidebar.pack_forget()
@@ -319,16 +317,9 @@ class BeamSkinStudioApp(ctk.CTk):
         if view_name in self.tabs:
             # Show regular tab
             self.tabs[view_name].pack(fill="both", expand=True, side="left")
-            print(f"[DEBUG] Showing regular tab: {view_name}")
-        elif view_name == "developer":
-            if settings_tab and isinstance(settings_tab, SettingsTab):
-                if settings_tab.developer_tab:
-                    settings_tab.developer_tab.pack(fill="both", expand=True, side="left")
-                    print(f"[DEBUG] Successfully showed developer tab")
-                else:
-                    print(f"[DEBUG] ERROR: Developer tab doesn't exist yet - has developer mode been enabled?")
-            else:
-                print(f"[DEBUG] ERROR: Settings tab not found or wrong type")
+            print(f"[DEBUG] Showing tab: {view_name}")
+        else:
+            print(f"[DEBUG] ERROR: Tab '{view_name}' not found")
         
         self.current_tab = view_name
         

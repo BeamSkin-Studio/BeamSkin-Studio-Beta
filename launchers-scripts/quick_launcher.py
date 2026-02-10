@@ -1,5 +1,6 @@
 """
 BeamSkin Studio - Quick Launcher
+Cross-platform splash screen and app launcher
 """
 import customtkinter as ctk
 from PIL import Image
@@ -8,6 +9,7 @@ import sys
 import time
 import threading
 import os
+import platform
 
 COLORS = {
     "bg": "#0a0a0a",           # app_bg
@@ -19,6 +21,7 @@ COLORS = {
 }
 
 print(f"[DEBUG] Loading class: QuickLauncher")
+print(f"[DEBUG] Platform: {platform.system()}")
 
 class QuickLauncher:
     def __init__(self):
@@ -34,10 +37,16 @@ class QuickLauncher:
         self.app.resizable(False, False)
         self.app.configure(fg_color=COLORS["bg"])
         
-        self.app.attributes('-topmost', True)
+        # Platform-specific window setup
+        if platform.system() != "Darwin":  # Not macOS
+            self.app.attributes('-topmost', True)
         
         # Remove window decorations for cleaner look
-        self.app.overrideredirect(True)
+        try:
+            self.app.overrideredirect(True)
+        except:
+            # Some window managers don't support this
+            pass
         
         # Load logo
         self.logo_image = self._load_logo()
@@ -87,17 +96,31 @@ class QuickLauncher:
         parent_dir = os.path.dirname(script_dir)
         main_py_path = os.path.join(parent_dir, "main.py")
         
-        # Launch main app without console window
-        if sys.platform == 'win32':
+        system = platform.system()
+        
+        # Launch main app without console window (platform-specific)
+        if system == 'Windows':
+            # Windows: Use pythonw to avoid console
             self.process = subprocess.Popen(
                 ["pythonw", main_py_path],
                 cwd=parent_dir,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-        else:
+        elif system == 'Darwin':
+            # macOS: Use python3
             self.process = subprocess.Popen(
-                ["python", main_py_path],
-                cwd=parent_dir
+                ["python3", main_py_path],
+                cwd=parent_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            # Linux: Use python3
+            self.process = subprocess.Popen(
+                ["python3", main_py_path],
+                cwd=parent_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
             )
         
         print(f"[DEBUG] main.py launched, PID: {self.process.pid}")
