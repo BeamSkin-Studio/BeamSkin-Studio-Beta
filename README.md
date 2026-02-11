@@ -3,7 +3,7 @@
 ## Installation
 
 1. **Download the repository**
-- download as zip
+- Press on the green button "Code" and select "Download ZIP"
 
 
 

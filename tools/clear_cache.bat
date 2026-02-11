@@ -1,13 +1,10 @@
 @echo off
-REM Clear All Cache for BeamSkin Studio
-REM This script removes all cache files and temporary data
 
 echo ========================================
 echo BeamSkin Studio - Clear Cache
 echo ========================================
 echo.
 
-REM Change to parent directory (main program folder)
 cd /d "%~dp0\.."
 
 echo Current directory: %CD%
@@ -42,7 +39,6 @@ echo.
 
 set "DELETED_COUNT=0"
 
-REM Delete Python cache folders (__pycache__)
 echo [1/5] Removing Python cache folders...
 for /d /r . %%d in (__pycache__) do (
     if exist "%%d" (
@@ -52,7 +48,6 @@ for /d /r . %%d in (__pycache__) do (
     )
 )
 
-REM Delete .pyc files
 echo.
 echo [2/5] Removing compiled Python files (.pyc)...
 for /r . %%f in (*.pyc) do (
@@ -63,7 +58,6 @@ for /r . %%f in (*.pyc) do (
     )
 )
 
-REM Delete .pyo files
 echo.
 echo [3/5] Removing optimized Python files (.pyo)...
 for /r . %%f in (*.pyo) do (
@@ -74,7 +68,6 @@ for /r . %%f in (*.pyo) do (
     )
 )
 
-REM Delete temporary preview images (if they exist)
 echo.
 echo [4/5] Checking for temporary files...
 if exist "temp" (
@@ -93,7 +86,6 @@ if exist "*.tmp" (
     set /a DELETED_COUNT+=1
 )
 
-REM Delete log files (optional)
 echo.
 echo [5/5] Checking for log files...
 if exist "*.log" (
@@ -109,7 +101,6 @@ if exist "*.log" (
     echo   No log files found.
 )
 
-REM Delete Windows thumbnail cache (optional, in current directory only)
 if exist "Thumbs.db" (
     echo   Deleting Thumbs.db...
     del /f /q /a "Thumbs.db" 2>nul

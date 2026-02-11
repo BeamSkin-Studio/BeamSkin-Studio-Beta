@@ -1,8 +1,5 @@
 @echo off
-:: BeamSkin Studio - Quick Launcher with Loading Screen
-:: This version shows a loading GUI while the main app starts
 
-:: Check if quick_launcher.py exists
 if exist "launchers-scripts\quick_launcher.py" (
     start "" pythonw "launchers-scripts\quick_launcher.py"
     exit

@@ -5,20 +5,17 @@ import customtkinter as ctk
 from typing import Dict, Tuple, List
 from gui.state import state
 
-
 class HowToTab(ctk.CTkFrame):
     """Professional documentation tab with comprehensive BeamSkin Studio guide"""
-    
+
     def __init__(self, parent: ctk.CTk):
         super().__init__(parent, fg_color=state.colors["app_bg"])
-        
-        # UI references
+
         self.content_textbox: ctk.CTkTextbox = None
         self.search_entry: ctk.CTkEntry = None
         self.chapter_buttons: List[Tuple[ctk.CTkButton, str]] = []
         self.current_chapter: str = "all"
-        
-        # Enhanced chapter structure with icons and better organization
+
         self.chapters = {
             "getting_started": {
                 "icon": "🚀",
@@ -61,17 +58,16 @@ class HowToTab(ctk.CTkFrame):
                 "content": self._chapter_faq()
             }
         }
-        
+
         self._setup_ui()
-        self.load_all_chapters()  # Load all chapters by default
-    
+        self.load_all_chapters()
+
     def _setup_ui(self):
         """Set up the modern How-To tab UI"""
-        # Main container
+
         main_container = ctk.CTkFrame(self, fg_color="transparent")
         main_container.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Header section
+
         header_frame = ctk.CTkFrame(
             main_container,
             fg_color=state.colors["frame_bg"],
@@ -80,11 +76,10 @@ class HowToTab(ctk.CTkFrame):
         )
         header_frame.pack(fill="x", pady=(0, 15))
         header_frame.pack_propagate(False)
-        
-        # Title and description
+
         title_container = ctk.CTkFrame(header_frame, fg_color="transparent")
         title_container.pack(side="left", padx=20, pady=15)
-        
+
         ctk.CTkLabel(
             title_container,
             text="📚 How to Use BeamSkin Studio",
@@ -92,7 +87,7 @@ class HowToTab(ctk.CTkFrame):
             text_color=state.colors["text"],
             anchor="w"
         ).pack(anchor="w")
-        
+
         ctk.CTkLabel(
             title_container,
             text="Complete guide to creating and managing vehicle skins for BeamNG.drive",
@@ -100,18 +95,17 @@ class HowToTab(ctk.CTkFrame):
             text_color=state.colors["text_secondary"],
             anchor="w"
         ).pack(anchor="w", pady=(5, 0))
-        
-        # Search box in header
+
         search_container = ctk.CTkFrame(header_frame, fg_color="transparent")
         search_container.pack(side="right", padx=20, pady=15)
-        
+
         ctk.CTkLabel(
             search_container,
             text="🔍",
             font=ctk.CTkFont(size=18),
             text_color=state.colors["text_secondary"]
         ).pack(side="left", padx=(0, 8))
-        
+
         self.search_entry = ctk.CTkEntry(
             search_container,
             placeholder_text="Search documentation...",
@@ -123,16 +117,14 @@ class HowToTab(ctk.CTkFrame):
         )
         self.search_entry.pack(side="left")
         self.search_entry.bind("<Return>", lambda e: self._search_content())
-        
-        # Navigation frame with chapter buttons
+
         nav_frame = ctk.CTkFrame(
             main_container,
             fg_color=state.colors["frame_bg"],
             corner_radius=12
         )
         nav_frame.pack(fill="x", pady=(0, 15))
-        
-        # "View All" button
+
         self.view_all_btn = ctk.CTkButton(
             nav_frame,
             text="📖 View All",
@@ -146,11 +138,10 @@ class HowToTab(ctk.CTkFrame):
             corner_radius=8
         )
         self.view_all_btn.pack(side="left", padx=10, pady=10)
-        
-        # Chapter navigation buttons
+
         chapters_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
         chapters_container.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=10)
-        
+
         for chapter_key, chapter_data in self.chapters.items():
             btn = ctk.CTkButton(
                 chapters_container,
@@ -166,15 +157,14 @@ class HowToTab(ctk.CTkFrame):
             )
             btn.pack(side="left", padx=3)
             self.chapter_buttons.append((btn, chapter_key))
-        
-        # Content area with scrollable textbox
+
         content_frame = ctk.CTkFrame(
             main_container,
             fg_color=state.colors["frame_bg"],
             corner_radius=12
         )
         content_frame.pack(fill="both", expand=True)
-        
+
         self.content_textbox = ctk.CTkTextbox(
             content_frame,
             font=ctk.CTkFont(size=14),
@@ -184,30 +174,28 @@ class HowToTab(ctk.CTkFrame):
             activate_scrollbars=True
         )
         self.content_textbox.pack(fill="both", expand=True, padx=15, pady=15)
-    
+
     def _search_content(self):
         """Search through documentation content"""
         search_term = self.search_entry.get().lower().strip()
-        
+
         if not search_term:
             self.load_all_chapters()
             return
-        
-        # Search through all chapters
+
         results = []
         for chapter_key, chapter_data in self.chapters.items():
             content = chapter_data['content'].lower()
             if search_term in content:
                 results.append((chapter_key, chapter_data))
-        
-        # Display results
+
         self.content_textbox.configure(state="normal")
         self.content_textbox.delete("0.0", "end")
-        
+
         if results:
             self.content_textbox.insert("0.0", f"🔍 Search Results for '{search_term}'\n")
             self.content_textbox.insert("end", "=" * 60 + "\n\n")
-            
+
             for chapter_key, chapter_data in results:
                 self.content_textbox.insert("end", f"{chapter_data['icon']} {chapter_data['title']}\n")
                 self.content_textbox.insert("end", "-" * 60 + "\n")
@@ -216,74 +204,66 @@ class HowToTab(ctk.CTkFrame):
         else:
             self.content_textbox.insert("0.0", f"❌ No results found for '{search_term}'\n\n")
             self.content_textbox.insert("end", "Try different keywords or browse chapters above.")
-        
+
         self.content_textbox.configure(state="disabled")
-        
-        # Reset View All button when showing search results
+
         self.view_all_btn.configure(
             fg_color=state.colors["card_bg"],
             hover_color=state.colors["card_hover"],
             text_color=state.colors["text"]
         )
-        
-        # Reset all chapter buttons
+
         self._reset_button_colors()
-    
+
     def load_chapter(self, chapter_key: str):
         """Load a specific chapter"""
         if chapter_key not in self.chapters:
             return
-        
+
         chapter_data = self.chapters[chapter_key]
         self.current_chapter = chapter_key
-        
-        # Update content
+
         self.content_textbox.configure(state="normal")
         self.content_textbox.delete("0.0", "end")
-        
-        # Chapter header
+
         self.content_textbox.insert("0.0", f"{chapter_data['icon']} {chapter_data['title']}\n")
         self.content_textbox.insert("end", "=" * 60 + "\n\n")
-        
-        # Chapter content
+
         self.content_textbox.insert("end", chapter_data['content'])
-        
+
         self.content_textbox.configure(state="disabled")
-        
-        # Reset View All button since we're viewing a specific chapter
+
         self.view_all_btn.configure(
             fg_color=state.colors["card_bg"],
             hover_color=state.colors["card_hover"],
             text_color=state.colors["text"]
         )
-        
-        # Update button states
+
         for btn, key in self.chapter_buttons:
             if key == chapter_key:
-                # Selected button: accent color with no hover effect
+
                 btn.configure(
                     fg_color=state.colors["accent"],
-                    hover_color=state.colors["accent"],  # Same as fg_color to disable hover
+                    hover_color=state.colors["accent"],
                     text_color=state.colors["accent_text"]
                 )
             else:
-                # Unselected buttons: normal state with hover
+
                 btn.configure(
                     fg_color=state.colors["card_bg"],
                     hover_color=state.colors["card_hover"],
                     text_color=state.colors["text"]
                 )
-        
+
         print(f"[DEBUG] Loaded chapter: {chapter_data['title']}")
-    
+
     def load_all_chapters(self):
         """Load all chapters in sequence"""
         self.current_chapter = "all"
-        
+
         self.content_textbox.configure(state="normal")
         self.content_textbox.delete("0.0", "end")
-        
-        # Introduction
+
         intro_text = """Welcome to BeamSkin Studio Documentation
 
 This comprehensive guide will help you create, manage, and export custom vehicle skins for BeamNG.drive.
@@ -300,28 +280,25 @@ Let's get started!
 """
         self.content_textbox.insert("0.0", intro_text)
         self.content_textbox.insert("end", "=" * 60 + "\n\n")
-        
-        # Add all chapters in order
+
         for chapter_key, chapter_data in self.chapters.items():
             self.content_textbox.insert("end", f"{chapter_data['icon']} {chapter_data['title']}\n")
             self.content_textbox.insert("end", "-" * 60 + "\n")
             self.content_textbox.insert("end", chapter_data['content'])
             self.content_textbox.insert("end", "\n\n")
-        
+
         self.content_textbox.configure(state="disabled")
-        
-        # Set View All button to selected state (green, no hover)
+
         self.view_all_btn.configure(
             fg_color=state.colors["accent"],
-            hover_color=state.colors["accent"],  # Same as fg_color to disable hover
+            hover_color=state.colors["accent"],
             text_color=state.colors["accent_text"]
         )
-        
-        # Reset all chapter buttons to unselected state
+
         self._reset_button_colors()
-        
+
         print("[DEBUG] Loaded all chapters")
-    
+
     def _reset_button_colors(self):
         """Reset all chapter buttons to default colors"""
         for btn, _ in self.chapter_buttons:
@@ -330,11 +307,7 @@ Let's get started!
                 hover_color=state.colors["card_hover"],
                 text_color=state.colors["text"]
             )
-    
-    # ============================================================================
-    # CHAPTER CONTENT METHODS
-    # ============================================================================
-    
+
     def _chapter_getting_started(self) -> str:
         """Getting Started chapter content"""
         return """Welcome to BeamSkin Studio!
@@ -403,7 +376,7 @@ That's it! Your skin is now ready to use in-game.
 
 Continue to the next chapters for detailed instructions on each feature.
 """
-    
+
     def _chapter_skin_creation(self) -> str:
         """Skin Creation chapter content"""
         return """Creating Professional Vehicle Skins
@@ -419,7 +392,7 @@ Required Format: DDS (DirectDraw Surface)
 Compression Settings:
 • BC3 (DXT5) - Best for color + alpha
 • BC1 (DXT1) - For solid colors without transparency
-• BC7 - Highest quality 
+• BC7 - Highest quality
 
 Recommended Resolutions:
 1:1 Aspect Ratio:
@@ -548,7 +521,7 @@ Before exporting:
 ☐ Master file is saved
 ☐ Ready for testing in-game
 """
-    
+
     def _chapter_project(self) -> str:
         """Project Tab chapter content"""
         return """Using the Project Tab
@@ -771,7 +744,7 @@ Quality Assurance:
 • Get feedback from others
 • Iterate and improve
 """
-    
+
     def _chapter_car_list(self) -> str:
         """Car List chapter content"""
         return """Using the Car List Tab
@@ -1001,7 +974,7 @@ Organization:
 • Keeps work organized
 • Easy to find files later
 """
-    
+
     def _chapter_add_vehicle(self) -> str:
         """Add Vehicle tab chapter content"""
         return """Using the Add Vehicle Tab
@@ -1040,7 +1013,7 @@ Required Method - BeamNG Console:
 
 Console Message Examples:
 "Vehicle replaced: civetta_scintilla" → Use: civetta_scintilla
-"Vehicle replaced: etk800" → Use: etk800  
+"Vehicle replaced: etk800" → Use: etk800
 "Vehicle replaced: custom_mod_car" → Use: custom_mod_car
 "Vehicle replaced: rally_car_2024" → Use: rally_car_2024
 
@@ -1116,7 +1089,7 @@ How to Verify Correct File:
 1. Open in text editor (Notepad, VS Code)
 2. Should contain entries like:
    • "paint1"
-   • "paint2"  
+   • "paint2"
    • "skin"
    • Material properties
 3. Contains color/texture definitions
@@ -1374,7 +1347,7 @@ Documentation:
 
 Remember: The Car ID must be EXACTLY as shown in the BeamNG.drive console. This cannot be emphasized enough - it's the #1 cause of issues!
 """
-    
+
     def _chapter_developer_mode(self) -> str:
         """Developer Mode chapter content"""
         return """Developer Mode - Advanced Vehicle Integration
@@ -1663,7 +1636,7 @@ Material Names:
 
 The Developer Mode is powerful but requires careful attention to detail. Always verify your Car ID and test thoroughly!
 """
-    
+
     def _chapter_troubleshooting(self) -> str:
         """Troubleshooting chapter content"""
         return """Troubleshooting Common Issues
@@ -1945,7 +1918,7 @@ macOS: ~/Library/Application Support/BeamNG.drive/current/mods
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Windows Path Problems:
-• Avoid special characters: !@#$%^&*()
+• Avoid special characters: !@
 • No spaces in folder names (use underscores)
 • Keep paths reasonably short
 • Use forward / or double backslash \\
@@ -2010,7 +1983,7 @@ Quality Workflow:
 8. Generate final mod
 9. Test thoroughly
 10. Share with confidence"""
-    
+
     def _chapter_advanced(self) -> str:
         """Advanced Topics chapter content"""
         return """Advanced Topics
@@ -2120,7 +2093,7 @@ Community Best Practices:
 • Respond to user feedback
 • Regular updates and bug fixes
 """
-    
+
     def _chapter_faq(self) -> str:
         """FAQ chapter content"""
         return """Frequently Asked Questions
