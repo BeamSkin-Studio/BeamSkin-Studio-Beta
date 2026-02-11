@@ -39,6 +39,8 @@
 
 ## Troubleshooting
 
+**Antivirus / Windows Defender Warnings:** Virus scanners may give false positive warnings, including Windows Defender, Windows SmartScreen, and other antivirus software. This is common with Python applications. The application is safe to use. If you encounter warnings, click "More info" and "Run anyway" on SmartScreen, or add an exception in your antivirus software.
+
 If you get a `ModuleNotFoundError`, make sure everything was installed correctly,
 
-if u get errors, please submit what error u are getting on github > issues and telll me how I can replicate it
+if u get errors, please submit what error u are getting on github > issues and telll me how I can replicate it

@@ -86,6 +86,9 @@ class GeneratorTab(ctk.CTkFrame):
 
         self.selected_skin_index: Optional[int] = None
         self.editing_mode: bool = False
+        
+        self.add_skin_section_label: Optional[ctk.CTkLabel] = None
+        self.add_skin_section_card: Optional[ctk.CTkFrame] = None
 
         self.car_id_list = self._build_car_id_list()
 
@@ -218,15 +221,19 @@ class GeneratorTab(ctk.CTkFrame):
             text_color=state.colors["accent"]
         )
 
-        ctk.CTkLabel(
+        self.add_skin_section_label = ctk.CTkLabel(
             self.generator_scroll,
             text="Add Skins to Selected Car",
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color=state.colors["text"]
-        ).pack(anchor="w", padx=20, pady=(20, 5))
+        )
+        self.add_skin_section_label.pack(anchor="w", padx=20, pady=(20, 5))
+        self.add_skin_section_label.pack_forget()  # Hide initially
 
         skin_card = self._create_card(self.generator_scroll)
         skin_card.pack(fill="x", padx=20, pady=(0, 15))
+        skin_card.pack_forget()  # Hide initially
+        self.add_skin_section_card = skin_card
 
         header_row = ctk.CTkFrame(skin_card, fg_color="transparent")
         header_row.pack(fill="x", padx=15, pady=(15, 5))
@@ -467,10 +474,10 @@ class GeneratorTab(ctk.CTkFrame):
             command=self.browse_dds,
             width=100,
             height=36,
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=state.colors["accent"],
+            hover_color=state.colors["accent_hover"],
+            text_color=state.colors["accent_text"],
+            font=ctk.CTkFont(size=11, weight="bold"),
             corner_radius=8
         )
         dds_browse.pack(side="right")
@@ -637,6 +644,13 @@ class GeneratorTab(ctk.CTkFrame):
 
             if self.selected_car_for_skin == car_instance_id:
                 self.selected_car_for_skin = None
+            
+            # Hide the add skin section if no cars remain
+            if not self.project_data["cars"]:
+                if self.add_skin_section_label:
+                    self.add_skin_section_label.pack_forget()
+                if self.add_skin_section_card:
+                    self.add_skin_section_card.pack_forget()
 
             car_name = state.vehicle_ids.get(base_carid, base_carid)
             self.show_notification(f"Removed {car_name}", "info")
@@ -668,6 +682,12 @@ class GeneratorTab(ctk.CTkFrame):
 
             self.selected_car_for_skin = car_instance_id
             print(f"[DEBUG] Selected car for adding skins: {car_instance_id}")
+            
+            # Show the add skin section
+            if self.add_skin_section_label:
+                self.add_skin_section_label.pack(anchor="w", padx=20, pady=(20, 5))
+            if self.add_skin_section_card:
+                self.add_skin_section_card.pack(fill="x", padx=20, pady=(0, 15))
 
             if not self.editing_mode:
                 self._reset_skin_form_fields()
@@ -2024,6 +2044,13 @@ class GeneratorTab(ctk.CTkFrame):
                     self.author_entry_sidebar.delete(0, "end")
                     self.author_entry_sidebar.insert(0, loaded_data["author"])
                     self.author_entry_sidebar.configure(text_color=state.colors["text"])
+                
+                # Hide the add skin section if loaded project has no cars
+                if not loaded_data.get("cars"):
+                    if self.add_skin_section_label:
+                        self.add_skin_section_label.pack_forget()
+                    if self.add_skin_section_card:
+                        self.add_skin_section_card.pack_forget()
 
                 print(f"[DEBUG] Project loaded from: {filename}")
                 self.show_notification(f"Loaded project with {len(loaded_data['cars'])} cars", "success")
@@ -2061,6 +2088,12 @@ class GeneratorTab(ctk.CTkFrame):
             self._update_button_ui()
 
             self._reset_skin_form_fields()
+            
+            # Hide the add skin section when no cars exist
+            if self.add_skin_section_label:
+                self.add_skin_section_label.pack_forget()
+            if self.add_skin_section_card:
+                self.add_skin_section_card.pack_forget()
 
             if self.mod_name_entry_sidebar:
                 self.mod_name_entry_sidebar.delete(0, "end")

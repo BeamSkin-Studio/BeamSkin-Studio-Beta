@@ -397,7 +397,14 @@ class PathConfigurationSection:
         return True
 
     def _validate_mods_path(self, path: str, show_success: bool = True) -> bool:
-        """Validate mods folder path"""
+        """Validate mods folder path - accepts any existing directory named 'mods'"""
+        if not path or not path.strip():
+            self.mods_status.configure(
+                text="✗ No path provided",
+                text_color=state.colors["error"]
+            )
+            return False
+            
         if not os.path.exists(path):
             self.mods_status.configure(
                 text="✗ Path does not exist",
@@ -412,13 +419,25 @@ class PathConfigurationSection:
             )
             return False
 
-        if show_success:
-            self.mods_status.configure(
-                text="✓ Valid mods folder",
-                text_color=state.colors["success"]
-            )
+        # Check if the folder is named "mods" or is clearly a mods folder
+        folder_name = os.path.basename(path).lower()
+        if folder_name != "mods":
+            # Allow it anyway but show a warning
+            if show_success:
+                self.mods_status.configure(
+                    text="⚠ Valid directory (not named 'mods', but accepted)",
+                    text_color=state.colors["warning"]
+                )
+            else:
+                self.mods_status.configure(text="")
         else:
-            self.mods_status.configure(text="")
+            if show_success:
+                self.mods_status.configure(
+                    text="✓ Valid mods folder",
+                    text_color=state.colors["success"]
+                )
+            else:
+                self.mods_status.configure(text="")
 
         return True
 

@@ -163,8 +163,13 @@ def get_beamng_mods_default_paths():
         import getpass
         username = getpass.getuser()
         paths.extend([
+            # Version-specific paths (newer structure)
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "0.33", "mods"),
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "mods"),
+            # Current/mods path (alternative structure)
+            os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG", "BeamNG.drive", "current", "mods"),
+            os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "current", "mods"),
+            # Documents location
             os.path.join("C:\\Users", username, "Documents", "BeamNG.drive", "mods")
         ])
 
@@ -172,6 +177,9 @@ def get_beamng_mods_default_paths():
         paths.extend([
             os.path.join(home, ".local", "share", "BeamNG.drive", "0.33", "mods"),
             os.path.join(home, ".local", "share", "BeamNG.drive", "mods"),
+            # Current/mods path
+            os.path.join(home, ".local", "share", "BeamNG", "BeamNG.drive", "current", "mods"),
+            os.path.join(home, ".local", "share", "BeamNG.drive", "current", "mods"),
             os.path.join(home, "Documents", "BeamNG.drive", "mods"),
 
             os.path.join(home, ".var", "app", "com.beamng.drive", "data", "BeamNG.drive", "mods")
@@ -181,6 +189,9 @@ def get_beamng_mods_default_paths():
         paths.extend([
             os.path.join(home, "Library", "Application Support", "BeamNG.drive", "0.33", "mods"),
             os.path.join(home, "Library", "Application Support", "BeamNG.drive", "mods"),
+            # Current/mods path
+            os.path.join(home, "Library", "Application Support", "BeamNG", "BeamNG.drive", "current", "mods"),
+            os.path.join(home, "Library", "Application Support", "BeamNG.drive", "current", "mods"),
             os.path.join(home, "Documents", "BeamNG.drive", "mods")
         ])
 

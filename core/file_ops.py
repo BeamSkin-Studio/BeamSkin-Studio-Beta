@@ -11,37 +11,15 @@ import re
 import json
 
 def sanitize_skin_id(name):
-    """
-    Convert skin name to valid ID format for DDS identifiers.
-    Removes spaces entirely (does NOT replace with underscores).
-    Example: "My Cool Skin" -> "mycoolskin"
-    Example: "7-eleven V1" -> "7-elevenV1"
-    """
     return name.replace(" ", "")
 
 def sanitize_folder_name(name):
-    """
-    Convert skin name to valid folder name format.
-    Replaces spaces with underscores.
-    Example: "My Cool Skin" -> "My_Cool_Skin"
-    Example: "7-eleven V1" -> "7-eleven_V1"
-    """
     return name.replace(" ", "_")
 
 def sanitize_mod_name(name):
-    """
-    Clean mod name for file system use.
-    Removes spaces and strips whitespace.
-    """
     return name.strip().replace(" ", "_")
 
 def get_beamng_mods_path():
-    """
-    Get the BeamNG.drive mods folder path from settings.
-    Falls back to default path if not configured.
-
-    Returns: Path to BeamNG mods folder
-    """
 
     try:
         from core.settings import get_mods_folder_path
@@ -68,13 +46,7 @@ def get_beamng_mods_path():
     return default_path
 
 def zip_folder(source_dir, zip_path):
-    """
-    Create a ZIP file from a directory.
 
-    Args:
-        source_dir: Directory to zip
-        zip_path: Path where ZIP file should be created
-    """
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root_dir, _, files in os.walk(source_dir):
             for file in files:
@@ -83,21 +55,7 @@ def zip_folder(source_dir, zip_path):
                 zipf.write(full_path, relative_path)
 
 def validate_and_fix_dds_filenames(skin_folder_path, car_id):
-    """
-    Validates and fixes DDS filenames in a skin folder.
-    Correct format: <carid>_skin_<skinname>.dds
 
-    Args:
-        skin_folder_path: Path to the skin folder containing DDS files
-        car_id: The car ID that should prefix all DDS files
-
-    Returns:
-        dict: {
-            'renamed': [(old_name, new_name), ...],
-            'already_correct': [filename, ...],
-            'errors': [(filename, error_msg), ...]
-        }
-    """
     results = {
         'renamed': [],
         'already_correct': [],
@@ -164,16 +122,7 @@ def validate_and_fix_dds_filenames(skin_folder_path, car_id):
     return results
 
 def process_dds_files_in_mod(temp_mod_root):
-    """
-    Process all DDS files in the mod structure and fix their naming.
-    Searches through vehicles/<carid>/<skinname>/ folders.
 
-    Args:
-        temp_mod_root: Root directory of the temporary mod being built
-
-    Returns:
-        dict: Summary of all DDS file operations across all skins
-    """
     total_results = {
         'renamed': [],
         'already_correct': [],
@@ -228,15 +177,7 @@ def process_dds_files_in_mod(temp_mod_root):
     return total_results
 
 def update_info_json_fields(json_path, config_type, config_name):
-    """
-    Update the 'Config Type' and 'Configuration' fields in the info JSON file using Regex.
-    This preserves comments and handles existing values.
 
-    Args:
-        json_path: Path to the info JSON file
-        config_type: Value for "Config Type" field (e.g., "Police", "Factory")
-        config_name: Value for "Configuration" field (e.g., "Highway Patrol Unit 23")
-    """
     try:
         print(f"[DEBUG] Updating info JSON fields in: {os.path.basename(json_path)}")
 
@@ -267,11 +208,7 @@ def update_info_json_fields(json_path, config_type, config_name):
         return False
 
 def process_skin_config_data(skin_data, base_carid, skin_name, temp_mod_root, template_path):
-    """
-    Process config data for a skin.
-    Copies .pc, .jpg, and generates info_skinname.json in vehicles/<carid>/
-    NOW USES custom configuration name from user input
-    """
+
     if "config_data" not in skin_data:
         return True
 
@@ -381,15 +318,7 @@ def process_skin_config_data(skin_data, base_carid, skin_name, temp_mod_root, te
         return False
 
 def process_material_properties(skin_data, base_carid, skin_id, dest_skin_folder):
-    """
-    Process material properties from skin data and update .materials.json files
 
-    Args:
-        skin_data: Skin dict containing 'material_properties' if present
-        base_carid: Base car ID (e.g., "ccf")
-        skin_id: Sanitized skin name (e.g., "my_custom_skin")
-        dest_skin_folder: Path to destination skin folder
-    """
     if "material_properties" not in skin_data:
         return True
 
@@ -539,7 +468,6 @@ def generate_mod(
     progress_callback=None,
     author=None
 ):
-    """Legacy function for single skin generation"""
 
     print(f"\n{'='*60}")
     print(f"SINGLE SKIN MOD GENERATION")
@@ -600,9 +528,6 @@ def generate_multi_skin_mod(
     output_path=None,
     progress_callback=None
 ):
-    """
-    Generate a mod with multiple cars and multiple skins per car.
-    """
     print(f"\n{'='*60}")
     print(f"MULTI-SKIN MOD GENERATION")
     print(f"{'='*60}")
@@ -788,10 +713,7 @@ def generate_multi_skin_mod(
             shutil.rmtree(temp_dir)
 
 def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
-    """
-    Process all JBEAM files in the folder.
-    Updates skin references, author, and display name.
-    """
+
     for root_dir, _, files in os.walk(folder_path):
         for file in files:
             if not file.endswith(".jbeam"):
@@ -801,6 +723,12 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
 
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
+
+            content = re.sub(
+                r'"([^"]+_skin_)[^"]*("\s*:\s*\{)',
+                rf'"\g<1>{dds_identifier}\g<2>',
+                content
+            )
 
             content = re.sub(
                 r'("authors"\s*:\s*")[^"]*(")',
@@ -815,15 +743,17 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
             )
 
             content = re.sub(
-                r'"([^"]+_skin_)SKINNAME"',
+                r'"([^"]+_skin_)skinname"',
                 rf'"\g<1>{dds_identifier}"',
-                content
+                content,
+                flags=re.IGNORECASE
             )
 
             content = re.sub(
-                r'("globalSkin"\s*:\s*")SKINNAME(")',
+                r'("globalSkin"\s*:\s*")[^"]*(")',
                 rf'\g<1>{dds_identifier}\g<2>',
-                content
+                content,
+                flags=re.IGNORECASE
             )
 
             def replace_extra_skin(match):
@@ -853,12 +783,7 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
                 f.write(content)
 
 def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, dds_identifier):
-    """
-    Process all JSON files in the folder.
-    Updates skin references and texture paths.
-    Skips info_*.json files to avoid conflicts.
-    ONLY updates Stage 2 baseColorMap - leaves Stage 1 untouched.
-    """
+
     for root_dir, _, files in os.walk(folder_path):
         for file in files:
             if not file.endswith(".json") or file.startswith("info"):
@@ -882,11 +807,11 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
                             if "baseColorMap" in stage2:
                                 old_path = stage2["baseColorMap"]
 
-                                if "SKINNAME" in old_path:
+                                if "skinname" in old_path.lower():
 
-                                    new_path = old_path.replace("/SKINNAME/", f"/{skin_folder_name}/")
-                                    new_path = new_path.replace("_skin_SKINNAME.dds", f"_skin_{dds_identifier}.dds")
-                                    print(f"[DEBUG] Replaced SKINNAME placeholder in baseColorMap for {material_key}:")
+                                    new_path = re.sub(r'/skinname/', f'/{skin_folder_name}/', old_path, flags=re.IGNORECASE)
+                                    new_path = re.sub(r'_skin_skinname\.dds', f'_skin_{dds_identifier}.dds', new_path, flags=re.IGNORECASE)
+                                    print(f"[DEBUG] Replaced skinname placeholder in baseColorMap for {material_key}:")
                                 else:
 
                                     new_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{dds_filename}"
@@ -951,14 +876,16 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
             )
 
             content = re.sub(
-                r'/SKINNAME/',
+                r'/skinname/',
                 f'/{skin_folder_name}/',
-                content
+                content,
+                flags=re.IGNORECASE
             )
             content = re.sub(
-                r'_skin_SKINNAME\.dds',
+                r'_skin_skinname\.dds',
                 f'_skin_{dds_identifier}.dds',
-                content
+                content,
+                flags=re.IGNORECASE
             )
 
             with open(file_path, "w", encoding="utf-8") as f:
