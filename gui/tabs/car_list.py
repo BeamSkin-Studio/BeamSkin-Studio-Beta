@@ -215,7 +215,26 @@ class CarListTab(ctk.CTkFrame):
 
     def _get_uv_map(self, carid: str):
         """Search for UV map in BeamNG installation and prompt user to copy it"""
-        beamng_path = r"C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\content\vehicles"
+        # Get BeamNG installation path from user settings
+        from core.settings import get_beamng_install_path
+        
+        beamng_install = get_beamng_install_path()
+        
+        # Check if BeamNG path is configured
+        if not beamng_install:
+            show_notification(self.app, "⚠️ BeamNG.drive installation path not configured. Please set it in Settings.", "warning", 5000)
+            print(f"[DEBUG] UV Map search failed: BeamNG installation path not configured")
+            return
+        
+        # Build the path to the vehicles folder
+        beamng_path = os.path.join(beamng_install, "content", "vehicles")
+        
+        # Check if the vehicles folder exists
+        if not os.path.exists(beamng_path):
+            show_notification(self.app, f"❌ Vehicles folder not found at: {beamng_path}", "error", 5000)
+            print(f"[DEBUG] UV Map search failed: Vehicles folder does not exist - {beamng_path}")
+            return
+        
         zip_file_path = os.path.join(beamng_path, f"{carid}.zip")
 
         if not os.path.exists(zip_file_path):
