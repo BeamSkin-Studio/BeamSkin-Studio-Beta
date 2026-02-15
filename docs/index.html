@@ -163,11 +163,11 @@
     </div>
 
     <div class="download-row">
-        <a id="winLink" href="#" class="dl-btn btn-win">
+        <a id="winLink" href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest" class="dl-btn btn-win">
             <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
             <span id="winVer" class="ver-tag">Loading...</span>
         </a>
-        <a id="linLink" href="#" class="dl-btn btn-linux">
+        <a id="linLink" href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest" class="dl-btn btn-linux">
             <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
             <span id="linVer" class="ver-tag">Loading...</span>
         </a>
@@ -181,25 +181,65 @@
 <script>
     async function updateLinks() {
         const repos = [
-            { id: 'win', url: 'https://api.github.com/repos/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest' },
-            { id: 'lin', url: 'https://api.github.com/repos/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest' }
+            { 
+                id: 'win', 
+                owner: 'BeamSkin-Studio',
+                repo: 'BeamSkin-Studio-Beta'
+            },
+            { 
+                id: 'lin', 
+                owner: 'BeamSkin-Studio',
+                repo: 'BeamSkin-Studio-Linux-Beta'
+            }
         ];
 
         for (const repo of repos) {
             try {
-                const response = await fetch(repo.url);
+                const apiUrl = `https://api.github.com/repos/${repo.owner}/${repo.repo}/releases/latest`;
+                const response = await fetch(apiUrl);
+                
+                // Check for rate limiting
+                if (response.status === 403) {
+                    console.warn('GitHub API rate limit may be exceeded');
+                    document.getElementById(repo.id + 'Ver').innerText = "View on GitHub";
+                    continue;
+                }
+                
+                // Check if response is successful
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
+                // Update version tag
                 if (data.tag_name) {
                     document.getElementById(repo.id + 'Ver').innerText = data.tag_name;
-                    if (data.assets && data.assets.length > 0) {
-                        document.getElementById(repo.id + 'Link').href = data.assets[0].browser_download_url;
-                    } else {
-                        document.getElementById(repo.id + 'Link').href = data.html_url;
-                    }
                 }
-            } catch (e) {
-                document.getElementById(repo.id + 'Ver').innerText = "Check GitHub";
+                
+                // Update download link - prefer the first asset (should be the installer/executable)
+                if (data.assets && data.assets.length > 0) {
+                    // Find the main executable/installer asset
+                    const mainAsset = data.assets.find(asset => 
+                        asset.name.includes('.exe') || 
+                        asset.name.includes('.msi') || 
+                        asset.name.includes('.AppImage') ||
+                        asset.name.includes('.deb') ||
+                        asset.name.includes('.rpm')
+                    ) || data.assets[0]; // Fallback to first asset
+                    
+                    document.getElementById(repo.id + 'Link').href = mainAsset.browser_download_url;
+                } else {
+                    // No assets, link to the release page
+                    document.getElementById(repo.id + 'Link').href = data.html_url;
+                }
+                
+                console.log(`✓ Loaded ${repo.id}: ${data.tag_name}`);
+                
+            } catch (error) {
+                console.error(`Error fetching ${repo.id} release:`, error);
+                document.getElementById(repo.id + 'Ver').innerText = "Latest Release";
+                // Keep the fallback link to releases page (already set in HTML)
             }
         }
     }
@@ -218,6 +258,7 @@
         videoContainer.style.display = 'block';
     }
 
+    // Initialize on page load
     updateLinks();
 </script>
 
