@@ -159,20 +159,20 @@
         <div class="nav-card" onclick="showImage('image5.png')"><img src="image5.png"><span>APP SETTINGS</span></div>
         <div class="nav-card" onclick="showImage('image6.png')"><img src="image6.png"><span>VERSION INFO</span></div>
         <div class="nav-card" onclick="window.open('https://github.com/BeamSkin-Studio', '_blank')">
-            <img src="https://github.blog/wp-content/uploads/2023/01/68747470733a2f2f6f63746f6465782e6769746875622e636f6d2f696d616765732f6d6f6465726e746f6361742e6a7067.jpg?resize=1200%2C630">
+            <img src="https://opengraph.githubassets.com/1/BeamSkin-Studio">
             <span>VIEW SOURCE</span>
         </div>
     </div>
 
     <div class="download-row">
-        <button id="winBtn" class="dl-btn btn-win">
+        <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest/download/BeamSkin-Studio-Beta-Setup.exe" class="dl-btn btn-win">
             <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
-            <span id="winVer" class="ver-tag">Loading...</span>
-        </button>
-        <button id="linBtn" class="dl-btn btn-linux">
+            <span class="ver-tag">Latest Release</span>
+        </a>
+        <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest" class="dl-btn btn-linux">
             <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
-            <span id="linVer" class="ver-tag">Loading...</span>
-        </button>
+            <span class="ver-tag">Latest Release</span>
+        </a>
     </div>
 
     <div class="footer">
@@ -181,33 +181,6 @@
 </div>
 
 <script>
-    const winRepo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
-    const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
-    
-    let winUrl = "";
-    let linuxUrl = "";
-
-    async function getRelease(repo, labelId) {
-        try {
-            const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
-            const data = await response.json();
-            document.getElementById(labelId).innerText = data.tag_name;
-            return (data.assets && data.assets.length > 0) ? data.assets[0].browser_download_url : data.html_url;
-        } catch (err) {
-            document.getElementById(labelId).innerText = "View on GitHub";
-            return `https://github.com/${repo}/releases/latest`;
-        }
-    }
-
-    // Initialize both buttons
-    async function init() {
-        winUrl = await getRelease(winRepo, 'winVer');
-        linuxUrl = await getRelease(linuxRepo, 'linVer');
-    }
-
-    document.getElementById('winBtn').addEventListener('click', () => window.location.href = winUrl);
-    document.getElementById('linBtn').addEventListener('click', () => window.location.href = linuxUrl);
-
     const videoContainer = document.getElementById('videoContainer');
     const imageDisplay = document.getElementById('imageDisplay');
 
@@ -221,8 +194,6 @@
         imageDisplay.style.display = 'none';
         videoContainer.style.display = 'block';
     }
-
-    init();
 </script>
 
 </body>
