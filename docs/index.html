@@ -30,33 +30,36 @@
         .container {
             width: 100%;
             max-width: 1000px;
-            padding: 40px 20px;
+            padding: 10px 20px 40px 20px; /* Reduced top padding to move everything up */
             text-align: center;
         }
 
-        .logo { width: 280px; margin-bottom: 30px; filter: drop-shadow(0 0 15px var(--accent-glow)); }
+        .logo { width: 260px; margin-bottom: 25px; filter: drop-shadow(0 0 15px var(--accent-glow)); }
 
-        /* Video Section */
-        .video-box {
+        /* The Dynamic Display Box */
+        .display-wrapper {
             width: 100%;
             border-radius: 15px;
             border: 2px solid var(--accent);
             box-shadow: 0 0 30px var(--accent-glow);
             overflow: hidden;
-            margin-bottom: 40px;
-            transition: all 0.3s ease;
+            margin-bottom: 30px;
+            background: #000;
+            aspect-ratio: 16 / 9;
+            position: relative;
         }
 
-        /* Animation triggered on click */
-        .video-highlight { animation: flash 1s ease-out; }
-        @keyframes flash {
-            0% { transform: scale(1); box-shadow: 0 0 30px var(--accent); }
-            50% { transform: scale(1.02); box-shadow: 0 0 60px var(--accent); }
-            100% { transform: scale(1); box-shadow: 0 0 30px var(--accent-glow); }
+        .display-content {
+            width: 100%;
+            height: 100%;
+            display: none; /* Hidden by default */
+            object-fit: contain;
         }
 
-        .aspect-ratio { position: relative; padding-bottom: 56.25%; height: 0; }
-        .aspect-ratio iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
+        .active-content { display: block; }
+
+        .aspect-ratio { width: 100%; height: 100%; position: relative; }
+        .aspect-ratio iframe { width: 100%; height: 100%; border: 0; }
 
         /* Grid Section */
         .gallery-grid {
@@ -75,12 +78,11 @@
             cursor: pointer;
             transition: 0.2s;
             position: relative;
-            -webkit-tap-highlight-color: transparent;
         }
 
         .nav-card img { width: 100%; height: 100px; object-fit: cover; opacity: 0.5; transition: 0.3s; pointer-events: none; }
         .nav-card:hover { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
-        .nav-card:active { transform: scale(0.95); } /* Visual feedback on press */
+        .nav-card:active { transform: scale(0.95); }
         .nav-card:hover img { opacity: 1; }
         
         .nav-card span {
@@ -95,13 +97,12 @@
             justify-content: center;
             gap: 20px;
             width: 100%;
-            margin-top: 10px;
         }
 
         .dl-btn {
             flex: 1;
             max-width: 480px;
-            padding: 20px;
+            padding: 18px;
             border-radius: 12px;
             text-decoration: none;
             color: #000;
@@ -118,7 +119,7 @@
 
         .ver-tag { font-size: 11px; text-transform: uppercase; margin-top: 5px; opacity: 0.8; }
 
-        .footer { margin-top: 60px; color: var(--text-mute); }
+        .footer { margin-top: 40px; color: var(--text-mute); }
         .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
 
         @media (max-width: 900px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -130,23 +131,26 @@
 <div class="container">
     <img src="beamSkin_studio_logo.png" alt="BeamSkin Studio" class="logo">
 
-    <div id="videoSection" class="video-box">
-        <div class="aspect-ratio">
-            <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" allowfullscreen></iframe>
+    <div id="displayBox" class="display-wrapper">
+        <div id="videoContainer" class="display-content active-content">
+            <div class="aspect-ratio">
+                <iframe id="youtubeIframe" src="https://www.youtube.com/embed/N1M8Tsnlodw" allowfullscreen></iframe>
+            </div>
         </div>
+        <img id="imageDisplay" class="display-content" src="" alt="Screenshot">
     </div>
 
     <div class="gallery-grid">
-        <div class="nav-card" onclick="jumpToVideo()">
+        <div class="nav-card" onclick="showVideo()">
             <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg">
             <span><i class="fas fa-play"></i> PREVIEW VIDEO</span>
         </div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image1.png"><span>UI PREVIEW</span></div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image2.png"><span>USER GUIDE</span></div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image3.png"><span>CAR DATABASE</span></div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image4.png"><span>MOD TOOLS</span></div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image5.png"><span>APP SETTINGS</span></div>
-        <div class="nav-card" onclick="jumpToVideo()"><img src="image6.png"><span>VERSION INFO</span></div>
+        <div class="nav-card" onclick="showImage('image1.png')"><img src="image1.png"><span>UI PREVIEW</span></div>
+        <div class="nav-card" onclick="showImage('image2.png')"><img src="image2.png"><span>USER GUIDE</span></div>
+        <div class="nav-card" onclick="showImage('image3.png')"><img src="image3.png"><span>CAR DATABASE</span></div>
+        <div class="nav-card" onclick="showImage('image4.png')"><img src="image4.png"><span>MOD TOOLS</span></div>
+        <div class="nav-card" onclick="showImage('image5.png')"><img src="image5.png"><span>APP SETTINGS</span></div>
+        <div class="nav-card" onclick="showImage('image6.png')"><img src="image6.png"><span>VERSION INFO</span></div>
         <div class="nav-card" onclick="window.open('https://github.com/BeamSkin-Studio', '_blank')">
             <img src="https://github.blog/wp-content/uploads/2023/01/68747470733a2f2f6f63746f6465782e6769746875622e636f6d2f696d616765732f6d6f6465726e746f6361742e6a7067.jpg?resize=1200%2C630">
             <span><i class="fab fa-github"></i> VIEW SOURCE</span>
@@ -190,19 +194,33 @@
         }
     }
 
-    // Fixed Scroll Function
-    function jumpToVideo() {
-        const videoElement = document.getElementById('videoSection');
+    // Display Switching Logic
+    const videoContainer = document.getElementById('videoContainer');
+    const imageDisplay = document.getElementById('imageDisplay');
+    const youtubeIframe = document.getElementById('youtubeIframe');
+    const originalVideoSrc = youtubeIframe.src;
+
+    function showImage(src) {
+        // Pause the video by resetting the src (stops the sound)
+        youtubeIframe.src = ""; 
         
-        // Method 1: Scroll into view
-        videoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        videoContainer.classList.remove('active-content');
+        imageDisplay.classList.add('active-content');
+        imageDisplay.src = src;
         
-        // Method 2: Flash animation for feedback
-        videoElement.classList.remove('video-highlight');
-        void videoElement.offsetWidth; // Force CSS refresh
-        videoElement.classList.add('video-highlight');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showVideo() {
+        imageDisplay.classList.remove('active-content');
+        videoContainer.classList.add('active-content');
         
-        console.log("Navigating to video..."); // Check your console (F12) to see if this triggers
+        // Restore video src if it was stopped
+        if (!youtubeIframe.src || youtubeIframe.src === "about:blank") {
+            youtubeIframe.src = originalVideoSrc;
+        }
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     updateLinks();
