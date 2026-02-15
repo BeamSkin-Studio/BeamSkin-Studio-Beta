@@ -165,14 +165,14 @@
     </div>
 
     <div class="download-row">
-        <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest/download/BeamSkin-Studio-Beta-Setup.exe" class="dl-btn btn-win">
+        <button id="winBtn" class="dl-btn btn-win">
             <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
-            <span class="ver-tag">Latest Release</span>
-        </a>
-        <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest" class="dl-btn btn-linux">
+            <span id="winVer" class="ver-tag">Latest Release</span>
+        </button>
+        <button id="linBtn" class="dl-btn btn-linux">
             <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
-            <span class="ver-tag">Latest Release</span>
-        </a>
+            <span id="linVer" class="ver-tag">Latest Release</span>
+        </button>
     </div>
 
     <div class="footer">
@@ -181,6 +181,78 @@
 </div>
 
 <script>
+    const winRepo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
+    const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
+    
+    let winUrl = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest";
+    let linuxUrl = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest";
+
+    async function getRelease(repo, labelId) {
+        try {
+            const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
+            
+            // If rate limited, fall back to direct GitHub page
+            if (response.status === 403) {
+                console.warn(`Rate limited for ${repo}. Using direct GitHub link.`);
+                document.getElementById(labelId).innerText = "Latest Release";
+                return `https://github.com/${repo}/releases/latest`;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`${repo} release data:`, data);
+            
+            // Update version display
+            if (data.tag_name) {
+                document.getElementById(labelId).innerText = data.tag_name;
+            }
+            
+            // If there are assets, use the first one
+            // Otherwise, just link to the release page where user can see all download options
+            if (data.assets && data.assets.length > 0) {
+                console.log(`${repo} assets:`, data.assets.map(a => a.name));
+                return data.assets[0].browser_download_url;
+            } else {
+                console.log(`${repo} has no assets, linking to release page`);
+                return data.html_url;
+            }
+            
+        } catch (err) {
+            console.error(`Error fetching ${repo}:`, err.message);
+            document.getElementById(labelId).innerText = "Latest Release";
+            return `https://github.com/${repo}/releases/latest`;
+        }
+    }
+
+    // Initialize both buttons
+    async function init() {
+        // Fetch both in parallel
+        const [winResult, linuxResult] = await Promise.all([
+            getRelease(winRepo, 'winVer'),
+            getRelease(linuxRepo, 'linVer')
+        ]);
+        
+        winUrl = winResult;
+        linuxUrl = linuxResult;
+        
+        console.log('Download URLs ready:');
+        console.log('Windows:', winUrl);
+        console.log('Linux:', linuxUrl);
+    }
+
+    document.getElementById('winBtn').addEventListener('click', () => {
+        console.log('Redirecting to:', winUrl);
+        window.location.href = winUrl;
+    });
+    
+    document.getElementById('linBtn').addEventListener('click', () => {
+        console.log('Redirecting to:', linuxUrl);
+        window.location.href = linuxUrl;
+    });
+
     const videoContainer = document.getElementById('videoContainer');
     const imageDisplay = document.getElementById('imageDisplay');
 
@@ -194,6 +266,8 @@
         imageDisplay.style.display = 'none';
         videoContainer.style.display = 'block';
     }
+
+    init();
 </script>
 
 </body>
