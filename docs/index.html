@@ -3,243 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeamSkin Studio | Professional Skinning Tool</title>
+    <title>BeamSkin Studio</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --bg: #0d1117;
-            --card-bg: #161b22;
-            --accent: #2ecc71; 
-            /* Unified High-Intensity Glow */
-            --glow-primary: 0 0 20px rgba(46, 204, 113, 0.4), 0 0 40px rgba(46, 204, 113, 0.2);
-            --glow-hover: 0 0 30px rgba(46, 204, 113, 0.6), 0 0 60px rgba(46, 204, 113, 0.3);
-            
-            --text-dim: #8b949e;
-            --white: #f0f6fc;
-            --linux-color: #f39c12;
-            --linux-glow: 0 0 20px rgba(243, 156, 18, 0.4), 0 0 40px rgba(243, 156, 18, 0.2);
+            --bg: #05070a;
+            --surface: #0f1218;
+            --accent: #2ecc71;
+            --accent-glow: rgba(46, 204, 113, 0.6);
+            --linux: #f39c12;
+            --linux-glow: rgba(243, 156, 18, 0.4);
+            --text: #ffffff;
+            --text-mute: #94a3b8;
         }
 
         body {
             background-color: var(--bg);
-            color: var(--white);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
             margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            overflow-x: hidden;
+            scroll-behavior: smooth;
         }
 
         .container {
-            max-width: 1100px;
-            width: 90%;
-            text-align: center;
-            padding: 60px 0;
-        }
-
-        .logo {
-            width: 280px;
-            height: auto;
-            margin-bottom: 10px;
-            filter: drop-shadow(0 0 15px rgba(46, 204, 113, 0.4));
-        }
-
-        .description { color: var(--text-dim); font-size: 1.2rem; margin-bottom: 40px; }
-
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 30px; 
-            margin: 40px 0;
-        }
-
-        .screenshot-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--accent); /* Constant green border */
-            transition: all 0.3s ease;
-            text-align: left;
-            cursor: pointer;
-            /* Same glow as the buttons */
-            box-shadow: var(--glow-primary);
-        }
-
-        .screenshot-card:hover {
-            transform: translateY(-8px);
-            box-shadow: var(--glow-hover);
-            filter: brightness(1.1);
-        }
-
-        .screenshot-card img {
             width: 100%;
-            height: 220px;
-            object-fit: cover;
-            display: block;
-            border-bottom: 1px solid var(--accent);
+            max-width: 1100px;
+            padding: 40px 20px;
+            text-align: center;
         }
 
-        .card-text { padding: 15px; }
-        .card-text h3 { margin: 0; font-size: 1rem; color: var(--accent); }
-        .card-text p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-dim); }
+        .logo { width: 280px; margin-bottom: 30px; filter: drop-shadow(0 0 15px var(--accent-glow)); }
 
-        .download-section {
+        /* Video Box Highlight */
+        .video-box {
+            width: 100%;
+            border-radius: 15px;
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 30px var(--accent-glow);
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .video-highlight { animation: flash 1.5s ease-out; }
+        @keyframes flash {
+            0% { box-shadow: 0 0 0px var(--accent); }
+            50% { box-shadow: 0 0 60px var(--accent); }
+            100% { box-shadow: 0 0 30px var(--accent-glow); }
+        }
+
+        .aspect-ratio { position: relative; padding-bottom: 56.25%; height: 0; }
+        .aspect-ratio iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
+
+        /* Perfect 2x4 Grid */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .nav-card {
+            background: var(--surface);
+            border-radius: 10px;
+            border: 1px solid #222;
+            overflow: hidden;
+            cursor: pointer;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .nav-card img { width: 100%; height: 100px; object-fit: cover; opacity: 0.5; transition: 0.3s; }
+        .nav-card:hover { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); transform: scale(1.02); }
+        .nav-card:hover img { opacity: 1; }
+        
+        .nav-card span {
+            position: absolute; bottom: 6px; width: 100%; font-size: 11px; 
+            font-weight: 900; color: var(--accent); text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* Download Section Under Grid */
+        .download-row {
             display: flex;
             justify-content: center;
-            gap: 30px;
-            flex-wrap: wrap;
-            margin: 50px 0 90px 0;
+            gap: 20px;
+            width: 100%;
+            margin-top: 10px;
         }
 
-        .download-btn {
-            color: #000;
-            padding: 22px 45px;
-            border-radius: 14px;
+        .dl-btn {
+            flex: 1;
+            max-width: 480px;
+            padding: 20px;
+            border-radius: 12px;
             text-decoration: none;
+            color: #000;
             font-weight: 900;
-            font-size: 1.2rem;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
-            cursor: pointer;
-            border: none;
-            transition: all 0.3s ease;
-            min-width: 280px;
+            transition: 0.3s;
         }
 
-        .btn-win {
-            background-color: var(--accent);
-            box-shadow: var(--glow-primary);
+        .btn-win { background: var(--accent); box-shadow: 0 0 25px var(--accent-glow); }
+        .btn-linux { background: var(--linux); box-shadow: 0 0 25px var(--linux-glow); }
+        .dl-btn:hover { transform: translateY(-5px); filter: brightness(1.2); }
+
+        .ver-tag { font-size: 11px; text-transform: uppercase; margin-top: 5px; opacity: 0.8; }
+
+        .footer {
+            margin: 60px 0 20px 0;
+            color: var(--text-mute);
+            font-size: 1rem;
         }
 
-        .btn-linux {
-            background-color: var(--linux-color);
-            box-shadow: var(--linux-glow);
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: bold;
+            transition: 0.2s;
         }
 
-        .download-btn:hover {
-            transform: scale(1.08);
-            filter: brightness(1.2);
-            box-shadow: 0 0 30px white, 0 0 60px rgba(255, 255, 255, 0.2);
+        .footer a:hover { text-shadow: 0 0 15px var(--accent-glow); }
+
+        @media (max-width: 900px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { 
+            .download-row { flex-direction: column; align-items: center; }
+            .dl-btn { width: 100%; }
         }
-
-        .version-label { font-size: 0.75rem; font-weight: 400; opacity: 1; color: rgba(0,0,0,0.7); }
-
-        .video-wrapper { 
-            width: 100%; 
-            max-width: 850px; 
-            margin: 0 auto 100px auto; 
-            border-radius: 22px;
-            /* Video now has the intense glow too */
-            box-shadow: var(--glow-primary);
-            border: 2px solid var(--accent);
-        }
-
-        .video-container {
-            position: relative; padding-bottom: 56.25%; height: 0;
-            border-radius: 20px; overflow: hidden;
-        }
-        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
-
-        #lightbox {
-            display: none; position: fixed; z-index: 9999;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); justify-content: center; align-items: center; cursor: zoom-out;
-        }
-        #lightbox img { 
-            max-width: 95%; max-height: 90%; border-radius: 8px; 
-            border: 3px solid var(--accent); 
-            box-shadow: var(--glow-hover);
-        }
-
-        footer { padding: 60px; border-top: 1px solid #30363d; width: 100%; text-align: center; color: var(--text-dim); }
-
-        @media (max-width: 900px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 700px) { .download-section { flex-direction: column; align-items: center; } }
-        @media (max-width: 600px) { .gallery { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
-    <div id="lightbox" onclick="this.style.display='none'">
-        <img src="" id="lightboxImg">
-    </div>
+<div class="container">
+    <img src="beamSkin_studio_logo.png" alt="BeamSkin Studio" class="logo">
 
-    <div class="container">
-        <img src="beamSkin_studio_logo.png" alt="BeamSkin Studio" class="logo">
-        <p class="description">Streamlined vehicle skinning for the BeamNG.drive community.</p>
-
-        <div class="gallery">
-            <div class="screenshot-card" onclick="openLightbox('image1.png')">
-                <img src="image1.png"><div class="card-text"><h3>Project Management</h3><p>Manage mod metadata & files.</p></div>
-            </div>
-            <div class="screenshot-card" onclick="openLightbox('image2.png')">
-                <img src="image2.png"><div class="card-text"><h3>Documentation</h3><p>Full "How to Use" guide.</p></div>
-            </div>
-            <div class="screenshot-card" onclick="openLightbox('image3.png')">
-                <img src="image3.png"><div class="card-text"><h3>Car Database</h3><p>UV maps & IDs.</p></div>
-            </div>
-            <div class="screenshot-card" onclick="openLightbox('image4.png')">
-                <img src="image4.png"><div class="card-text"><h3>Add Vehicles</h3><p>Integrate custom vehicle mods.</p></div>
-            </div>
-            <div class="screenshot-card" onclick="openLightbox('image5.png')">
-                <img src="image5.png"><div class="card-text"><h3>Settings</h3><p>Configure paths & themes.</p></div>
-            </div>
-            <div class="screenshot-card" onclick="openLightbox('image6.png')">
-                <img src="image6.png"><div class="card-text"><h3>About</h3><p>Version details & credits.</p></div>
-            </div>
-        </div>
-
-        <div class="download-section">
-            <button id="winBtn" class="download-btn btn-win">
-                <span><i class="fab fa-windows"></i> Download for Windows</span>
-                <span id="winVersion" class="version-label">Detecting...</span>
-            </button>
-            <button id="linuxBtn" class="download-btn btn-linux">
-                <span><i class="fab fa-linux"></i> Download for Linux</span>
-                <span id="linuxVersion" class="version-label">Detecting...</span>
-            </button>
-        </div>
-
-        <div class="video-wrapper">
-            <div class="video-container">
-                <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" title="Preview" allowfullscreen></iframe>
-            </div>
+    <div id="videoSection" class="video-box">
+        <div class="aspect-ratio">
+            <iframe id="mainVideo" src="https://www.youtube.com/embed/N1M8Tsnlodw" allowfullscreen></iframe>
         </div>
     </div>
 
-    <footer>
-        <p>Project maintained by <a href="https://github.com/BeamSkin-Studio" style="color:var(--accent); text-decoration:none;">@Burzt_YT</a></p>
-    </footer>
+    <div class="gallery-grid">
+        <div class="nav-card" onclick="scrollToVideo()">
+            <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg">
+            <span><i class="fas fa-play"></i> PREVIEW VIDEO</span>
+        </div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image1.png"><span>UI PREVIEW</span></div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image2.png"><span>USER GUIDE</span></div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image3.png"><span>CAR DATABASE</span></div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image4.png"><span>MOD TOOLS</span></div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image5.png"><span>APP SETTINGS</span></div>
+        <div class="nav-card" onclick="scrollToVideo()"><img src="image6.png"><span>VERSION INFO</span></div>
+        <div class="nav-card" onclick="window.open('https://github.com/BeamSkin-Studio', '_blank')">
+            <img src="https://github.blog/wp-content/uploads/2023/01/68747470733a2f2f6f63746f6465782e6769746875622e636f6d2f696d616765732f6d6f6465726e746f6361742e6a7067.jpg?resize=1200%2C630">
+            <span><i class="fab fa-github"></i> VIEW SOURCE</span>
+        </div>
+    </div>
 
-    <script>
-        const winRepo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
-        const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
-        let winUrl = ""; let linuxUrl = "";
+    <div class="download-row">
+        <a href="#" id="winLink" class="dl-btn btn-win">
+            <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
+            <span id="winVer" class="ver-tag">Fetching...</span>
+        </a>
+        <a href="#" id="linLink" class="dl-btn btn-linux">
+            <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
+            <span id="linVer" class="ver-tag">Fetching...</span>
+        </a>
+    </div>
 
-        async function getRelease(repo, labelId) {
-            try {
-                const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
-                const data = await response.json();
-                document.getElementById(labelId).innerText = "Version: " + data.tag_name;
-                return (data.assets && data.assets.length > 0) ? data.assets[0].browser_download_url : data.html_url;
-            } catch (err) {
-                document.getElementById(labelId).innerText = "View on GitHub";
-                return `https://github.com/${repo}/releases/latest`;
-            }
+    <div class="footer">
+        Project made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a>
+    </div>
+</div>
+
+<script>
+    const WIN_REPO = "BeamSkin-Studio/BeamSkin-Studio-Beta";
+    const LIN_REPO = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
+
+    async function updateLinks() {
+        try {
+            const [winRes, linRes] = await Promise.all([
+                fetch(`https://api.github.com/repos/${WIN_REPO}/releases/latest`).then(r => r.json()),
+                fetch(`https://api.github.com/repos/${LIN_REPO}/releases/latest`).then(r => r.json())
+            ]);
+            document.getElementById('winVer').innerText = "Latest: " + (winRes.tag_name || "Beta");
+            document.getElementById('winLink').href = winRes.assets[0]?.browser_download_url || winRes.html_url;
+            document.getElementById('linVer').innerText = "Latest: " + (linRes.tag_name || "Beta");
+            document.getElementById('linLink').href = linRes.assets[0]?.browser_download_url || linRes.html_url;
+        } catch (e) {
+            document.getElementById('winVer').innerText = "Visit GitHub";
+            document.getElementById('linVer').innerText = "Visit GitHub";
         }
+    }
 
-        async function init() {
-            winUrl = await getRelease(winRepo, 'winVersion');
-            linuxUrl = await getRelease(linuxRepo, 'linuxVersion');
-        }
+    function scrollToVideo() {
+        const video = document.getElementById('videoSection');
+        video.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        video.classList.remove('video-highlight');
+        void video.offsetWidth; 
+        video.classList.add('video-highlight');
+    }
 
-        document.getElementById('winBtn').addEventListener('click', () => window.location.href = winUrl);
-        document.getElementById('linuxBtn').addEventListener('click', () => window.location.href = linuxUrl);
-        function openLightbox(imgSrc) { document.getElementById('lightboxImg').src = imgSrc; document.getElementById('lightbox').style.display = 'flex'; }
-        init();
-    </script>
+    updateLinks();
+</script>
+
 </body>
 </html>
