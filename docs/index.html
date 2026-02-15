@@ -10,13 +10,14 @@
             --bg: #0d1117;
             --card-bg: #161b22;
             --accent: #2ecc71; 
-            /* High-intensity glow colors */
-            --accent-glow: rgba(46, 204, 113, 0.4);
-            --accent-bloom: rgba(46, 204, 113, 0.15);
+            /* Unified High-Intensity Glow */
+            --glow-primary: 0 0 20px rgba(46, 204, 113, 0.4), 0 0 40px rgba(46, 204, 113, 0.2);
+            --glow-hover: 0 0 30px rgba(46, 204, 113, 0.6), 0 0 60px rgba(46, 204, 113, 0.3);
+            
             --text-dim: #8b949e;
             --white: #f0f6fc;
             --linux-color: #f39c12;
-            --linux-glow: rgba(243, 156, 18, 0.4);
+            --linux-glow: 0 0 20px rgba(243, 156, 18, 0.4), 0 0 40px rgba(243, 156, 18, 0.2);
         }
 
         body {
@@ -41,8 +42,7 @@
             width: 280px;
             height: auto;
             margin-bottom: 10px;
-            /* Stronger Logo Glow */
-            filter: drop-shadow(0 0 15px var(--accent-glow));
+            filter: drop-shadow(0 0 15px rgba(46, 204, 113, 0.4));
         }
 
         .description { color: var(--text-dim); font-size: 1.2rem; margin-bottom: 40px; }
@@ -50,7 +50,7 @@
         .gallery {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 25px; 
+            gap: 30px; 
             margin: 40px 0;
         }
 
@@ -58,22 +58,18 @@
             background: var(--card-bg);
             border-radius: 12px;
             overflow: hidden;
-            border: 1px solid rgba(46, 204, 113, 0.3); /* Tinted border */
+            border: 1px solid var(--accent); /* Constant green border */
             transition: all 0.3s ease;
             text-align: left;
             cursor: pointer;
-            /* Layered glow for depth */
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5), 
-                        0 0 15px var(--accent-bloom);
+            /* Same glow as the buttons */
+            box-shadow: var(--glow-primary);
         }
 
         .screenshot-card:hover {
             transform: translateY(-8px);
-            border-color: var(--accent);
-            /* Massive bloom on hover */
-            box-shadow: 0 0 10px var(--accent-glow), 
-                        0 0 30px var(--accent-bloom),
-                        0 0 50px rgba(46, 204, 113, 0.1);
+            box-shadow: var(--glow-hover);
+            filter: brightness(1.1);
         }
 
         .screenshot-card img {
@@ -81,11 +77,11 @@
             height: 220px;
             object-fit: cover;
             display: block;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--accent);
         }
 
         .card-text { padding: 15px; }
-        .card-text h3 { margin: 0; font-size: 1rem; color: var(--accent); text-shadow: 0 0 8px var(--accent-bloom); }
+        .card-text h3 { margin: 0; font-size: 1rem; color: var(--accent); }
         .card-text p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-dim); }
 
         .download-section {
@@ -115,22 +111,18 @@
 
         .btn-win {
             background-color: var(--accent);
-            /* Intense Mint Glow */
-            box-shadow: 0 0 20px var(--accent), 
-                        0 0 40px var(--accent-bloom);
+            box-shadow: var(--glow-primary);
         }
 
         .btn-linux {
             background-color: var(--linux-color);
-            /* Intense Orange Glow */
-            box-shadow: 0 0 20px var(--linux-color), 
-                        0 0 40px rgba(243, 156, 18, 0.2);
+            box-shadow: var(--linux-glow);
         }
 
         .download-btn:hover {
             transform: scale(1.08);
             filter: brightness(1.2);
-            box-shadow: 0 0 30px white, 0 0 60px var(--accent-glow);
+            box-shadow: 0 0 30px white, 0 0 60px rgba(255, 255, 255, 0.2);
         }
 
         .version-label { font-size: 0.75rem; font-weight: 400; opacity: 1; color: rgba(0,0,0,0.7); }
@@ -139,18 +131,28 @@
             width: 100%; 
             max-width: 850px; 
             margin: 0 auto 100px auto; 
-            border-radius: 20px;
-            /* Triple-layer video glow */
-            box-shadow: 0 0 20px var(--accent-glow), 
-                        0 0 40px var(--accent-bloom), 
-                        0 20px 60px rgba(0,0,0,0.8);
+            border-radius: 22px;
+            /* Video now has the intense glow too */
+            box-shadow: var(--glow-primary);
+            border: 2px solid var(--accent);
         }
 
         .video-container {
             position: relative; padding-bottom: 56.25%; height: 0;
-            border-radius: 20px; overflow: hidden; border: 2px solid var(--accent-bloom);
+            border-radius: 20px; overflow: hidden;
         }
         .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+        #lightbox {
+            display: none; position: fixed; z-index: 9999;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); justify-content: center; align-items: center; cursor: zoom-out;
+        }
+        #lightbox img { 
+            max-width: 95%; max-height: 90%; border-radius: 8px; 
+            border: 3px solid var(--accent); 
+            box-shadow: var(--glow-hover);
+        }
 
         footer { padding: 60px; border-top: 1px solid #30363d; width: 100%; text-align: center; color: var(--text-dim); }
 
@@ -160,8 +162,9 @@
     </style>
 </head>
 <body>
-    <div id="lightbox" style="display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; cursor: zoom-out;" onclick="this.style.display='none'">
-        <img src="" id="lightboxImg" style="max-width: 95%; max-height: 90%; border-radius: 8px; border: 2px solid var(--accent); box-shadow: 0 0 30px var(--accent);">
+
+    <div id="lightbox" onclick="this.style.display='none'">
+        <img src="" id="lightboxImg">
     </div>
 
     <div class="container">
@@ -208,23 +211,31 @@
     </div>
 
     <footer>
-        <p>Project maintained by <a href="https://github.com/BeamSkin-Studio" style="color:var(--accent); text-decoration:none; text-shadow: 0 0 5px var(--accent-bloom);">@Burzt_YT</a></p>
+        <p>Project maintained by <a href="https://github.com/BeamSkin-Studio" style="color:var(--accent); text-decoration:none;">@Burzt_YT</a></p>
     </footer>
 
     <script>
-        // ... (Previous JavaScript remains identical)
         const winRepo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
         const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
         let winUrl = ""; let linuxUrl = "";
+
         async function getRelease(repo, labelId) {
             try {
                 const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
                 const data = await response.json();
                 document.getElementById(labelId).innerText = "Version: " + data.tag_name;
                 return (data.assets && data.assets.length > 0) ? data.assets[0].browser_download_url : data.html_url;
-            } catch (err) { document.getElementById(labelId).innerText = "View on GitHub"; return `https://github.com/${repo}/releases/latest`; }
+            } catch (err) {
+                document.getElementById(labelId).innerText = "View on GitHub";
+                return `https://github.com/${repo}/releases/latest`;
+            }
         }
-        async function init() { winUrl = await getRelease(winRepo, 'winVersion'); linuxUrl = await getRelease(linuxRepo, 'linuxVersion'); }
+
+        async function init() {
+            winUrl = await getRelease(winRepo, 'winVersion');
+            linuxUrl = await getRelease(linuxRepo, 'linuxVersion');
+        }
+
         document.getElementById('winBtn').addEventListener('click', () => window.location.href = winUrl);
         document.getElementById('linuxBtn').addEventListener('click', () => window.location.href = linuxUrl);
         function openLightbox(imgSrc) { document.getElementById('lightboxImg').src = imgSrc; document.getElementById('lightbox').style.display = 'flex'; }
