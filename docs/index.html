@@ -30,24 +30,23 @@
         .container {
             width: 100%;
             max-width: 1000px;
-            padding: 5px 20px 20px 20px; /* Minimal top padding */
+            padding: 0px 20px;
             text-align: center;
         }
 
         .logo { 
-            width: 220px; /* Slightly smaller to save space */
-            margin-bottom: 15px; 
+            width: 200px;
+            margin: 10px 0; 
             filter: drop-shadow(0 0 15px var(--accent-glow)); 
         }
 
-        /* The Display Area */
         .display-wrapper {
             width: 100%;
             border-radius: 12px;
             border: 2px solid var(--accent);
             box-shadow: 0 0 30px var(--accent-glow);
             overflow: hidden;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             background: #000;
             aspect-ratio: 16 / 9;
             position: relative;
@@ -64,17 +63,15 @@
         }
 
         .active-content { display: block; }
+        .aspect-ratio { width: 100%; height: 100%; background: #000; }
+        .aspect-ratio iframe { width: 100%; height: 100%; border: 0; display: block; }
 
-        .aspect-ratio { width: 100%; height: 100%; }
-        .aspect-ratio iframe { width: 100%; height: 100%; border: 0; }
-
-        /* Grid Section */
         .gallery-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
+            gap: 10px;
             width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .nav-card {
@@ -87,18 +84,17 @@
             position: relative;
         }
 
-        .nav-card img { width: 100%; height: 90px; object-fit: cover; opacity: 0.5; transition: 0.3s; pointer-events: none; }
+        .nav-card img { width: 100%; height: 85px; object-fit: cover; opacity: 0.5; transition: 0.3s; pointer-events: none; }
         .nav-card:hover { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
         .nav-card:active { transform: scale(0.95); }
         .nav-card:hover img { opacity: 1; }
         
         .nav-card span {
-            position: absolute; bottom: 4px; width: 100%; font-size: 10px; 
+            position: absolute; bottom: 4px; width: 100%; font-size: 9px; 
             font-weight: 900; color: var(--accent); text-align: center;
             pointer-events: none; text-shadow: 0 1px 3px #000;
         }
 
-        /* Downloads */
         .download-row {
             display: flex;
             justify-content: center;
@@ -109,10 +105,10 @@
         .dl-btn {
             flex: 1;
             max-width: 450px;
-            padding: 15px;
+            padding: 12px;
             border-radius: 10px;
             text-decoration: none;
-            color: #000;
+            color: #000 !important;
             font-weight: 900;
             display: flex;
             flex-direction: column;
@@ -124,13 +120,15 @@
         .btn-linux { background: var(--linux); box-shadow: 0 0 20px var(--linux-glow); }
         .dl-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
 
-        .ver-tag { font-size: 10px; text-transform: uppercase; margin-top: 3px; opacity: 0.8; }
+        .ver-tag { font-size: 10px; text-transform: uppercase; margin-top: 2px; opacity: 0.9; color: #000; }
+        
+        /* Icon spacing */
+        .dl-btn i { margin-bottom: 2px; font-size: 1.1rem; }
 
-        .footer { margin-top: 25px; color: var(--text-mute); font-size: 0.85rem; }
+        .footer { margin-top: 20px; color: var(--text-mute); font-size: 0.8rem; padding-bottom: 15px; }
         .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
 
         @media (max-width: 800px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px) { .download-row { flex-direction: column; align-items: center; } .dl-btn { width: 100%; } }
     </style>
 </head>
 <body>
@@ -141,7 +139,7 @@
     <div id="displayBox" class="display-wrapper">
         <div id="videoContainer" class="display-content active-content">
             <div class="aspect-ratio">
-                <iframe id="youtubeIframe" src="https://www.youtube.com/embed/N1M8Tsnlodw?enablejsapi=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" allowfullscreen></iframe>
             </div>
         </div>
         <img id="imageDisplay" class="display-content" src="" alt="Screenshot">
@@ -150,7 +148,7 @@
     <div class="gallery-grid">
         <div class="nav-card" onclick="showVideo()">
             <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg">
-            <span><i class="fas fa-play"></i> PREVIEW VIDEO</span>
+            <span>PREVIEW VIDEO</span>
         </div>
         <div class="nav-card" onclick="showImage('image1.png')"><img src="image1.png"><span>UI PREVIEW</span></div>
         <div class="nav-card" onclick="showImage('image2.png')"><img src="image2.png"><span>USER GUIDE</span></div>
@@ -160,18 +158,18 @@
         <div class="nav-card" onclick="showImage('image6.png')"><img src="image6.png"><span>VERSION INFO</span></div>
         <div class="nav-card" onclick="window.open('https://github.com/BeamSkin-Studio', '_blank')">
             <img src="https://github.blog/wp-content/uploads/2023/01/68747470733a2f2f6f63746f6465782e6769746875622e636f6d2f696d616765732f6d6f6465726e746f6361742e6a7067.jpg?resize=1200%2C630">
-            <span><i class="fab fa-github"></i> VIEW SOURCE</span>
+            <span>VIEW SOURCE</span>
         </div>
     </div>
 
     <div class="download-row">
-        <a href="#" id="winLink" class="dl-btn btn-win">
+        <a id="winLink" href="#" class="dl-btn btn-win">
             <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
-            <span id="winVer" class="ver-tag">Fetching...</span>
+            <span id="winVer" class="ver-tag">Loading...</span>
         </a>
-        <a href="#" id="linLink" class="dl-btn btn-linux">
+        <a id="linLink" href="#" class="dl-btn btn-linux">
             <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
-            <span id="linVer" class="ver-tag">Fetching...</span>
+            <span id="linVer" class="ver-tag">Loading...</span>
         </a>
     </div>
 
@@ -181,46 +179,43 @@
 </div>
 
 <script>
-    const WIN_REPO = "BeamSkin-Studio/BeamSkin-Studio-Beta";
-    const LIN_REPO = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
-
     async function updateLinks() {
-        try {
-            const [winRes, linRes] = await Promise.all([
-                fetch(`https://api.github.com/repos/${WIN_REPO}/releases/latest`).then(r => r.json()),
-                fetch(`https://api.github.com/repos/${LIN_REPO}/releases/latest`).then(r => r.json())
-            ]);
-            document.getElementById('winVer').innerText = "Latest: " + (winRes.tag_name || "Beta");
-            document.getElementById('winLink').href = winRes.assets[0]?.browser_download_url || winRes.html_url;
-            document.getElementById('linVer').innerText = "Latest: " + (linRes.tag_name || "Beta");
-            document.getElementById('linLink').href = linRes.assets[0]?.browser_download_url || linRes.html_url;
-        } catch (e) {
-            document.getElementById('winVer').innerText = "Visit GitHub";
-            document.getElementById('linVer').innerText = "Visit GitHub";
+        const repos = [
+            { id: 'win', url: 'https://api.github.com/repos/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest' },
+            { id: 'lin', url: 'https://api.github.com/repos/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest' }
+        ];
+
+        for (const repo of repos) {
+            try {
+                const response = await fetch(repo.url);
+                const data = await response.json();
+                
+                if (data.tag_name) {
+                    document.getElementById(repo.id + 'Ver').innerText = data.tag_name;
+                    if (data.assets && data.assets.length > 0) {
+                        document.getElementById(repo.id + 'Link').href = data.assets[0].browser_download_url;
+                    } else {
+                        document.getElementById(repo.id + 'Link').href = data.html_url;
+                    }
+                }
+            } catch (e) {
+                document.getElementById(repo.id + 'Ver').innerText = "Check GitHub";
+            }
         }
     }
 
     const videoContainer = document.getElementById('videoContainer');
     const imageDisplay = document.getElementById('imageDisplay');
-    const iframe = document.getElementById('youtubeIframe');
 
     function showImage(src) {
-        // Pause video using postMessage instead of clearing SRC (prevents reload bugs)
-        iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-        
         videoContainer.style.display = 'none';
         imageDisplay.src = src;
         imageDisplay.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function showVideo() {
         imageDisplay.style.display = 'none';
         videoContainer.style.display = 'block';
-        
-        // Resume video
-        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     updateLinks();
