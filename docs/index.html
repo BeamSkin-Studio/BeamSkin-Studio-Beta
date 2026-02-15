@@ -9,7 +9,7 @@
         :root {
             --bg: #0d1117;
             --card-bg: #161b22;
-            --accent: #2ecc71; /* Mint Green from your UI */
+            --accent: #2ecc71; /* Mint Green */
             --text-dim: #8b949e;
             --white: #f0f6fc;
         }
@@ -36,52 +36,16 @@
             height: auto;
             margin-bottom: 20px;
             border-radius: 15px;
-            box-shadow: 0 0 20px rgba(46, 204, 113, 0.1);
         }
 
         h1 { font-size: 2.8rem; margin: 10px 0; letter-spacing: -1px; }
         .description { color: var(--text-dim); font-size: 1.2rem; margin-bottom: 40px; }
 
-        .download-btn {
-            background-color: var(--accent);
-            color: #000;
-            padding: 16px 45px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 1.2rem;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 4px 20px rgba(46, 204, 113, 0.2);
-        }
-
-        .download-btn:hover {
-            transform: translateY(-3px);
-            filter: brightness(1.1);
-            box-shadow: 0 6px 25px rgba(46, 204, 113, 0.4);
-        }
-
-        .video-container {
-            margin: 60px 0;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            border-radius: 20px;
-            overflow: hidden;
-            border: 1px solid #30363d;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
-
-        iframe { width: 100%; height: 100%; border: none; }
-
-        /* 3-Column Grid */
         .gallery {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
-            margin-top: 20px;
-            padding-bottom: 80px;
+            margin: 40px 0;
         }
 
         .screenshot-card {
@@ -110,6 +74,50 @@
         .card-text h3 { margin: 0; font-size: 1rem; color: var(--accent); }
         .card-text p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-dim); }
 
+        /* Download Button Styling */
+        .download-btn {
+            background-color: var(--accent);
+            color: #000;
+            padding: 18px 50px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.3rem;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            flex-direction: column; /* Stacked for version label */
+            align-items: center;
+            gap: 5px;
+            margin: 20px 0 60px 0;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 20px rgba(46, 204, 113, 0.2);
+        }
+
+        .download-btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        .version-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            font-weight: normal;
+        }
+
+        .video-container {
+            width: 100%;
+            max-width: 850px;
+            margin: 0 auto 80px auto;
+            aspect-ratio: 16 / 9;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid #30363d;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+
+        iframe { width: 100%; height: 100%; border: none; }
+
         footer {
             padding: 40px;
             border-top: 1px solid #30363d;
@@ -119,7 +127,6 @@
             font-size: 0.85rem;
         }
 
-        /* Mobile Responsive */
         @media (max-width: 900px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .gallery { grid-template-columns: 1fr; } }
     </style>
@@ -127,74 +134,72 @@
 <body>
 
     <div class="container">
-        <img src="BeamSkin_Studio_logo.jpg" alt="BeamSkin Studio Logo" class="logo">
+        <img src="BeamSkin_Studio_logo.png" alt="BeamSkin Studio Logo" class="logo">
         
         <h1>BeamSkin Studio</h1>
         <p class="description">The all-in-one workstation for BeamNG.drive skin creation.</p>
 
-        <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest" class="download-btn">
-            <i class="fab fa-github"></i> Download Beta
-        </a>
-
-        <div class="video-container">
-            <iframe 
-                src="https://www.youtube.com/embed/N1M8Tsnlodw" 
-                title="BeamSkin Studio Preview" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen>
-            </iframe>
+        <div class="gallery">
+            <div class="screenshot-card"><img src="image1.png"><div class="card-text"><h3>Project Overview</h3><p>Manage mod metadata.</p></div></div>
+            <div class="screenshot-card"><img src="image2.png"><div class="card-text"><h3>In-App Guide</h3><p>Built-in documentation.</p></div></div>
+            <div class="screenshot-card"><img src="image3.png"><div class="card-text"><h3>Car Database</h3><p>Quick UV map access.</p></div></div>
+            <div class="screenshot-card"><img src="image4.png"><div class="card-text"><h3>Vehicle Integration</h3><p>Add custom mods.</p></div></div>
+            <div class="screenshot-card"><img src="image5.png"><div class="card-text"><h3>System Settings</h3><p>Configure paths.</p></div></div>
+            <div class="screenshot-card"><img src="image6.png"><div class="card-text"><h3>About Studio</h3><p>Credits & Info.</p></div></div>
         </div>
 
-        <div class="gallery">
-            <div class="screenshot-card">
-                <img src="image1.png" alt="Project Tab">
-                <div class="card-text">
-                    <h3>Project Overview</h3>
-                    <p>Manage mod metadata and zip locations.</p>
-                </div>
-            </div>
-            <div class="screenshot-card">
-                <img src="image2.png" alt="How to Use">
-                <div class="card-text">
-                    <h3>In-App Guide</h3>
-                    <p>Built-in documentation for fast learning.</p>
-                </div>
-            </div>
-            <div class="screenshot-card">
-                <img src="image3.png" alt="Car List">
-                <div class="card-text">
-                    <h3>Car Database</h3>
-                    <p>Quick access to UV maps and internal IDs.</p>
-                </div>
-            </div>
-            <div class="screenshot-card">
-                <img src="image4.png" alt="Add Vehicle">
-                <div class="card-text">
-                    <h3>Vehicle Integration</h3>
-                    <p>Add custom vehicle mods to your workspace.</p>
-                </div>
-            </div>
-            <div class="screenshot-card">
-                <img src="image5.png" alt="Settings">
-                <div class="card-text">
-                    <h3>System Settings</h3>
-                    <p>Configure paths and personalize your theme.</p>
-                </div>
-            </div>
-            <div class="screenshot-card">
-                <img src="image6.png" alt="About">
-                <div class="card-text">
-                    <h3>About Studio</h3> 
-                    <p>Version 0.6.3 Beta info and credits.</p>
-                </div>
-            </div>
+        <button id="downloadBtn" class="download-btn">
+            <span><i class="fab fa-github"></i> Download Latest Beta</span>
+            <span id="versionLabel" class="version-label">Detecting version...</span>
+        </button>
+
+        <div class="video-container">
+            <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" title="Preview" allowfullscreen></iframe>
         </div>
     </div>
 
     <footer>
         <p>Project maintained by <a href="https://github.com/BeamSkin-Studio" style="color:var(--accent); text-decoration:none;">@Burzt_YT</a></p>
-        <p>BeamSkin Studio is a community project and is not affiliated with BeamNG GmbH.</p>
     </footer>
+
+    <script>
+        const repo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
+        const btn = document.getElementById('downloadBtn');
+        const vLabel = document.getElementById('versionLabel');
+        let downloadUrl = "";
+
+        // Auto-fetch version on load
+        async function fetchLatest() {
+            try {
+                const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
+                const data = await response.json();
+                
+                if (data.tag_name) {
+                    vLabel.innerText = "Latest Version: " + data.tag_name;
+                    // Store the first asset URL if it exists
+                    if (data.assets && data.assets.length > 0) {
+                        downloadUrl = data.assets[0].browser_download_url;
+                    } else {
+                        downloadUrl = data.html_url;
+                    }
+                }
+            } catch (err) {
+                vLabel.innerText = "Download via GitHub";
+                downloadUrl = `https://github.com/${repo}/releases/latest`;
+            }
+        }
+
+        btn.addEventListener('click', () => {
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+                btn.querySelector('span').innerText = "Starting Download...";
+            } else {
+                window.location.href = `https://github.com/${repo}/releases/latest`;
+            }
+        });
+
+        fetchLatest();
+    </script>
 
 </body>
 </html>
