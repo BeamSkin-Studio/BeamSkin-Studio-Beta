@@ -10,16 +10,17 @@
             --bg: #0d1117;
             --card-bg: #161b22;
             --accent: #2ecc71; 
+            --accent-glow: rgba(46, 204, 113, 0.3);
             --text-dim: #8b949e;
             --white: #f0f6fc;
         }
 
         body {
             background-color: var(--bg);
-            /* Cool Background Effect: Neon Mint Glow */
+            /* Cool Background Effect: Mint Glow Aura */
             background-image: 
-                radial-gradient(circle at 50% -20%, rgba(46, 204, 113, 0.15), transparent 40%),
-                radial-gradient(circle at 0% 100%, rgba(46, 204, 113, 0.05), transparent 25%);
+                radial-gradient(circle at 50% 20%, var(--accent-glow), transparent 45%),
+                radial-gradient(circle at 80% 80%, rgba(46, 204, 113, 0.05), transparent 30%);
             background-attachment: fixed;
             color: var(--white);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -27,6 +28,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
 
         .container {
@@ -34,6 +36,7 @@
             width: 90%;
             text-align: center;
             padding: 60px 0;
+            z-index: 1;
         }
 
         .logo {
@@ -49,7 +52,7 @@
             margin-bottom: 40px;
         }
 
-        /* 3-Column Grid */
+        /* Gallery Grid - Improved Size */
         .gallery {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -75,7 +78,7 @@
 
         .screenshot-card img {
             width: 100%;
-            height: 200px;
+            height: 220px; /* Taller for better visibility */
             object-fit: cover;
             display: block;
             border-bottom: 1px solid #30363d;
@@ -85,7 +88,7 @@
         .card-text h3 { margin: 0; font-size: 1rem; color: var(--accent); }
         .card-text p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-dim); }
 
-        /* Large Download Button */
+        /* Pulsing Download Button */
         .download-btn {
             background-color: var(--accent);
             color: #000;
@@ -94,51 +97,74 @@
             text-decoration: none;
             font-weight: 800;
             font-size: 1.4rem;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: inline-flex;
             flex-direction: column;
             align-items: center;
             gap: 5px;
-            margin: 20px 0 80px 0;
+            margin: 40px 0 80px 0;
             cursor: pointer;
             border: none;
-            box-shadow: 0 0 30px rgba(46, 204, 113, 0.3);
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.4);
+            animation: pulse 2.5s infinite;
+            transition: transform 0.2s ease;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+            70% { box-shadow: 0 0 0 25px rgba(46, 204, 113, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
         }
 
         .download-btn:hover {
             transform: scale(1.05);
-            box-shadow: 0 0 50px rgba(46, 204, 113, 0.5);
+            animation: none;
+            box-shadow: 0 0 40px rgba(46, 204, 113, 0.6);
         }
 
-        .version-label { font-size: 0.8rem; font-weight: 400; opacity: 0.8; }
+        .version-label { font-size: 0.8rem; font-weight: 400; opacity: 0.9; }
 
-        /* Video Section */
-        .video-container {
+        /* Video Section - Fixed Tiny Size */
+        .video-wrapper {
             width: 100%;
-            max-width: 900px;
-            margin: 0 auto 80px auto;
-            aspect-ratio: 16 / 9;
-            border-radius: 24px;
-            overflow: hidden;
-            border: 1px solid #444;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            max-width: 850px;
+            margin: 0 auto 100px auto;
         }
 
-        /* LIGHTBOX (Zoom Effect) */
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid #30363d;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+        }
+
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Lightbox */
         #lightbox {
             display: none;
             position: fixed;
             z-index: 9999;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             justify-content: center;
             align-items: center;
             cursor: zoom-out;
         }
         #lightbox img { 
-            max-width: 90%; max-height: 85%; 
-            border-radius: 10px; 
+            max-width: 95%; max-height: 90%; 
+            border-radius: 8px; 
             border: 2px solid var(--accent);
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
         }
 
         footer {
@@ -170,33 +196,35 @@
             </div>
             <div class="screenshot-card" onclick="openLightbox('image2.png')">
                 <img src="image2.png">
-                <div class="card-text"><h3>Documentation</h3><p>Built-in "How to Use" guide.</p></div>
+                <div class="card-text"><h3>Documentation</h3><p>Full "How to Use" guide.</p></div>
             </div>
             <div class="screenshot-card" onclick="openLightbox('image3.png')">
                 <img src="image3.png">
-                <div class="card-text"><h3>Car Database</h3><p>UV maps & Internal IDs.</p></div>
+                <div class="card-text"><h3>Car Database</h3><p>UV maps & IDs.</p></div>
             </div>
             <div class="screenshot-card" onclick="openLightbox('image4.png')">
                 <img src="image4.png">
-                <div class="card-text"><h3>Vehicle Integration</h3><p>Add custom vehicle mods.</p></div>
+                <div class="card-text"><h3>Add Vehicles</h3><p>Integrate custom vehicle mods.</p></div>
             </div>
             <div class="screenshot-card" onclick="openLightbox('image5.png')">
                 <img src="image5.png">
-                <div class="card-text"><h3>Studio Settings</h3><p>Configure paths & themes.</p></div>
+                <div class="card-text"><h3>Settings</h3><p>Configure paths & themes.</p></div>
             </div>
             <div class="screenshot-card" onclick="openLightbox('image6.png')">
                 <img src="image6.png">
-                <div class="card-text"><h3>Information</h3><p>Version details & credits.</p></div>
+                <div class="card-text"><h3>About</h3><p>Version details & credits.</p></div>
             </div>
         </div>
 
         <button id="downloadBtn" class="download-btn">
             <span><i class="fab fa-github"></i> DOWNLOAD LATEST BETA</span>
-            <span id="versionLabel" class="version-label">Detecting version...</span>
+            <span id="versionLabel" class="version-label">Checking Version...</span>
         </button>
 
-        <div class="video-container">
-            <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" title="Preview" allowfullscreen></iframe>
+        <div class="video-wrapper">
+            <div class="video-container">
+                <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" title="Preview" allowfullscreen></iframe>
+            </div>
         </div>
     </div>
 
@@ -205,7 +233,6 @@
     </footer>
 
     <script>
-        // Version Fetcher
         const repo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
         const btn = document.getElementById('downloadBtn');
         const vLabel = document.getElementById('versionLabel');
@@ -224,7 +251,6 @@
 
         btn.addEventListener('click', () => { window.location.href = downloadUrl || `https://github.com/${repo}/releases/latest`; });
 
-        // Lightbox Function
         function openLightbox(imgSrc) {
             document.getElementById('lightboxImg').src = imgSrc;
             document.getElementById('lightbox').style.display = 'flex';
