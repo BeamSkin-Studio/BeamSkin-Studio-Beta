@@ -6,6 +6,7 @@ import customtkinter as ctk
 import re
 import os
 import sys
+import subprocess
 import platform
 
 def get_github_repo():
@@ -358,158 +359,222 @@ def prompt_update(new_version):
             ).pack(pady=10)
             
             def extract_and_update():
-                """Extract and apply the update"""
-                print(f"[DEBUG] extract_and_update called")
-                extract_btn.configure(text="Extracting...", state="disabled")
+                """Extract ZIP and update application files"""
+                import zipfile
+                import shutil
+                from pathlib import Path
                 
                 try:
-                    import zipfile
-                    import tempfile
-                    import shutil
+                    # Update button to show extraction status
+                    extract_btn.configure(text="Extracting...", state="disabled")
+                    success_window.update()
                     
-                    # Get current directory
+                    # Get current application directory (root of the app)
                     if getattr(sys, 'frozen', False):
-                        current_dir = os.path.dirname(sys.executable)
+                        # Running as compiled exe - get the directory containing the exe
+                        app_dir = os.path.dirname(sys.executable)
                     else:
-                        current_dir = os.path.dirname(os.path.abspath(__file__))
+                        # Running as script - get the directory containing main.py
+                        # Go up from core/updater.py to the root
+                        current_file = os.path.abspath(__file__)
+                        # updater.py is in core/, so parent of parent is root
+                        app_dir = os.path.dirname(os.path.dirname(current_file))
                     
-                    print(f"[DEBUG] Current directory: {current_dir}")
-                    print(f"[DEBUG] Extracting: {filepath}")
+                    print(f"[DEBUG] Application root directory: {app_dir}")
                     
-                    # Create temp directory for extraction
-                    temp_extract_dir = os.path.join(tempfile.gettempdir(), 'beamskin_update')
-                    if os.path.exists(temp_extract_dir):
-                        shutil.rmtree(temp_extract_dir)
-                    os.makedirs(temp_extract_dir)
+                    # Create temporary extraction directory
+                    temp_extract_dir = os.path.join(downloads_folder, f"BeamSkin-Studio-temp-{new_version}")
                     
-                    # Extract zip
+                    # Extract ZIP
+                    print(f"[DEBUG] Extracting to: {temp_extract_dir}")
                     with zipfile.ZipFile(filepath, 'r') as zip_ref:
                         zip_ref.extractall(temp_extract_dir)
                     
-                    print(f"[DEBUG] Extracted to: {temp_extract_dir}")
-                    
-                    # Find the extracted folder (GitHub adds repo name to the folder)
-                    extracted_items = os.listdir(temp_extract_dir)
-                    if len(extracted_items) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_items[0])):
-                        source_dir = os.path.join(temp_extract_dir, extracted_items[0])
+                    # Find the extracted folder (GitHub adds a folder like "BeamSkin-Studio-main")
+                    extracted_contents = os.listdir(temp_extract_dir)
+                    if len(extracted_contents) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_contents[0])):
+                        source_dir = os.path.join(temp_extract_dir, extracted_contents[0])
                     else:
                         source_dir = temp_extract_dir
                     
                     print(f"[DEBUG] Source directory: {source_dir}")
+                    print(f"[DEBUG] Target directory: {app_dir}")
                     
-                    # Copy files
-                    for item in os.listdir(source_dir):
-                        source = os.path.join(source_dir, item)
-                        dest = os.path.join(current_dir, item)
+                    # Files to preserve (don't overwrite)
+                    preserve_relative_paths = {
+                        os.path.join('data', 'app_settings.json'),
+                        os.path.join('vehicles', 'added_vehicles.json')
+                    }
+                    
+                    # Backup user data before updating
+                    backup_data = {}
+                    for preserve_path in preserve_relative_paths:
+                        full_path = os.path.join(app_dir, preserve_path)
+                        if os.path.exists(full_path):
+                            try:
+                                with open(full_path, 'r', encoding='utf-8') as f:
+                                    backup_data[preserve_path] = f.read()
+                                print(f"[DEBUG] Backed up: {preserve_path}")
+                            except Exception as e:
+                                print(f"[DEBUG] Could not backup {preserve_path}: {e}")
+                    
+                    # Copy new files, overwriting old ones
+                    files_updated = 0
+                    for root, dirs, files in os.walk(source_dir):
+                        # Calculate relative path from source_dir
+                        rel_dir = os.path.relpath(root, source_dir)
                         
-                        try:
-                            if os.path.isdir(source):
-                                if os.path.exists(dest):
-                                    shutil.rmtree(dest)
-                                shutil.copytree(source, dest)
+                        # Determine target directory
+                        if rel_dir == '.':
+                            target_dir = app_dir
+                        else:
+                            target_dir = os.path.join(app_dir, rel_dir)
+                        
+                        # Create directory if it doesn't exist
+                        os.makedirs(target_dir, exist_ok=True)
+                        
+                        # Copy files
+                        for file in files:
+                            source_file = os.path.join(root, file)
+                            
+                            # Calculate relative path for this file
+                            if rel_dir == '.':
+                                rel_file_path = file
                             else:
-                                if os.path.exists(dest):
-                                    os.remove(dest)
-                                shutil.copy2(source, dest)
-                            print(f"[DEBUG] Updated: {item}")
-                        except Exception as e:
-                            print(f"[DEBUG] Warning - could not update {item}: {e}")
+                                rel_file_path = os.path.join(rel_dir, file)
+                            
+                            # Normalize path separators
+                            rel_file_path_normalized = rel_file_path.replace('/', os.sep).replace('\\', os.sep)
+                            
+                            # Check if this file should be preserved
+                            should_preserve = False
+                            for preserve_path in preserve_relative_paths:
+                                preserve_normalized = preserve_path.replace('/', os.sep).replace('\\', os.sep)
+                                if rel_file_path_normalized == preserve_normalized:
+                                    should_preserve = True
+                                    break
+                            
+                            if should_preserve:
+                                print(f"[DEBUG] Skipping preserved file: {rel_file_path}")
+                                continue
+                            
+                            target_file = os.path.join(target_dir, file)
+                            
+                            try:
+                                # Copy file and preserve metadata
+                                shutil.copy2(source_file, target_file)
+                                files_updated += 1
+                                if files_updated <= 10:  # Only print first 10 to avoid spam
+                                    print(f"[DEBUG] Updated: {rel_file_path}")
+                            except Exception as e:
+                                print(f"[DEBUG] Could not update {rel_file_path}: {e}")
                     
-                    # Cleanup
-                    shutil.rmtree(temp_extract_dir)
+                    print(f"[DEBUG] Total files updated: {files_updated}")
+                    
+                    # Restore preserved files
+                    for preserve_path, content in backup_data.items():
+                        full_path = os.path.join(app_dir, preserve_path)
+                        try:
+                            # Ensure directory exists
+                            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                            with open(full_path, 'w', encoding='utf-8') as f:
+                                f.write(content)
+                            print(f"[DEBUG] Restored: {preserve_path}")
+                        except Exception as e:
+                            print(f"[DEBUG] Could not restore {preserve_path}: {e}")
+                    
+                    # Clean up temp directory
+                    try:
+                        shutil.rmtree(temp_extract_dir)
+                        print(f"[DEBUG] Cleaned up temp directory")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not clean up temp directory: {e}")
+                    
+                    # Delete the downloaded ZIP file
+                    try:
+                        os.remove(filepath)
+                        print(f"[DEBUG] Deleted downloaded ZIP file: {filepath}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not delete ZIP file: {e}")
                     
                     print(f"[DEBUG] Update complete!")
                     
-                    # Show completion dialog
+                    # Show completion message
                     success_window.destroy()
-                    update_window.destroy()
                     
                     completion_window = ctk.CTkToplevel(_app_instance)
                     completion_window.title("Update Complete")
-                    completion_window.geometry("400x250")
+                    completion_window.geometry("450x280")  # INCREASED HEIGHT from 220 to 280
                     completion_window.resizable(False, False)
                     completion_window.transient(_app_instance)
                     completion_window.grab_set()
                     
                     # Center window
                     completion_window.update_idletasks()
-                    width = completion_window.winfo_width()
-                    height = completion_window.winfo_height()
-                    x = (completion_window.winfo_screenwidth() // 2) - (width // 2)
-                    y = (completion_window.winfo_screenheight() // 2) - (height // 2)
-                    completion_window.geometry(f"{width}x{height}+{x}+{y}")
+                    w = completion_window.winfo_width()
+                    h = completion_window.winfo_height()
+                    x = (completion_window.winfo_screenwidth() // 2) - (w // 2)
+                    y = (completion_window.winfo_screenheight() // 2) - (h // 2)
+                    completion_window.geometry(f"{w}x{h}+{x}+{y}")
                     
                     comp_frame = ctk.CTkFrame(completion_window, fg_color=_colors["frame_bg"])
                     comp_frame.pack(fill="both", expand=True, padx=15, pady=15)
                     
                     ctk.CTkLabel(
                         comp_frame,
-                        text="✓",
-                        font=ctk.CTkFont(size=40, weight="bold"),
+                        text="✓ Update Complete!",
+                        font=ctk.CTkFont(size=18, weight="bold"),
                         text_color=_colors["accent"]
                     ).pack(pady=(10, 5))
                     
                     ctk.CTkLabel(
                         comp_frame,
-                        text="Update Installed!",
-                        font=ctk.CTkFont(size=16, weight="bold"),
-                        text_color=_colors["text"]
-                    ).pack(pady=(0, 10))
-                    
-                    ctk.CTkLabel(
-                        comp_frame,
-                        text="The update has been installed successfully.\nPlease restart the application to use the new version.",
+                        text=f"Updated {files_updated} files to version {new_version}\n\n"
+                             "Your settings and custom vehicles have been preserved.\n\n"
+                             "Please restart BeamSkin Studio to use the new version.",
                         font=ctk.CTkFont(size=11),
-                        text_color=_colors["text_secondary"],
+                        text_color=_colors["text"],
                         justify="center"
                     ).pack(pady=10)
                     
                     def restart_app():
-                        """Restart the application"""
+                        """Restart the application using the batch launcher if available"""
                         print(f"[DEBUG] Restarting application...")
                         
+                        # Get current directory
                         if getattr(sys, 'frozen', False):
-                            # Running as executable
-                            exe_path = sys.executable
-                            print(f"[DEBUG] Executable path: {exe_path}")
-                            
-                            # Close windows
+                            # Running as executable - restart the exe
+                            subprocess.Popen([sys.executable])
                             completion_window.destroy()
                             _app_instance.destroy()
-                            
-                            # Start new instance
-                            import subprocess
-                            subprocess.Popen([sys.executable], cwd=current_dir)
-                            
-                            # Exit current process
                             sys.exit(0)
                         else:
-                            # Running as script - check for quick_launcher.py
-                            launcher_script = os.path.join(current_dir, "launchers-scripts", "quick_launcher.py")
-                            main_script = os.path.join(current_dir, 'main.py')
+                            # Running as script - check for launcher
+                            # Try batch file first (Windows)
+                            batch_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.bat")
+                            py_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.py")
+                            main_script = os.path.join(app_dir, "main.py")
                             
-                            print(f"[DEBUG] Launcher script: {launcher_script}")
+                            print(f"[DEBUG] Batch launcher: {batch_launcher}")
+                            print(f"[DEBUG] Python launcher: {py_launcher}")
                             print(f"[DEBUG] Main script: {main_script}")
                             
-                            # Close current instance
                             completion_window.destroy()
                             _app_instance.destroy()
                             
-                            import subprocess
-                            python = sys.executable
-                            
-                            # Use launcher if available, otherwise use main.py
-                            if os.path.exists(launcher_script):
-                                print(f"[DEBUG] Using quick_launcher.py for restart")
+                            if os.path.exists(batch_launcher) and sys.platform == 'win32':
+                                print(f"[DEBUG] Using batch launcher")
+                                subprocess.Popen([batch_launcher], cwd=app_dir, shell=True)
+                            elif os.path.exists(py_launcher):
+                                print(f"[DEBUG] Using Python launcher")
                                 if sys.platform == 'win32':
-                                    subprocess.Popen(["pythonw", launcher_script], cwd=current_dir)
+                                    subprocess.Popen(["pythonw", py_launcher], cwd=app_dir)
                                 else:
-                                    subprocess.Popen([python, launcher_script], cwd=current_dir)
+                                    subprocess.Popen([sys.executable, py_launcher], cwd=app_dir)
                             else:
-                                print(f"[DEBUG] Using main.py for restart")
-                                subprocess.Popen([python, main_script], cwd=current_dir)
+                                print(f"[DEBUG] Using main.py")
+                                subprocess.Popen([sys.executable, main_script], cwd=app_dir)
                             
-                            # Exit current process
                             sys.exit(0)
                     
                     ctk.CTkButton(

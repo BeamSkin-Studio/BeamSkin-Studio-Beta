@@ -1,0 +1,11 @@
+{
+    "ccf_skin_skinname": {
+        "information":{
+            "authors":"author",
+            "name":"skinname",
+            "value":1350
+        },
+        "slotType" : "paint_design",
+        "globalSkin" : "skinname"
+    }
+}
