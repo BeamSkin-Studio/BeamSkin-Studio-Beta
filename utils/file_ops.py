@@ -283,11 +283,15 @@ def edit_material_json(source_json_path, target_folder, carid):
             new_value = copy.deepcopy(value)
 
             if "name" in new_value and isinstance(new_value["name"], str):
-
+                # First remove _lbe if present
+                new_value["name"] = new_value["name"].replace(".skin_lbe.", ".skin.")
+                # Then replace the skinname
                 new_value["name"] = new_value["name"].replace(selected_skinname, "skinname")
 
             if "mapTo" in new_value and isinstance(new_value["mapTo"], str):
-
+                # First remove _lbe if present
+                new_value["mapTo"] = new_value["mapTo"].replace(".skin_lbe.", ".skin.")
+                # Then replace the skinname
                 new_value["mapTo"] = new_value["mapTo"].replace(selected_skinname, "skinname")
 
             if "Stages" in new_value and isinstance(new_value["Stages"], list):
@@ -662,6 +666,9 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
+            # First remove _lbe if present
+            content = content.replace('.skin_lbe.', '.skin.')
+
             content = re.sub(
                 r'("authors"\s*:\s*")[^"]*(")',
                 rf'\g<1>{author}\g<2>',
@@ -745,8 +752,11 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
 
                     print(f"[DEBUG]   Processing material: {material_key}")
 
-                    if "name" in material_data and ".skin." in material_data["name"]:
+                    if "name" in material_data and (".skin." in material_data["name"] or ".skin_lbe." in material_data["name"]):
                         old_name = material_data["name"]
+                        # First remove _lbe if present
+                        material_data["name"] = material_data["name"].replace(".skin_lbe.", ".skin.")
+                        # Then replace the skin identifier
                         material_data["name"] = re.sub(
                             r'(\.skin\.)[^"]+$',
                             rf'\1{dds_identifier}',
@@ -755,8 +765,11 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
                         if old_name != material_data["name"]:
                             print(f"[DEBUG]     Updated name: {old_name} -> {material_data['name']}")
 
-                    if "mapTo" in material_data and ".skin." in material_data["mapTo"]:
+                    if "mapTo" in material_data and (".skin." in material_data["mapTo"] or ".skin_lbe." in material_data["mapTo"]):
                         old_mapTo = material_data["mapTo"]
+                        # First remove _lbe if present
+                        material_data["mapTo"] = material_data["mapTo"].replace(".skin_lbe.", ".skin.")
+                        # Then replace the skin identifier
                         material_data["mapTo"] = re.sub(
                             r'(\.skin\.)[^"]+$',
                             rf'\1{dds_identifier}',
@@ -809,6 +822,9 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
                     def replace_skin_name(match):
                         return f'{match.group(1)}{dds_identifier}"'
 
+                    # First remove _lbe if present
+                    content = content.replace('.skin_lbe.', '.skin.')
+                    
                     content = re.sub(
                         r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',
                         replace_skin_name,
