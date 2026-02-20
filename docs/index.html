@@ -9,8 +9,8 @@
         :root {
             --bg: #05070a;
             --surface: #0f1218;
-            --accent: #2ecc71;
-            --accent-glow: rgba(46, 204, 113, 0.6);
+            --accent: #FF6600;
+            --accent-glow: rgba(255, 102, 0, 0.6);
             --linux: #f39c12;
             --linux-glow: rgba(243, 156, 18, 0.4);
             --text: #ffffff;
@@ -189,9 +189,6 @@
     const winRepo = "BeamSkin-Studio/BeamSkin-Studio-Beta";
     const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
     
-    // GitHub has a special URL pattern that ALWAYS redirects to the latest release download
-    // Format: https://github.com/OWNER/REPO/releases/latest/download/FILENAME
-    // This works even without API calls!
     let winUrl = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest";
     let linuxUrl = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest";
 
@@ -200,7 +197,6 @@
             const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`);
             
             if (response.status === 403) {
-                // Rate limited - use fallback
                 console.warn(`Rate limited. Buttons will redirect to latest release page.`);
                 document.getElementById(labelId).innerText = "Latest Release";
                 return `https://github.com/${repo}/releases/latest`;
@@ -212,18 +208,15 @@
             
             const data = await response.json();
             
-            // Update version display
             if (data.tag_name) {
                 document.getElementById(labelId).innerText = data.tag_name;
             }
             
-            // Get download URL - prefer first asset
             if (data.assets && data.assets.length > 0) {
                 console.log(`Found asset: ${data.assets[0].name}`);
                 return data.assets[0].browser_download_url;
             }
             
-            // No assets - link to release page
             return data.html_url;
             
         } catch (err) {
@@ -251,7 +244,6 @@
         }
     }
 
-    // Button click handlers - these trigger the download
     document.getElementById('winBtn').addEventListener('click', () => {
         window.location.href = winUrl;
     });
@@ -274,7 +266,6 @@
         videoContainer.style.display = 'block';
     }
 
-    // Start initialization
     init();
 </script>
 
