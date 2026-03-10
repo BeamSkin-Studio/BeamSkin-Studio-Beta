@@ -53,6 +53,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Clearing seen changelogs...
+
+set "CHANGELOG_FILE=data\seen_changelogs.json"
+
+if exist "%CHANGELOG_FILE%" (
+    del "%CHANGELOG_FILE%"
+    if errorlevel 1 (
+        echo WARNING: Could not delete seen_changelogs.json
+    ) else (
+        echo Seen changelogs cleared.
+    )
+) else (
+    echo No seen_changelogs.json found, skipping.
+)
+
 echo.
 echo ========================================
 echo SUCCESS!
@@ -63,10 +78,12 @@ echo   - first_launch: changed to TRUE
 echo   - setup_complete: changed to FALSE
 echo   - beamng_install: cleared (empty)
 echo   - mods_folder: cleared (empty)
+echo   - seen_changelogs.json: deleted
 echo.
 echo Next time you launch BeamSkin Studio, you will see:
 echo   1. The setup wizard
 echo   2. The WIP warning dialog
+echo   3. The changelog for the current version
 echo.
 echo Your backup is saved as: app_settings_backup_%TIMESTAMP%.json
 echo.

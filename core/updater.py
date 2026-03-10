@@ -3,11 +3,17 @@ import requests
 from tkinter import messagebox
 import webbrowser
 import customtkinter as ctk
+from gui.icon_helper import set_window_icon
 import re
 import os
 import sys
 import subprocess
 import platform
+from core.localization import t
+
+
+
+
 
 def get_github_repo():
     """Get the appropriate GitHub repository URL based on the operating system"""
@@ -157,14 +163,14 @@ def is_newer_version(remote_version, current_version):
         # Fallback: just check if strings differ
         return remote_version != current_version
 
-def prompt_update(new_version):
-    """Show custom update notification window"""
+def prompt_update(new_version, on_done=None):
+
     print(f"[DEBUG] prompt_update called")
     print(f"\n[DEBUG] ========== UPDATE PROMPT ==========")
     print(f"[DEBUG] Showing update dialog for version: {new_version}")
 
     if _app_instance is None or _colors is None:
-        # Fallback to basic messagebox if app instance not set
+
         response = messagebox.askyesno(
             "Update Available",
             f"A new version is available!\n\n"
@@ -174,28 +180,39 @@ def prompt_update(new_version):
         )
         if response:
             webbrowser.open(get_github_repo())
+        if on_done:
+            on_done()
         return
 
     update_window = ctk.CTkToplevel(_app_instance)
     update_window.title("Update Available")
-    update_window.geometry("500x400")  # Increased from 350 to 400 for download progress
+    update_window.geometry("500x360") 
     update_window.resizable(False, False)
     update_window.transient(_app_instance)
     update_window.grab_set()
+    set_window_icon(update_window)
+
+    # Fire on_done exactly once, regardless of how the window is closed
+    _done_fired = [False]
+    def _fire_on_done(event=None):
+        if not _done_fired[0]:
+            _done_fired[0] = True
+            if on_done:
+                _app_instance.after(0, on_done)
+    update_window.bind("<Destroy>", _fire_on_done)
 
     update_window.update_idletasks()
-    width = update_window.winfo_width()
-    height = update_window.winfo_height()
-    x = (update_window.winfo_screenwidth() // 2) - (width // 2)
-    y = (update_window.winfo_screenheight() // 2) - (height // 2)
-    update_window.geometry(f"{width}x{height}+{x}+{y}")
+    _WIN_W, _WIN_H = 500, 360
+    x = (update_window.winfo_screenwidth()  // 2) - (_WIN_W // 2)
+    y = (update_window.winfo_screenheight() // 2) - (_WIN_H // 2)
+    update_window.geometry(f"{_WIN_W}x{_WIN_H}+{x}+{y}")
 
     main_frame = ctk.CTkFrame(update_window, fg_color=_colors["frame_bg"])
     main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
     title_label = ctk.CTkLabel(
         main_frame,
-        text="Update Available!",
+        text=t("update.title"),
         font=ctk.CTkFont(size=20, weight="bold"),
         text_color=_colors["accent"]
     )
@@ -206,8 +223,8 @@ def prompt_update(new_version):
 
     current_label = ctk.CTkLabel(
         info_frame,
-        text=f"Current Version: {CURRENT_VERSION}",
-        font=ctk.CTkFont(size=13),
+        text=t(f"update.current_version").format(CURRENT_VERSION=CURRENT_VERSION),
+        font=ctk.CTkFont(size=15),
         text_color=_colors["text"]
     )
     current_label.pack(pady=(10, 5))
@@ -222,17 +239,16 @@ def prompt_update(new_version):
 
     new_label = ctk.CTkLabel(
         info_frame,
-        text=f"New Version: {new_version}",
-        font=ctk.CTkFont(size=19, weight="bold"),
+        text=t(f"update.new_version").format(new_version=new_version),
+        font=ctk.CTkFont(size=18, weight="bold"),
         text_color=_colors["accent"]
     )
     new_label.pack(pady=(5, 10))
 
     message_label = ctk.CTkLabel(
         main_frame,
-        text="A new version of BeamSkin Studio is available!\n"
-             "Would you like to download it now?",
-        font=ctk.CTkFont(size=12),
+        text=t("update.update_message"),
+        font=ctk.CTkFont(size=16),
         text_color=_colors["text"],
         justify="center"
     )
@@ -246,11 +262,18 @@ def prompt_update(new_version):
         print(f"[DEBUG] download_update called")
         print(f"[DEBUG] Downloading latest version ZIP from: {get_github_repo()}")
         
+        # Expand the window to fit the download progress area
+        _WIN_W = 500
+        _WIN_H_EXPANDED = 400
+        x = (update_window.winfo_screenwidth()  // 2) - (_WIN_W // 2)
+        y = (update_window.winfo_screenheight() // 2) - (_WIN_H_EXPANDED // 2)
+        update_window.geometry(f"{_WIN_W}x{_WIN_H_EXPANDED}+{x}+{y}")
+
         # Update button to show downloading status
         download_btn.configure(text="Downloading Update...", state="disabled")
         skip_btn.configure(state="disabled")
         update_window.update()
-        
+
         # Add status label
         status_label = ctk.CTkLabel(
             main_frame,
@@ -315,15 +338,36 @@ def prompt_update(new_version):
             print(f"[DEBUG] Download complete: {filepath}")
             status_label.configure(text="Download complete!")
             update_window.update()
-            
-            # Show success window
-            success_window = ctk.CTkToplevel(update_window)
+
+            # Hide the update window — success_window takes over.
+            # We withdraw rather than destroy so _fire_on_done doesn't fire yet;
+            # it will fire once the user closes success_window (which destroys update_window).
+            update_window.withdraw()
+
+            # Show success window — parented to _app_instance, not update_window,
+            # so it stays visible even though update_window is hidden.
+            success_window = ctk.CTkToplevel(_app_instance)
+            set_window_icon(success_window)
             success_window.title("Download Complete")
             success_window.geometry("450x300")
             success_window.resizable(False, False)
-            success_window.transient(update_window)
+            success_window.transient(_app_instance)
             success_window.grab_set()
-            
+
+            def _close_all():
+                """Destroy both success_window and update_window (triggers on_done)."""
+                try:
+                    success_window.destroy()
+                except Exception:
+                    pass
+                try:
+                    update_window.destroy()
+                except Exception:
+                    pass
+
+            # If the user closes via the X button, also clean up update_window
+            success_window.protocol("WM_DELETE_WINDOW", _close_all)
+
             # Center window
             success_window.update_idletasks()
             width = success_window.winfo_width()
@@ -503,6 +547,7 @@ def prompt_update(new_version):
                     success_window.destroy()
                     
                     completion_window = ctk.CTkToplevel(_app_instance)
+                    set_window_icon(completion_window)
                     completion_window.title("Update Complete")
                     completion_window.geometry("450x280")  # INCREASED HEIGHT from 220 to 280
                     completion_window.resizable(False, False)
@@ -620,7 +665,7 @@ def prompt_update(new_version):
                     os.system(f'open "{downloads_folder}"')
                 else:
                     os.system(f'xdg-open "{downloads_folder}"')
-                success_window.destroy()
+                _close_all()
             
             # Button frame with 3 buttons
             button_container = ctk.CTkFrame(frame, fg_color="transparent")
@@ -628,7 +673,7 @@ def prompt_update(new_version):
             
             extract_btn = ctk.CTkButton(
                 button_container,
-                text="Extract & Update",
+                text=t("update.update_button"),
                 command=extract_and_update,
                 fg_color=_colors["accent"],
                 hover_color=_colors["accent_hover"],
@@ -640,7 +685,7 @@ def prompt_update(new_version):
             
             ctk.CTkButton(
                 button_container,
-                text="Open Downloads Folder",
+                text=t("update.open_download_folder"),
                 command=open_folder,
                 fg_color=_colors["card_bg"],
                 hover_color=_colors["card_hover"],
@@ -651,7 +696,7 @@ def prompt_update(new_version):
             ctk.CTkButton(
                 button_container,
                 text="Close",
-                command=success_window.destroy,
+                command=_close_all,
                 fg_color=_colors["card_bg"],
                 hover_color=_colors["card_hover"],
                 text_color=_colors["text"],
@@ -684,7 +729,7 @@ def prompt_update(new_version):
 
     download_btn = ctk.CTkButton(
         button_frame,
-        text="Download Update",
+        text=t("update.download_update"),
         command=download_update,
         fg_color=_colors["accent"],
         hover_color=_colors["accent_hover"],
@@ -697,7 +742,7 @@ def prompt_update(new_version):
 
     skip_btn = ctk.CTkButton(
         button_frame,
-        text="Maybe Later",
+        text=t("update.maybe_later"),
         command=maybe_later,
         fg_color=_colors["card_bg"],
         hover_color=_colors["card_hover"],
@@ -708,8 +753,14 @@ def prompt_update(new_version):
     )
     skip_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
 
-def check_for_updates():
-    """Check for updates from OS-specific GitHub repository"""
+def check_for_updates(on_done=None):
+    """
+    Check for updates from OS-specific GitHub repository.
+
+    on_done: optional callable — invoked (on the main thread) once the update
+             check is fully complete *and* any update dialog has been closed.
+             Use this to chain the next startup dialog after this one.
+    """
     print(f"[DEBUG] check_for_updates called")
     print(f"\n[DEBUG] ========== UPDATE CHECK STARTED ==========")
     print(f"[DEBUG] Platform detected: {sys.platform}")
@@ -749,7 +800,7 @@ def check_for_updates():
                 print(f"[DEBUG] UPDATE AVAILABLE! {CURRENT_VERSION} -> {latest_version}")
 
                 if _app_instance:
-                    _app_instance.after(0, lambda: prompt_update(latest_version))
+                    _app_instance.after(0, lambda: prompt_update(latest_version, on_done=on_done))
                 else:
                     # Fallback to messagebox if no app instance
                     response = messagebox.askyesno(
@@ -758,9 +809,20 @@ def check_for_updates():
                     )
                     if response:
                         webbrowser.open(get_github_repo())
+                    if on_done:
+                        on_done()
+                # on_done is called inside prompt_update when the window closes
+                print(f"[DEBUG] ========== UPDATE CHECK COMPLETE ==========\n")
+                return
             else:
                 print(f"[DEBUG] Already on latest version (or newer)")
     except Exception as e:
         print(f"[DEBUG] Update check failed: {e}")
 
     print(f"[DEBUG] ========== UPDATE CHECK COMPLETE ==========\n")
+
+    # No update dialog was shown — call on_done immediately
+    if on_done and _app_instance:
+        _app_instance.after(0, on_done)
+    elif on_done:
+        on_done()

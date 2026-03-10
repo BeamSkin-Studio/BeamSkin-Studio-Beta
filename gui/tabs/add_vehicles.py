@@ -9,6 +9,7 @@ import json
 import sys
 
 from gui.state import state
+from core.localization import t
 
 try:
     from gui import confirmation_dialog
@@ -74,7 +75,7 @@ class AddVehiclesTab(ctk.CTkFrame):
         self.image_path_var = ctk.StringVar()
 
         self.dev_search_var = ctk.StringVar()
-        self.dev_search_placeholder = "🔍 Search vehicles..."
+        self.dev_search_placeholder = t("common.search_vehicle")
 
         self.dev_status_label: Optional[ctk.CTkLabel] = None
         self.dev_progress_bar: Optional[ctk.CTkProgressBar] = None
@@ -83,6 +84,15 @@ class AddVehiclesTab(ctk.CTkFrame):
         self.parent = parent
 
         self._setup_ui()
+    def refresh_ui(self):
+        """Refresh all UI text with current language"""
+        # Clear existing widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+        
+        # Recreate UI with new translations
+        self._setup_ui()
+
         self.refresh_developer_list()
 
     def _fallback_notification(self, message: str, type: str = "info", duration: int = 3000):
@@ -315,6 +325,9 @@ class AddVehiclesTab(ctk.CTkFrame):
     def _setup_ui(self):
         """Set up the developer tab UI"""
 
+        # Refresh the placeholder text for the current language
+        self.dev_search_placeholder = t("common.search_vehicle")
+
         warning_banner = ctk.CTkFrame(
             self,
             fg_color=state.colors["warning"],
@@ -329,7 +342,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             warning_content,
-            text="⚠️ Work in Progress - Limited mod compatibility, Expect bugs and skins not woking!",
+            text=t("add_vehicles.wip"),
             font=ctk.CTkFont(size=15, weight="bold"),
             text_color=state.colors["accent_text"],
             justify="left"
@@ -337,7 +350,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self,
-            text="Add New Vehicle",
+            text=t("add_vehicles.title"),
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=state.colors["text"]
         ).pack(anchor="w", padx=10, pady=(10, 5))
@@ -347,7 +360,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             input_frame,
-            text="Car ID:",
+            text=t("add_vehicles.car_id"),
             font=ctk.CTkFont(size=13),
             text_color=state.colors["text"]
         ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
@@ -355,7 +368,7 @@ class AddVehiclesTab(ctk.CTkFrame):
         ctk.CTkEntry(
             input_frame,
             textvariable=self.carid_var,
-            placeholder_text="e.g., mycar",
+            placeholder_text=t("add_vehicles.car_id_placeholder"),
             fg_color=state.colors["card_bg"],
             border_color=state.colors["border"],
             text_color=state.colors["text"]
@@ -363,7 +376,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             input_frame,
-            text="Car Name:",
+            text=t("add_vehicles.car_name"),
             font=ctk.CTkFont(size=13),
             text_color=state.colors["text"]
         ).grid(row=1, column=0, sticky="w", padx=10, pady=5)
@@ -379,7 +392,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             input_frame,
-            text="JSON File:",
+            text=t("add_vehicles.json_file"),
             font=ctk.CTkFont(size=13),
             text_color=state.colors["text"]
         ).grid(row=2, column=0, sticky="w", padx=10, pady=5)
@@ -400,7 +413,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             json_frame,
-            text="Browse",
+            text=t("common.browse"),
             width=80,
             command=self._browse_json,
             fg_color=state.colors["accent"],
@@ -410,7 +423,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             input_frame,
-            text="JBeam File:",
+            text=t("add_vehicles.jbeam_file"),
             font=ctk.CTkFont(size=13),
             text_color=state.colors["text"]
         ).grid(row=3, column=0, sticky="w", padx=10, pady=5)
@@ -431,7 +444,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             jbeam_frame,
-            text="Browse",
+            text=t("common.browse"),
             width=80,
             command=self._browse_jbeam,
             fg_color=state.colors["accent"],
@@ -441,7 +454,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             input_frame,
-            text="Image File:",
+            text=t("add_vehicles.image"),
             font=ctk.CTkFont(size=13),
             text_color=state.colors["text"]
         ).grid(row=4, column=0, sticky="w", padx=10, pady=5)
@@ -462,7 +475,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             image_frame,
-            text="Browse",
+            text=t("common.browse"),
             width=80,
             command=self._browse_image,
             fg_color=state.colors["accent"],
@@ -474,9 +487,9 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkButton(
             input_frame,
-            text="➕ Add Vehicle",
+            text=t("add_vehicles.add_vehicle"),
             command=self.add_vehicle,
-            fg_color=state.colors["success"],
+            fg_color=state.colors["accent"],
             hover_color=state.colors["accent_hover"],
             text_color=state.colors["accent_text"],
             height=40,
@@ -504,7 +517,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             list_header_frame,
-            text="Added Vehicles",
+            text=t("add_vehicles.vehicles_added"),
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=state.colors["text"]
         ).pack(side="left")
@@ -578,23 +591,23 @@ class AddVehiclesTab(ctk.CTkFrame):
         image_path = self.image_path_var.get().strip()
 
         if not carid or not carname:
-            self.show_notification("Car ID and Name are required", "error")
+            self.show_notification(t("add_vehicles.notification.name_and_id_required"), "error")
             return
 
         if not json_path or not jbeam_path:
-            self.show_notification("JSON and JBeam files are required", "error")
+            self.show_notification(t("add_vehicles.notification.json_and_jbeam_required"), "error")
             return
 
         if not os.path.exists(json_path) or not os.path.exists(jbeam_path):
-            self.show_notification("Selected files do not exist", "error")
+            self.show_notification(t("add_vehicles.notification.selected_files_do_not_exist"), "error")
             return
 
         if image_path and not os.path.exists(image_path):
-            self.show_notification("Selected image does not exist", "error")
+            self.show_notification(t("add_vehicles.notification.selected_image_does_not_exist"), "error")
             return
 
         if carid in state.added_vehicles:
-            self.show_notification(f"Vehicle '{carid}' already exists", "error")
+            self.show_notification(f"{t('add_vehicles.notification.vehicle_already_exists')} '{carid}'", "error")
             return
 
         self.dev_status_label.pack(padx=10, pady=(5, 0))
@@ -604,7 +617,7 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         try:
 
-            from core.developer import process_custom_vehicle
+            from core.add_vehicles import process_custom_vehicle
 
             success = process_custom_vehicle(
                 carid=carid,
@@ -629,7 +642,7 @@ class AddVehiclesTab(ctk.CTkFrame):
                 self.jbeam_path_var.set("")
                 self.image_path_var.set("")
 
-                self.show_notification(f"✅ Added vehicle '{carname}'", "success", 3000)
+                self.show_notification(f"{t('add_vehicles.notification.vehicle_added')} '{carname}'", 4000)
                 self.refresh_developer_list()
 
                 print(f"[DEBUG] Refreshing all tabs after adding vehicle...")
@@ -643,7 +656,7 @@ class AddVehiclesTab(ctk.CTkFrame):
         except ImportError:
             self.dev_status_label.configure(text="Error: Developer module not found")
             self.show_notification("Developer module not available", "error")
-            print("[ERROR] core.developer module not found")
+            print("[ERROR] core.add_vehicles module not found")
         except Exception as e:
             self.dev_status_label.configure(text=f"Error: {str(e)}")
             self.show_notification(f"Error: {str(e)}", "error")
@@ -670,19 +683,19 @@ class AddVehiclesTab(ctk.CTkFrame):
         if response:
             if carid in state.added_vehicles:
                 try:
-                    from core.developer import delete_custom_vehicle
+                    from core.add_vehicles import delete_custom_vehicle
                     file_delete_success = delete_custom_vehicle(carid)
 
                     if not file_delete_success:
                         print(f"[WARNING] Failed to delete some files for {carid}")
                 except ImportError:
-                    print(f"[WARNING] core.developer module not found, only removing from state")
+                    print(f"[WARNING] core.add_vehicles module not found, only removing from state")
                 except Exception as e:
                     print(f"[ERROR] Failed to delete vehicle files: {e}")
 
                 self._reload_added_vehicles_from_file()
 
-                self.show_notification(f"Deleted vehicle '{carname}'", "info")
+                self.show_notification(f"{t('add_vehicles.notification.deleted_vehicle')} '{carname}'", "info")
                 self.refresh_developer_list()
 
                 print(f"[DEBUG] Refreshing all tabs after deleting vehicle...")

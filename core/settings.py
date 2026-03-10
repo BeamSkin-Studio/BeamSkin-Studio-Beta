@@ -35,13 +35,13 @@ DEFAULT_THEMES = {
         "card_hover": "#282828",
         "text": "#f5f5f5",
         "text_secondary": "#999999",
-        "accent": "#39E09B",
-        "accent_hover": "#2fc97f",
+        "accent": "#FF6600",
+        "accent_hover": "#CC5100",
         "accent_text": "#0a0a0a",
-        "tab_selected": "#1e1e1e",
-        "tab_selected_hover": "#282828",
+        "tab_selected": "#FF6600",
+        "tab_selected_hover": "#E55B00",
         "tab_unselected": "#141414",
-        "tab_unselected_hover": "#1e1e1e",
+        "tab_unselected_hover": "#E55B00",
         "border": "#2a2a2a",
         "error": "#ff4444",
         "error_hover": "#cc3636",
@@ -52,18 +52,18 @@ DEFAULT_THEMES = {
     },
     "light": {
         "app_bg": "#fafafa",
-        "frame_bg": "#f0f0f0",
-        "card_bg": "#ffffff",
-        "card_hover": "#f5f5f5",
+        "frame_bg": "#CCCCCC",
+        "card_bg": "#B7B7B7",
+        "card_hover": "#070606",
         "text": "#1a1a1a",
-        "text_secondary": "#888888",
-        "accent": "#39E09B",
-        "accent_hover": "#2fc97f",
+        "text_secondary": "#323232",
+        "accent": "#FF6600",
+        "accent_hover": "#CC5100",
         "accent_text": "#0a0a0a",
-        "tab_selected": "#ffffff",
-        "tab_selected_hover": "#f5f5f5",
-        "tab_unselected": "#f0f0f0",
-        "tab_unselected_hover": "#ffffff",
+        "tab_selected": "#FF6600",
+        "tab_selected_hover": "#E55B00",
+        "tab_unselected": "#CCCCCC",
+        "tab_unselected_hover": "#E55B00",
         "border": "#e0e0e0",
         "error": "#ff4444",
         "error_hover": "#cc3636",
@@ -108,13 +108,13 @@ THEMES = {
         "card_hover": "#282828",
         "text": "#f5f5f5",
         "text_secondary": "#999999",
-        "accent": "#39E09B",
-        "accent_hover": "#2fc97f",
+        "accent": "#FF6600",
+        "accent_hover": "#CC5100",
         "accent_text": "#0a0a0a",
-        "tab_selected": "#1e1e1e",
-        "tab_selected_hover": "#282828",
+        "tab_selected": "#FF6600",
+        "tab_selected_hover": "#E55B00",
         "tab_unselected": "#141414",
-        "tab_unselected_hover": "#1e1e1e",
+        "tab_unselected_hover": "#E55B00",
         "border": "#2a2a2a",
         "error": "#ff4444",
         "error_hover": "#cc3636",
@@ -125,18 +125,18 @@ THEMES = {
     },
     "light": {
         "app_bg": "#fafafa",
-        "frame_bg": "#f0f0f0",
-        "card_bg": "#ffffff",
-        "card_hover": "#f5f5f5",
+        "frame_bg": "#CCCCCC",
+        "card_bg": "#B7B7B7",
+        "card_hover": "#070606",
         "text": "#1a1a1a",
-        "text_secondary": "#888888",
-        "accent": "#39E09B",
-        "accent_hover": "#2fc97f",
+        "text_secondary": "#323232",
+        "accent": "#FF6600",
+        "accent_hover": "#CC5100",
         "accent_text": "#0a0a0a",
-        "tab_selected": "#ffffff",
-        "tab_selected_hover": "#f5f5f5",
-        "tab_unselected": "#f0f0f0",
-        "tab_unselected_hover": "#ffffff",
+        "tab_selected": "#FF6600",
+        "tab_selected_hover": "#E55B00",
+        "tab_unselected": "#CCCCCC",
+        "tab_unselected_hover": "#E55B00",
         "border": "#e0e0e0",
         "error": "#ff4444",
         "error_hover": "#cc3636",
@@ -152,8 +152,7 @@ if "custom_themes" in app_settings:
 else:
     import copy
     THEMES = copy.deepcopy(DEFAULT_THEMES)
-    app_settings["custom_themes"] = THEMES
-    save_settings()
+    # Do NOT write custom_themes to disk here — only save when user explicitly customises
 
 current_theme = app_settings["theme"]
 colors = THEMES[current_theme]
@@ -274,13 +273,28 @@ def show_wip_warning(app=None, force=False):
 def reset_theme_colors(theme_name):
     """Reset a theme to default colors"""
     import copy
-    if theme_name in DEFAULT_THEMES:
-        THEMES[theme_name] = copy.deepcopy(DEFAULT_THEMES[theme_name])
+    if theme_name not in DEFAULT_THEMES:
+        return False
+
+    THEMES[theme_name] = copy.deepcopy(DEFAULT_THEMES[theme_name])
+
+    # Check if ALL themes are now back to their defaults
+    all_default = all(
+        THEMES.get(t) == DEFAULT_THEMES[t]
+        for t in DEFAULT_THEMES
+    )
+
+    if all_default:
+        # Remove custom_themes entirely — no custom data left to persist
+        app_settings.pop("custom_themes", None)
+        print(f"[DEBUG] All themes back to default — removed custom_themes from save file")
+    else:
+        # Other theme still has customisations, keep the entry updated
         app_settings["custom_themes"] = THEMES
-        save_settings()
-        print(f"[DEBUG] Reset {theme_name} theme to default colors")
-        return True
-    return False
+
+    save_settings()
+    print(f"[DEBUG] Reset {theme_name} theme to default colors")
+    return True
 
 def update_theme_color(theme_name, color_key, color_value):
     """Update a single color in a theme
@@ -296,7 +310,8 @@ def update_theme_color(theme_name, color_key, color_value):
 
     if "custom_themes" not in app_settings:
         import copy
-        app_settings["custom_themes"] = copy.deepcopy(THEMES)
+        app_settings["custom_themes"] = copy.deepcopy(DEFAULT_THEMES)
+        app_settings["custom_themes"][theme_name] = copy.deepcopy(THEMES[theme_name])
 
     if theme_name not in THEMES:
         print(f"[ERROR] Theme '{theme_name}' not found")

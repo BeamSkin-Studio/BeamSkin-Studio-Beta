@@ -6,6 +6,8 @@ import customtkinter as ctk
 from tkinter import filedialog
 from gui.state import state
 from gui.components.preview import HoverPreviewManager
+from core.localization import t
+from gui.icon_helper import set_window_icon
 
 print(f"[DEBUG] Loading class: Sidebar")
 
@@ -15,14 +17,20 @@ class Sidebar(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTk, preview_manager: HoverPreviewManager):
 
         print(f"[DEBUG] __init__ called")
-        super().__init__(parent, width=280, fg_color=state.colors["sidebar_bg"], corner_radius=0)
+        super().__init__(parent, width=260, fg_color=state.colors["sidebar_bg"], corner_radius=0)
         self.pack_propagate(False)
         self.preview_manager = preview_manager
 
         self.output_mode_var = ctk.StringVar(value="steam")
         self.custom_output_var = ctk.StringVar()
         self.sidebar_search_var = ctk.StringVar()
-        self.sidebar_search_placeholder = "🔍 Search vehicles..."
+        self.sidebar_search_placeholder = t("common.search_vehicle")
+
+        # Kept in __init__ so user-typed values survive a UI rebuild
+        self.mod_name_var = ctk.StringVar()
+        self.author_var = ctk.StringVar()
+        self._mod_name_is_placeholder = True
+        self._author_is_placeholder = True
 
         self.expanded_vehicle_carid: Optional[str] = None
 
@@ -40,7 +48,7 @@ class Sidebar(ctk.CTkFrame):
 
         ctk.CTkLabel(
             sidebar_header,
-            text="PROJECT SETTINGS",
+            text=t("project.title").upper(),
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=state.colors["text_secondary"],
             anchor="w"
@@ -48,13 +56,12 @@ class Sidebar(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self,
-            text="ZIP Name",
+            text=t("project.mod_name"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
         ).pack(fill="x", padx=15, pady=(5, 5))
 
-        self.mod_name_var = ctk.StringVar()
         self.mod_name_entry = ctk.CTkEntry(
             self,
             textvariable=self.mod_name_var,
@@ -65,22 +72,25 @@ class Sidebar(ctk.CTkFrame):
         )
         self.mod_name_entry.pack(fill="x", padx=15, pady=(0, 10))
 
-        self.mod_name_placeholder = "Enter mod name..."
-        self.mod_name_entry.insert(0, self.mod_name_placeholder)
-        self.mod_name_entry.configure(text_color="#888888")
+        self.mod_name_placeholder = t("project.mod_name_placeholder")
+        if self._mod_name_is_placeholder:
+            self.mod_name_var.set("")
+            self.mod_name_entry.insert(0, self.mod_name_placeholder)
+            self.mod_name_entry.configure(text_color="#888888")
+        else:
+            self.mod_name_entry.configure(text_color=state.colors["text"])
 
         self.mod_name_entry.bind("<FocusIn>", self._on_mod_name_focus_in)
         self.mod_name_entry.bind("<FocusOut>", self._on_mod_name_focus_out)
 
         ctk.CTkLabel(
             self,
-            text="Author",
+            text=t("project.author_name"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
         ).pack(fill="x", padx=15, pady=(0, 5))
 
-        self.author_var = ctk.StringVar()
         self.author_entry = ctk.CTkEntry(
             self,
             textvariable=self.author_var,
@@ -91,16 +101,20 @@ class Sidebar(ctk.CTkFrame):
         )
         self.author_entry.pack(fill="x", padx=15, pady=(0, 15))
 
-        self.author_placeholder = "Your name..."
-        self.author_entry.insert(0, self.author_placeholder)
-        self.author_entry.configure(text_color="#888888")
+        self.author_placeholder = t("project.author_name_placeholder")
+        if self._author_is_placeholder:
+            self.author_var.set("")
+            self.author_entry.insert(0, self.author_placeholder)
+            self.author_entry.configure(text_color="#888888")
+        else:
+            self.author_entry.configure(text_color=state.colors["text"])
 
         self.author_entry.bind("<FocusIn>", self._on_author_focus_in)
         self.author_entry.bind("<FocusOut>", self._on_author_focus_out)
 
         ctk.CTkLabel(
             self,
-            text="Output Location",
+            text=t("project.output_mode"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
@@ -115,7 +129,7 @@ class Sidebar(ctk.CTkFrame):
 
         self.steam_radio_sidebar = ctk.CTkRadioButton(
             steam_option_sidebar,
-            text="Steam default",
+            text=t("project.steam_path"),
             variable=self.output_mode_var,
             value="steam",
             fg_color=state.colors["accent"],
@@ -134,7 +148,7 @@ class Sidebar(ctk.CTkFrame):
 
         self.custom_radio_sidebar = ctk.CTkRadioButton(
             custom_option_sidebar,
-            text="Custom Location",
+            text=t("project.custom_location"),
             variable=self.output_mode_var,
             value="custom",
             fg_color=state.colors["accent"],
@@ -153,7 +167,7 @@ class Sidebar(ctk.CTkFrame):
         custom_output_entry = ctk.CTkEntry(
             self.custom_output_frame,
             textvariable=self.custom_output_var,
-            placeholder_text="Select folder...",
+            placeholder_text=t("project.select_output"),
             placeholder_text_color="#888888",
             state="readonly",
             height=32,
@@ -183,7 +197,7 @@ class Sidebar(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self,
-            text="Vehicles",
+            text=t("project.add_vehicle"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
@@ -205,6 +219,7 @@ class Sidebar(ctk.CTkFrame):
         )
         self.sidebar_search_entry.pack(fill="x")
 
+        self.sidebar_search_placeholder = t("common.search_vehicle")
         self.sidebar_search_var.set(self.sidebar_search_placeholder)
         self.sidebar_search_entry.configure(text_color="#888888")
 
@@ -223,27 +238,31 @@ class Sidebar(ctk.CTkFrame):
 
     def _on_mod_name_focus_in(self, event):
         """Handle focus in for mod name entry"""
-        if self.mod_name_entry.get() == self.mod_name_placeholder:
+        if self._mod_name_is_placeholder:
             self.mod_name_entry.delete(0, "end")
             self.mod_name_entry.configure(text_color=state.colors["text"])
+            self._mod_name_is_placeholder = False
 
     def _on_mod_name_focus_out(self, event):
         """Handle focus out for mod name entry"""
         if not self.mod_name_entry.get():
             self.mod_name_entry.insert(0, self.mod_name_placeholder)
             self.mod_name_entry.configure(text_color="#888888")
+            self._mod_name_is_placeholder = True
 
     def _on_author_focus_in(self, event):
         """Handle focus in for author entry"""
-        if self.author_entry.get() == self.author_placeholder:
+        if self._author_is_placeholder:
             self.author_entry.delete(0, "end")
             self.author_entry.configure(text_color=state.colors["text"])
+            self._author_is_placeholder = False
 
     def _on_author_focus_out(self, event):
         """Handle focus out for author entry"""
         if not self.author_entry.get():
             self.author_entry.insert(0, self.author_placeholder)
             self.author_entry.configure(text_color="#888888")
+            self._author_is_placeholder = True
 
     def _on_search_focus_in(self, event):
         """Handle focus in for search entry - remove placeholder"""
@@ -296,6 +315,7 @@ class Sidebar(ctk.CTkFrame):
         print(f"[DEBUG] select_custom_output called")
         """Select custom output directory"""
         temp_window = ctk.CTkToplevel(self.winfo_toplevel())
+        set_window_icon(temp_window)
         temp_window.withdraw()
         temp_window.attributes('-alpha', 0)
 
@@ -327,6 +347,9 @@ class Sidebar(ctk.CTkFrame):
             add_callback: Function that takes (carid, display_name) and adds vehicle to project
         """
         print("[DEBUG] Populating sidebar with vehicles...")
+
+        # Clear stale widget references from any previous build before repopulating
+        state.sidebar_vehicle_buttons.clear()
 
         all_vehicles = {}
 
@@ -378,14 +401,14 @@ class Sidebar(ctk.CTkFrame):
 
         add_btn = ctk.CTkButton(
             add_button_frame,
-            text="➕ Add to Project",
+            text="➕ " + t("project.add_vehicle_to_project"), 
             command=lambda c=carid, d=display_name: add_callback(c, d),
             fg_color=state.colors["accent"],
             hover_color=state.colors["accent_hover"],
             text_color=state.colors["accent_text"],
             height=32,
             corner_radius=6,
-            font=ctk.CTkFont(size=10, weight="bold")
+            font=ctk.CTkFont(size=12, weight="bold")
         )
         add_btn.pack(fill="x")
 
@@ -419,6 +442,17 @@ class Sidebar(ctk.CTkFrame):
 
             add_button_frame.pack(fill="x", padx=5, pady=(0, 5))
             self.expanded_vehicle_carid = carid
+
+    def refresh_ui(self, populate_callback: Callable[[str, str], None] = None):
+        """Rebuild the sidebar UI for language/theme changes, preserving user data"""
+        if populate_callback:
+            self._populate_callback = populate_callback
+        for widget in self.winfo_children():
+            widget.destroy()
+        self.configure(fg_color=state.colors["sidebar_bg"])
+        self._setup_ui()
+        if hasattr(self, '_populate_callback') and self._populate_callback:
+            self.populate_vehicles(self._populate_callback)
 
     def update_icons(self, steam_icon, folder_icon):
 
@@ -487,12 +521,13 @@ class Topbar(ctk.CTkFrame):
         self.menu_frame.pack(side="left", padx=(150, 40))
 
         menu_items = [
-            ("Project", "generator"),
-            ("How to Use", "howto"),
-            ("Car List", "carlist"),
-            ("Add Vehicles", "add_vehicles"),
-            ("Settings", "settings"),
-            ("About", "about")
+            (t("menu.generator"), "generator"),
+            (t("menu.HowToTab"), "howto"),
+            (t("menu.carlist"), "carlist"),
+            (t("menu.add_vehicles"), "add_vehicles"),
+            (t("menu.settings"), "settings"),
+            (t("menu.about"), "about"),
+            (t("menu.online"), "online_tab"),
         ]
 
         for btn_text, view_name in menu_items:
@@ -503,7 +538,7 @@ class Topbar(ctk.CTkFrame):
                 width=110,
                 height=36,
                 fg_color=state.colors["accent"] if is_first else "transparent",
-                hover_color=state.colors["accent_hover"] if is_first else state.colors["card_hover"],
+                hover_color=state.colors["tab_selected_hover"] if is_first else state.colors["tab_unselected_hover"],
                 text_color=state.colors["accent_text"] if is_first else state.colors["text_secondary"],
                 corner_radius=8,
                 font=ctk.CTkFont(size=12, weight="bold" if is_first else "normal"),
@@ -514,7 +549,7 @@ class Topbar(ctk.CTkFrame):
 
         self.generate_button = ctk.CTkButton(
             self,
-            text="✨ Generate Mod",
+            text=f"✨ {t('project.generate_mod')}",
             command=self.on_generate,
             height=40,
             width=150,
@@ -526,12 +561,16 @@ class Topbar(ctk.CTkFrame):
         )
         self.generate_button.pack(side="right", padx=25)
 
-    def update_logo(self, logo_image):
-
-        print(f"[DEBUG] update_logo called")
-        """Update the logo image when theme changes"""
-        self.logo_image = logo_image
-
+    def refresh_ui(self):
+        """Rebuild topbar for theme/language changes"""
+        self.configure(fg_color=state.colors["topbar_bg"])
+        self.menu_buttons.clear()
         for widget in self.winfo_children():
             widget.destroy()
         self._setup_ui()
+
+    def update_logo(self, logo_image):
+        """Update the logo image and rebuild topbar"""
+        print(f"[DEBUG] update_logo called")
+        self.logo_image = logo_image
+        self.refresh_ui()

@@ -2,24 +2,88 @@
 Dialog Components - Reusable dialog windows and notifications
 """
 import customtkinter as ctk
+from gui.icon_helper import set_window_icon
 import webbrowser
+import threading
 from gui.state import state
 from gui.components.setup_wizard import show_setup_wizard
+
+try:
+    from core.localization import t
+except ImportError:
+    def t(key, **kwargs): return kwargs.get('default', key)
+
+
+
+
+
+
+def run_startup_sequence(app, show_offline_dialog_fn=None, on_complete=None):
+    def _step3_offline():
+        """Show server offline dialog, then call on_complete."""
+        import utils.connection as connection
+
+        def _do():
+            if not connection.is_online and show_offline_dialog_fn:
+                print("[STARTUP] Server offline — showing offline dialog")
+                show_offline_dialog_fn()
+            else:
+                print("[STARTUP] Server online — skipping offline dialog")
+            if on_complete:
+                on_complete()
+
+        # Wait until the connection check has finished (poll every 150 ms, up to 10 s)
+        _poll_offline(app, connection, _do, attempts=0)
+
+    def _poll_offline(app, connection, callback, attempts):
+        if connection.check_complete or attempts >= 67:
+            app.after(0, callback)
+        else:
+            app.after(150, lambda: _poll_offline(app, connection, callback, attempts + 1))
+
+    def _step2_updates():
+        """Run update check; when done (dialog closed or no update), go to step 3."""
+        print("[STARTUP] Checking for updates…")
+        try:
+            from core.updater import check_for_updates
+            # check_for_updates now accepts on_done so step 3 fires after dialog closes
+            threading.Thread(
+                target=check_for_updates,
+                kwargs={"on_done": lambda: app.after(0, _step3_offline)},
+                daemon=True,
+            ).start()
+        except Exception as e:
+            print(f"[STARTUP] Update check error: {e}")
+            app.after(0, _step3_offline)
+
+    def _step1b_changelog():
+        """Show changelog for this version (once per version), then move to step 2."""
+        print("[STARTUP] Checking changelog…")
+        try:
+            from core.updater import CURRENT_VERSION
+            from gui.components.changelog_dialog import show_changelog_if_needed
+            show_changelog_if_needed(app, CURRENT_VERSION)  # blocks via wait_window
+        except Exception as e:
+            print(f"[STARTUP] Changelog error: {e}")
+        print("[STARTUP] Changelog step done — proceeding to update check")
+        app.after(0, _step2_updates)
+
+    def _step1_wip():
+        """Show WIP warning (blocks until closed), then move to step 1b."""
+        print("[STARTUP] Showing WIP warning…")
+        show_wip_warning(app)          # blocks via wait_window
+        print("[STARTUP] WIP warning closed — proceeding to changelog")
+        app.after(0, _step1b_changelog)
+
+    # Kick off the chain
+    app.after(0, _step1_wip)
+
+
 
 def show_notification(app, message, type="info", duration=3000):
 
     print(f"[DEBUG] show_notification called")
-    """
-    Display a notification at the top of the app.
-
-    Args:
-        app: The main CTk application window
-        message: Notification message
-        type: Notification type ('info', 'success', 'warning', 'error')
-        duration: How long to show notification in milliseconds (0 = permanent)
-
-    Types: 'info', 'success', 'warning', 'error'
-    """
+    
     if not app:
         print(f"[WARNING] Could not show notification (no app window): {message}")
         print(f"[{type.upper()}] {message}")
@@ -110,6 +174,7 @@ def show_confirmation_dialog(parent, title: str, message: str) -> bool:
     dialog.resizable(False, False)
     dialog.transient(parent)
     dialog.grab_set()
+    set_window_icon(dialog)
 
     dialog.update_idletasks()
     width = dialog.winfo_width()
@@ -202,11 +267,12 @@ def show_update_dialog(app, new_version):
     from core.updater import CURRENT_VERSION
 
     update_window = ctk.CTkToplevel(app)
-    update_window.title("Update Available")
+    update_window.title(t("dialogs.update_available", default="Update Available"))
     update_window.geometry("500x350")
     update_window.resizable(False, False)
     update_window.transient(app)
     update_window.grab_set()
+    set_window_icon(update_window)
 
     update_window.update_idletasks()
     width = update_window.winfo_width()
@@ -220,7 +286,7 @@ def show_update_dialog(app, new_version):
 
     title_label = ctk.CTkLabel(
         main_frame,
-        text="🎉 Update Available!",
+        text="🎉 " + t("dialogs.update_available", default="Update Available!"),
         font=ctk.CTkFont(size=20, weight="bold"),
         text_color=state.colors["accent"]
     )
@@ -231,7 +297,7 @@ def show_update_dialog(app, new_version):
 
     current_label = ctk.CTkLabel(
         info_frame,
-        text=f"Current Version: {CURRENT_VERSION}",
+        text=t("dialogs.current_version", version=CURRENT_VERSION, default=f"Current Version: {CURRENT_VERSION}"),
         font=ctk.CTkFont(size=13),
         text_color=state.colors["text"]
     )
@@ -247,7 +313,7 @@ def show_update_dialog(app, new_version):
 
     new_label = ctk.CTkLabel(
         info_frame,
-        text=f"New Version: {new_version}",
+        text=t("dialogs.new_version", version=new_version, default=f"New Version: {new_version}"),
         font=ctk.CTkFont(size=13, weight="bold"),
         text_color=state.colors["accent"]
     )
@@ -255,7 +321,7 @@ def show_update_dialog(app, new_version):
 
     message_label = ctk.CTkLabel(
         main_frame,
-        text="Would you like to open the GitHub page to download it?",
+        text=t("dialogs.update_message", default="Would you like to open the GitHub page to download it?"),
         font=ctk.CTkFont(size=12),
         text_color=state.colors["text"]
     )
@@ -281,7 +347,7 @@ def show_update_dialog(app, new_version):
 
     download_btn = ctk.CTkButton(
         button_frame,
-        text="Download Update",
+        text=t("dialogs.download_update", default="Download Update"),
         command=download_update,
         fg_color=state.colors["accent"],
         hover_color=state.colors["accent_hover"],
@@ -294,7 +360,7 @@ def show_update_dialog(app, new_version):
 
     later_btn = ctk.CTkButton(
         button_frame,
-        text="Maybe Later",
+        text=t("dialogs.maybe_later", default="Maybe Later"),
         command=skip_update,
         fg_color=state.colors["card_bg"],
         hover_color=state.colors["card_hover"],
@@ -318,10 +384,11 @@ def show_wip_warning(app):
     if state.app_settings.get("first_launch", True):
         print(f"[DEBUG] First launch detected - showing WIP warning dialog")
         dialog = ctk.CTkToplevel(app)
-        dialog.title("Welcome to BeamSkin Studio")
+        dialog.title(t("dialogs.wip_warning_title", default="Welcome to BeamSkin Studio"))
         dialog.geometry("550x700")
         dialog.transient(app)
         dialog.grab_set()
+        set_window_icon(dialog)
         print(f"[DEBUG] Dialog created")
 
         dialog.update_idletasks()
@@ -347,7 +414,7 @@ def show_wip_warning(app):
 
         ctk.CTkLabel(
             title_frame,
-            text="Work-In-Progress Software",
+            text=t("wip.wip_warning_title", default="Work-In-Progress Software"),
             font=ctk.CTkFont(size=20, weight="bold"),
             text_color=state.colors["text"]
         ).pack(pady=(10, 0))
@@ -355,25 +422,23 @@ def show_wip_warning(app):
         message_frame = ctk.CTkFrame(main_frame, fg_color=state.colors["card_bg"], corner_radius=12)
         message_frame.pack(fill="both", expand=True, pady=(0, 20))
 
-        message_text = (
-            "Welcome to BeamSkin Studio!\n"
-            "This application is currently in active development.\n"
-            "While I strive to provide a stable experience, some features may not work\n\n"
-            "Please note:\n"
-            "Some features may be incomplete\n"
-            "Occasional bugs or unexpected behavior may occur\n"
-            "Updates and improvements are being made\n\n"
-            "Your feedback helps me improve the software!\n"
-            "If you encounter any issues, please report them on my GitHub page. "
-            "Your bug reports and feature suggestions are valuable to making "
-            "BeamSkin Studio better!\n\n"
-            " I appreciate your understanding and support as I continue "
-            "to enhance BeamSkin Studio."
-        )
-
         ctk.CTkLabel(
             message_frame,
-            text=message_text,
+            text=t("wip.wip_warning_message", default=(
+                "Welcome to BeamSkin Studio!\n"
+                "This application is currently in active development.\n"
+                "While I strive to provide a stable experience, some features may not work\n\n"
+                "Please note:\n"
+                "Some features may be incomplete\n"
+                "Occasional bugs or unexpected behavior may occur\n"
+                "Updates and improvements are being made\n\n"
+                "Your feedback helps me improve the software!\n"
+                "If you encounter any issues, please report them on my GitHub page. "
+                "Your bug reports and feature suggestions are valuable to making "
+                "BeamSkin Studio better!\n\n"
+                " I appreciate your understanding and support as I continue "
+                "to enhance BeamSkin Studio."
+            )),
             font=ctk.CTkFont(size=18),
             text_color=state.colors["text"],
             justify="center",
@@ -383,7 +448,7 @@ def show_wip_warning(app):
         dont_show_var = ctk.BooleanVar(value=False)
         checkbox = ctk.CTkCheckBox(
             main_frame,
-            text="Don't show this message again",
+            text=t("wip.wip_dont_show", default="Don't show this message again"),
             variable=dont_show_var,
             font=ctk.CTkFont(size=12),
             text_color=state.colors["text"]
@@ -405,7 +470,7 @@ def show_wip_warning(app):
 
         ctk.CTkButton(
             main_frame,
-            text="I Understand",
+            text=t("wip.wip_understand", default="I Understand"),
             command=on_ok,
             fg_color=state.colors["accent"],
             hover_color=state.colors["accent_hover"],

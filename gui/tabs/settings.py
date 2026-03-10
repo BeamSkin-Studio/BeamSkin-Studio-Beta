@@ -8,6 +8,7 @@ import sys
 import os
 from gui.state import state
 from core.settings import reset_theme_colors, update_theme_color, DEFAULT_THEMES
+from core.localization import t, set_language, get_available_languages, get_current_language
 from utils.debug import toggle_debug_mode
 from gui.components.path_configuration import PathConfigurationSection
 
@@ -55,6 +56,16 @@ class SettingsTab(ctk.CTkFrame):
             print("[ERROR] Could not find root window!")
             return None
 
+    def refresh_ui(self):
+        """Refresh UI text after language change"""
+        print("[DEBUG] SettingsTab.refresh_ui called")
+        # This will rebuild the entire settings UI with new translations
+        # Clear existing widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+        # Rebuild UI with new language
+        self._setup_ui()
+
     def _setup_ui(self):
         """Set up the settings UI"""
 
@@ -75,75 +86,158 @@ class SettingsTab(ctk.CTkFrame):
         self.settings_canvas.bind("<Configure>", self._check_settings_scroll)
         self.settings_canvas.after(100, self._check_settings_scroll)
 
+        # Main Title
         ctk.CTkLabel(
             self.settings_scrollable_frame,
-            text="Settings",
-            font=ctk.CTkFont(size=16, weight="bold"),
+            text=t("settings.title"),
+            font=ctk.CTkFont(size=20, weight="bold"),
             text_color=state.colors["text"]
-        ).pack(anchor="w", padx=10, pady=(10, 5))
+        ).pack(anchor="w", padx=20, pady=(20, 10))
 
+        # ═══════════════════════════════════════════════════════
+        # PATH CONFIGURATION SECTION
+        # ═══════════════════════════════════════════════════════
         self.path_config = PathConfigurationSection(
             self.settings_scrollable_frame,
             notification_callback=self.show_notification
         )
-        self.path_config.pack(fill="x", padx=10, pady=(10, 15))
+        self.path_config.pack(fill="x", padx=20, pady=(0, 20))
+
+        # ═══════════════════════════════════════════════════════
+        # APPEARANCE SECTION
+        # ═══════════════════════════════════════════════════════
+        appearance_card = ctk.CTkFrame(
+            self.settings_scrollable_frame,
+            fg_color=state.colors["card_bg"],
+            corner_radius=12,
+            border_width=1,
+            border_color=state.colors["border"]
+        )
+        appearance_card.pack(fill="x", padx=20, pady=(0, 20))
+
+        # Section Header
+        ctk.CTkLabel(
+            appearance_card,
+            text=t("settings.appearance"),
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=state.colors["text"]
+        ).pack(anchor="w", padx=20, pady=(20, 15))
+
+        # Theme Toggle
+        theme_frame = ctk.CTkFrame(appearance_card, fg_color="transparent")
+        theme_frame.pack(anchor="w", padx=20, pady=(0, 15), fill="x")
 
         ctk.CTkLabel(
-            self.settings_scrollable_frame,
-            text="─" * 60,
-            text_color=state.colors["border"]
-        ).pack(pady=10)
-
-        theme_frame = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
-        theme_frame.pack(anchor="w", padx=10, pady=(0, 10), fill="x")
-
-        ctk.CTkLabel(theme_frame, text="Theme:", text_color=state.colors["text"]).pack(side="left", padx=(0, 10))
-        ctk.CTkLabel(theme_frame, text="Dark Mode", text_color=state.colors["text"]).pack(side="left", padx=(0, 5))
+            theme_frame,
+            text=t("settings.theme"),
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=state.colors["text"]
+        ).pack(side="left", padx=(0, 15))
+        
+        ctk.CTkLabel(
+            theme_frame,
+            text=t("settings.theme_dark"),
+            text_color=state.colors["text"]
+        ).pack(side="left", padx=(0, 5))
 
         self.theme_switch = ctk.CTkSwitch(theme_frame, text="", command=self._toggle_theme, width=50)
         if state.current_theme == "light":
             self.theme_switch.select()
         self.theme_switch.pack(side="left", padx=5)
-        ctk.CTkLabel(theme_frame, text="Light Mode", text_color=state.colors["text"]).pack(side="left")
+        
+        ctk.CTkLabel(
+            theme_frame,
+            text=t("settings.theme_light"),
+            text_color=state.colors["text"]
+        ).pack(side="left")
 
-        debug_checkbox = ctk.CTkCheckBox(
+        # Language Selector
+        self._setup_language_selector(appearance_card)
+
+        # Bottom padding for appearance card
+        ctk.CTkLabel(appearance_card, text="", height=5).pack()
+
+        # ═══════════════════════════════════════════════════════
+        # ADVANCED SECTION
+        # ═══════════════════════════════════════════════════════
+        advanced_card = ctk.CTkFrame(
             self.settings_scrollable_frame,
-            text="Debug Mode (Opens debug console)",
-            variable=self.debug_mode_var,
-            command=self._toggle_debug_mode
+            fg_color=state.colors["card_bg"],
+            corner_radius=12,
+            border_width=1,
+            border_color=state.colors["border"]
         )
-        debug_checkbox.pack(anchor="w", padx=10, pady=(0, 10))
+        advanced_card.pack(fill="x", padx=20, pady=(0, 20))
 
+        # Section Header
         ctk.CTkLabel(
-            self.settings_scrollable_frame,
-            text="─" * 60,
-            text_color=state.colors["border"]
-        ).pack(pady=10)
-
-        ctk.CTkLabel(
-            self.settings_scrollable_frame,
-            text="Theme Customization",
+            advanced_card,
+            text=t("settings.advanced"),
             font=ctk.CTkFont(size=16, weight="bold"),
             text_color=state.colors["text"]
-        ).pack(anchor="w", padx=10, pady=(10, 5))
+        ).pack(anchor="w", padx=20, pady=(20, 15))
+
+        # Debug Mode
+        debug_checkbox = ctk.CTkCheckBox(
+            advanced_card,
+            text=t("settings.debug_mode"),
+            variable=self.debug_mode_var,
+            command=self._toggle_debug_mode,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        debug_checkbox.pack(anchor="w", padx=20, pady=(0, 5))
+        
+        # Debug mode description
+        ctk.CTkLabel(
+            advanced_card,
+            text=t("settings.debug_mode_desc"),
+            font=ctk.CTkFont(size=13),
+            text_color=state.colors["text_secondary"],
+            wraplength=600,
+            justify="left"
+        ).pack(anchor="w", padx=40, pady=(0, 20))
+
+        # ═══════════════════════════════════════════════════════
+        # THEME CUSTOMIZATION SECTION
+        # ═══════════════════════════════════════════════════════
+        theme_custom_card = ctk.CTkFrame(
+            self.settings_scrollable_frame,
+            fg_color=state.colors["card_bg"],
+            corner_radius=12,
+            border_width=1,
+            border_color=state.colors["border"]
+        )
+        theme_custom_card.pack(fill="x", padx=20, pady=(0, 20))
+
+        # Section Header
+        ctk.CTkLabel(
+            theme_custom_card,
+            text=t("settings.theme_customization"),
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=state.colors["text"]
+        ).pack(anchor="w", padx=20, pady=(20, 5))
 
         ctk.CTkLabel(
-            self.settings_scrollable_frame,
-            text="Customize theme colors (requires restart to apply)",
-            font=ctk.CTkFont(size=11),
-            text_color=state.colors["text_secondary"]
-        ).pack(anchor="w", padx=10, pady=(0, 10))
+            theme_custom_card,
+            text=t("settings.customize_desc"),
+            font=ctk.CTkFont(size=13),
+            text_color=state.colors["text_secondary"],
+            wraplength=600,
+            justify="left"
+        ).pack(anchor="w", padx=20, pady=(0, 15))
 
-        self.editors_container = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
+        self.editors_container = ctk.CTkFrame(theme_custom_card, fg_color="transparent")
 
-        dark_edit_frame = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
-        dark_edit_frame.pack(anchor="w", padx=10, pady=(0, 5), fill="x")
+        # Dark Theme Editor Toggle
+        dark_edit_frame = ctk.CTkFrame(theme_custom_card, fg_color="transparent")
+        dark_edit_frame.pack(anchor="w", padx=20, pady=(0, 10), fill="x")
 
         ctk.CTkLabel(
             dark_edit_frame,
-            text="Edit Dark Theme Colors",
+            text=t("settings.edit_dark"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=state.colors["text"]
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 15))
 
         self.dark_edit_switch = ctk.CTkSwitch(
             dark_edit_frame,
@@ -153,14 +247,16 @@ class SettingsTab(ctk.CTkFrame):
         )
         self.dark_edit_switch.pack(side="left")
 
-        light_edit_frame = ctk.CTkFrame(self.settings_scrollable_frame, fg_color="transparent")
-        light_edit_frame.pack(anchor="w", padx=10, pady=(0, 10), fill="x")
+        # Light Theme Editor Toggle
+        light_edit_frame = ctk.CTkFrame(theme_custom_card, fg_color="transparent")
+        light_edit_frame.pack(anchor="w", padx=20, pady=(0, 20), fill="x")
 
         ctk.CTkLabel(
             light_edit_frame,
-            text="Edit Light Theme Colors",
+            text=t("settings.edit_light"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=state.colors["text"]
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 15))
 
         self.light_edit_switch = ctk.CTkSwitch(
             light_edit_frame,
@@ -169,6 +265,212 @@ class SettingsTab(ctk.CTkFrame):
             width=50
         )
         self.light_edit_switch.pack(side="left")
+
+        # Bottom padding
+        ctk.CTkLabel(self.settings_scrollable_frame, text="", height=20).pack()
+
+    def _setup_language_selector(self, parent_frame):
+        """Set up the language selection UI"""
+        from PIL import Image
+        
+        # Language Section Frame - within provided parent (appearance card)
+        language_section = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        language_section.pack(anchor="w", padx=20, pady=(0, 15), fill="x")
+        
+        # Language label
+        ctk.CTkLabel(
+            language_section,
+            text=t("settings.language"),
+            text_color=state.colors["text"],
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(side="left", padx=(0, 15))
+        
+        # Get available languages
+        available_langs = get_available_languages()
+        current_lang = get_current_language()
+        
+        # Check if languages are available
+        if not available_langs:
+            print("[ERROR] No languages available!")
+            return
+        
+        # Get program root directory
+        if getattr(sys, 'frozen', False):
+            program_root = os.path.dirname(sys.executable)
+        else:
+            # Get the actual script location and go up to root
+            try:
+                # This file is gui/tabs/settings.py, so go up 2 levels to get to root
+                current_file = os.path.abspath(__file__)
+                gui_dir = os.path.dirname(current_file)  # gui/tabs
+                gui_parent = os.path.dirname(gui_dir)     # gui
+                program_root = os.path.dirname(gui_parent) # root
+                print(f"[DEBUG] Resolved path: file={current_file}, gui={gui_dir}, gui_parent={gui_parent}, root={program_root}")
+            except:
+                # Fallback: use current working directory
+                program_root = os.getcwd()
+                print(f"[DEBUG] Using fallback path: {program_root}")
+        
+        self.flags_dir = os.path.join(program_root, "imagesforgui", "flags")
+        
+        # Debug output
+        print(f"[DEBUG] Program root: {program_root}")
+        print(f"[DEBUG] Flags directory: {self.flags_dir}")
+        print(f"[DEBUG] Flags directory exists: {os.path.exists(self.flags_dir)}")
+        if os.path.exists(self.flags_dir):
+            try:
+                files = os.listdir(self.flags_dir)
+                print(f"[DEBUG] Files in flags directory: {files}")
+            except Exception as e:
+                print(f"[DEBUG] Error listing flags directory: {e}")
+        
+        # Container for flag image and button
+        lang_container = ctk.CTkFrame(language_section, fg_color="transparent")
+        lang_container.pack(side="left")
+        
+        # Load and display current language flag
+        # Get default language as fallback
+        default_lang = list(available_langs.keys())[0] if available_langs else "en_US"
+        current_lang_info = available_langs.get(current_lang, available_langs.get(default_lang, {"flag": "US", "native": "English"}))
+        flag_code = current_lang_info.get("flag", "US")
+        # Clean up flag code - remove spaces, underscores, convert to uppercase, take first 2 chars
+        flag_code = flag_code.replace(" ", "").replace("-", "").replace("_", "").upper()
+        if len(flag_code) > 2:
+            flag_code = flag_code[:2]
+        
+        # Special case: "EN" should map to "US" or "GB" 
+        if flag_code == "EN":
+            flag_code = "US"  # Default English to US flag
+        
+        # Convert to lowercase for filename (flag files are lowercase)
+        flag_filename = flag_code.lower()
+        flag_path = os.path.join(self.flags_dir, f"{flag_filename}.png")
+        
+        print(f"[DEBUG] Current language: {current_lang}")
+        print(f"[DEBUG] Current language info: {current_lang_info}")
+        print(f"[DEBUG] Original flag code: {current_lang_info.get('flag')}, cleaned: {flag_code}, filename: {flag_filename}")
+        print(f"[DEBUG] Flag path: {flag_path}")
+        print(f"[DEBUG] Flag file exists: {os.path.exists(flag_path)}")
+        
+        self.current_flag_label = None
+        if os.path.exists(flag_path):
+            try:
+                flag_image = Image.open(flag_path)
+                flag_image = flag_image.resize((24, 24), Image.Resampling.LANCZOS)
+                flag_photo = ctk.CTkImage(light_image=flag_image, dark_image=flag_image, size=(24, 24))
+                self.current_flag_label = ctk.CTkLabel(lang_container, image=flag_photo, text="")
+                self.current_flag_label.image = flag_photo  # Keep reference to prevent garbage collection
+                self.current_flag_label.pack(side="left", padx=(0, 5))
+                print(f"[DEBUG] Flag image loaded successfully")
+            except Exception as e:
+                print(f"[ERROR] Failed to load flag image {flag_path}: {e}")
+        else:
+            print(f"[WARNING] Flag file not found: {flag_path}")
+        
+        # Create button to open language selector
+        self.language_button = ctk.CTkButton(
+            lang_container,
+            text=current_lang_info.get("native", "English"),
+            command=self._open_language_selector,
+            fg_color=state.colors["card_bg"],
+            hover_color=state.colors["accent_hover"],
+            text_color=state.colors["text"],
+            border_width=1,
+            border_color=state.colors["border"],
+            width=200
+        )
+        self.language_button.pack(side="left")
+
+    def _open_language_selector(self):
+        """Open the language selection window"""
+        print("[DEBUG] _open_language_selector called")
+        # Prevent multiple windows from opening
+        if hasattr(self, '_lang_window') and self._lang_window and self._lang_window.winfo_exists():
+            print("[DEBUG] Window already exists, focusing it")
+            self._lang_window.focus()
+            return
+        
+        print("[DEBUG] Creating new language selector window")
+        try:
+            parent = self.root_app if self.root_app else self
+            self._lang_window = LanguageSelectorWindow(parent, self.flags_dir, self._on_language_selected)
+            print("[DEBUG] Language selector window created successfully")
+        except Exception as e:
+            print(f"[ERROR] Failed to create language selector window: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_language_selected(self, lang_code):
+        """Handle language selection from the selector window"""
+        from PIL import Image
+        
+        print(f"[DEBUG] Changing language to: {lang_code}")
+        
+        # Set the new language
+        if set_language(lang_code):
+            # Update flag image and button text
+            available_langs = get_available_languages()
+            lang_info = available_langs.get(lang_code)
+            if lang_info:
+                # Update button text
+                self.language_button.configure(text=lang_info.get("native", "English"))
+                
+                # Update flag image
+                if self.current_flag_label:
+                    flag_code = lang_info.get("flag", "US")
+                    # Clean up flag code
+                    flag_code = flag_code.replace(" ", "").replace("-", "").replace("_", "").upper()
+                    if len(flag_code) > 2:
+                        flag_code = flag_code[:2]
+                    
+                    # Special case: "EN" should map to "US"
+                    if flag_code == "EN":
+                        flag_code = "US"
+                    
+                    # Convert to lowercase for filename
+                    flag_filename = flag_code.lower()
+                    flag_path = os.path.join(self.flags_dir, f"{flag_filename}.png")
+                    
+                    if os.path.exists(flag_path):
+                        try:
+                            flag_image = Image.open(flag_path)
+                            flag_image = flag_image.resize((24, 24), Image.Resampling.LANCZOS)
+                            flag_photo = ctk.CTkImage(light_image=flag_image, dark_image=flag_image, size=(24, 24))
+                            self.current_flag_label.configure(image=flag_photo)
+                            self.current_flag_label.image = flag_photo  # Keep a reference
+                        except Exception as e:
+                            print(f"[ERROR] Failed to update flag image {flag_path}: {e}")
+            
+            # Refresh all UI (tabs, topbar, sidebar) with new language strings
+            self._refresh_all_ui()
+
+            # Update menu buttons
+            if self.menu_buttons:
+                self._update_menu_button_text()
+            
+            # Show notification
+            if self.notification_callback:
+                self.notification_callback(
+                    f"Language changed to {lang_info.get('native', 'Unknown')}",
+                    type="success"
+                )
+            
+            print(f"[DEBUG] Language changed successfully to {lang_code}")
+
+    def _update_menu_button_text(self):
+        """Update menu button text after language change"""
+        button_translations = {
+            'generator': 'menu.generator',
+            'carlist': 'menu.carlist',
+            'add_vehicles': 'menu.add_vehicles',
+            'settings': 'menu.settings',
+            'howto': 'menu.HowToTab',
+            'about': 'menu.about'
+        }
+        
+        for btn_name, translation_key in button_translations.items():
+            if btn_name in self.menu_buttons:
+                self.menu_buttons[btn_name].configure(text=t(translation_key))
 
     def _toggle_debug_mode(self):
         """Wrapper to toggle debug mode with correct app reference"""
@@ -198,235 +500,157 @@ class SettingsTab(ctk.CTkFrame):
         bbox = self.settings_canvas.bbox("all")
         if bbox and bbox[3] > self.settings_canvas.winfo_height():
             if not self.settings_scrollbar.winfo_ismapped():
-                self.settings_scrollbar.pack(side="right", fill="y")
-                self.settings_canvas.after(10, lambda: self.settings_canvas.itemconfig(
-                    self.settings_window_id, width=self.settings_canvas.winfo_width()))
+                self.settings_scrollbar.pack(side="right", fill="y", before=self.settings_canvas)
         else:
             if self.settings_scrollbar.winfo_ismapped():
                 self.settings_scrollbar.pack_forget()
-                self.settings_canvas.after(10, lambda: self.settings_canvas.itemconfig(
-                    self.settings_window_id, width=self.settings_canvas.winfo_width()))
 
     def _toggle_theme(self):
-        """Toggle between light and dark themes with app restart"""
-        print("[DEBUG] _toggle_theme called")
+        """Toggle between dark and light themes"""
+        print(f"[DEBUG] _toggle_theme called")
 
-        new_theme = "light" if state.current_theme == "dark" else "dark"
+        from core.settings import toggle_theme, THEMES
 
-        from gui.confirmation_dialog import askyesno
-        response = askyesno(
-            self.winfo_toplevel(),
-            "Restart Required",
-            f"Switch to {new_theme.title()} Mode?\n\n"
-            f"The application will restart to apply the theme change.",
-            state.colors,
-            icon="🔄",
-            danger=False
-        )
+        new_theme = toggle_theme(self.root_app)
 
-        if response:
-            print(f"[DEBUG] User confirmed theme switch to {new_theme}")
+        # Force state in sync regardless of core/settings version
+        state.current_theme = new_theme
+        state.colors.update(THEMES[new_theme])
 
+        print(f"[DEBUG] Theme toggled to: {new_theme}")
+
+        ctk.set_appearance_mode("dark" if new_theme == "dark" else "light")
+
+        self._refresh_all_ui()
+
+    def _refresh_all_ui(self):
+        """Rebuild all UI components after a theme change"""
+        print(f"[DEBUG] _refresh_all_ui called")
+
+        if not self.root_app:
+            print("[WARNING] Cannot refresh UI - root_app not found")
+            return
+
+        # Rebuild every tab that supports it
+        if hasattr(self.root_app, 'tabs'):
+            for tab_name, tab in self.root_app.tabs.items():
+                if hasattr(tab, 'refresh_ui'):
+                    try:
+                        tab.refresh_ui()
+                        print(f"[DEBUG] Rebuilt tab: {tab_name}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to rebuild {tab_name}: {e}")
+
+        # Rebuild topbar (handles its own background + buttons)
+        if hasattr(self.root_app, 'topbar'):
             try:
-                from core.settings import toggle_theme
-                toggle_theme(self.root_app)
-                print(f"[DEBUG] Theme setting saved to {new_theme}")
+                self.root_app.topbar.refresh_ui()
+                print("[DEBUG] Rebuilt topbar")
             except Exception as e:
-                print(f"[ERROR] Failed to toggle theme: {e}")
-                from gui.confirmation_dialog import showerror
-                showerror(
-                    self.winfo_toplevel(),
-                    "Error",
-                    f"Failed to save theme setting:\n{e}",
-                    state.colors
+                print(f"[ERROR] Failed to rebuild topbar: {e}")
+
+        # Update logo icons for the new theme
+        if hasattr(self.root_app, '_update_output_icons'):
+            self.root_app._update_output_icons()
+
+        # Rebuild sidebar
+        if hasattr(self.root_app, 'sidebar'):
+            try:
+                self.root_app.sidebar.refresh_ui(
+                    getattr(self.root_app, '_add_vehicle_to_project_from_sidebar', None)
                 )
+                print("[DEBUG] Rebuilt sidebar")
+            except Exception as e:
+                print(f"[ERROR] Failed to rebuild sidebar: {e}")
 
-                self._revert_theme_switch()
-                return
-
-            self._restart_application()
-        else:
-            print("[DEBUG] User cancelled theme switch - reverting toggle")
-
-            self._revert_theme_switch()
-
-    def _revert_theme_switch(self):
-        """Revert the theme switch to match the current theme"""
-        print(f"[DEBUG] Reverting theme switch to match current theme: {state.current_theme}")
-        if state.current_theme == "light":
-
-            if not self.theme_switch.get():
-                self.theme_switch.select()
-        else:
-
-            if self.theme_switch.get():
-                self.theme_switch.deselect()
-
-    def _restart_application(self):
-        """Restart the application to apply theme changes"""
-        print("[DEBUG] _restart_application called")
-
-        try:
-            python = sys.executable
-
-            if getattr(sys, 'frozen', False):
-
-                script = sys.executable
-            else:
-                script = os.path.abspath(sys.argv[0])
-
-            print(f"[DEBUG] Python executable: {python}")
-            print(f"[DEBUG] Script path: {script}")
-
-            print("[DEBUG] Closing current application window...")
-            if self.root_app:
-                self.root_app.withdraw()
-                self.root_app.quit()
-
-            print("[DEBUG] Starting new application instance...")
-            import subprocess
-
-            if sys.platform == 'win32':
-                if getattr(sys, 'frozen', False):
-
-                    subprocess.Popen([script], creationflags=subprocess.CREATE_NO_WINDOW)
-                else:
-
-                    pythonw = python.replace('python.exe', 'pythonw.exe')
-                    if os.path.exists(pythonw):
-                        subprocess.Popen([pythonw, script])
-                    else:
-                        subprocess.Popen([python, script], creationflags=subprocess.CREATE_NO_WINDOW)
-            else:
-
-                subprocess.Popen([python, script])
-
-            print("[DEBUG] New instance started, exiting current process...")
-
-            sys.exit(0)
-
-        except Exception as e:
-            print(f"[ERROR] Failed to restart application: {e}")
-            import traceback
-            traceback.print_exc()
-
-            messagebox.showerror(
-                "Restart Failed",
-                f"Failed to restart the application:\n\n{e}\n\n"
-                f"Please close and restart the application manually to see the theme changes."
-            )
-
-            if self.root_app:
-                self.root_app.quit()
+        # Re-apply active tab highlight
+        if hasattr(self.root_app, 'switch_view') and hasattr(self.root_app, 'current_tab'):
+            self.root_app.switch_view(self.root_app.current_tab)
 
     def _toggle_dark_theme_editor(self):
-        """Toggle dark theme editor visibility"""
+        """Toggle dark theme color editor"""
+        print(f"[DEBUG] _toggle_dark_theme_editor called")
+
         if self.dark_edit_switch.get():
-            print("[DEBUG] Showing dark theme editor")
-            if self.dark_theme_edit_frame is None:
+            print("[DEBUG] Opening dark theme editor")
+            if not self.dark_theme_edit_frame:
                 self._create_dark_theme_editor()
 
-            self.editors_container.pack(fill="both", expand=True, padx=10, pady=10)
-            self.editors_container.grid_columnconfigure(0, weight=1)
-            self.editors_container.grid_columnconfigure(1, weight=1)
-
-            self.dark_theme_edit_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-
-            if self.light_edit_switch.get() and self.light_theme_edit_frame:
-                self.light_theme_edit_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+            self.dark_theme_edit_frame.pack(fill="x", padx=10, pady=(0, 10), before=self.editors_container)
+            self.editors_container.pack(fill="x", padx=10, pady=(0, 10))
         else:
-            print("[DEBUG] Hiding dark theme editor")
+            print("[DEBUG] Closing dark theme editor")
             if self.dark_theme_edit_frame:
-                self.dark_theme_edit_frame.grid_forget()
-
-            if not self.light_edit_switch.get():
+                self.dark_theme_edit_frame.pack_forget()
                 self.editors_container.pack_forget()
 
     def _toggle_light_theme_editor(self):
-        """Toggle light theme editor visibility"""
+        """Toggle light theme color editor"""
+        print(f"[DEBUG] _toggle_light_theme_editor called")
+
         if self.light_edit_switch.get():
-            print("[DEBUG] Showing light theme editor")
-            if self.light_theme_edit_frame is None:
+            print("[DEBUG] Opening light theme editor")
+            if not self.light_theme_edit_frame:
                 self._create_light_theme_editor()
 
-            self.editors_container.pack(fill="both", expand=True, padx=10, pady=10)
-            self.editors_container.grid_columnconfigure(0, weight=1)
-            self.editors_container.grid_columnconfigure(1, weight=1)
-
-            self.light_theme_edit_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
-
-            if self.dark_edit_switch.get() and self.dark_theme_edit_frame:
-                self.dark_theme_edit_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+            self.light_theme_edit_frame.pack(fill="x", padx=10, pady=(0, 10), before=self.editors_container)
+            self.editors_container.pack(fill="x", padx=10, pady=(0, 10))
         else:
-            print("[DEBUG] Hiding light theme editor")
+            print("[DEBUG] Closing light theme editor")
             if self.light_theme_edit_frame:
-                self.light_theme_edit_frame.grid_forget()
-
-            if not self.dark_edit_switch.get():
+                self.light_theme_edit_frame.pack_forget()
                 self.editors_container.pack_forget()
 
     def _create_color_row(self, parent, theme_name, color_key, entries_dict):
-        """Create a color input row with live preview"""
+        """Create a single color editing row"""
         row_frame = ctk.CTkFrame(parent, fg_color="transparent")
         row_frame.pack(fill="x", pady=2)
 
-        label = ctk.CTkLabel(
+        label_text = state.color_labels.get(color_key, color_key)
+        ctk.CTkLabel(
             row_frame,
-            text=state.color_labels[color_key],
+            text=label_text,
             width=150,
             anchor="w",
             text_color=state.colors["text"]
-        )
-        label.pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 10))
 
         current_color = state.themes[theme_name][color_key]
-        preview = ctk.CTkLabel(
-            row_frame,
-            text="",
-            width=30,
-            height=20,
-            fg_color=current_color,
-            corner_radius=4
-        )
-        preview.pack(side="left", padx=(0, 10))
 
         entry = ctk.CTkEntry(
             row_frame,
             width=100,
-            placeholder_text="#RRGGBB"
+            fg_color=state.colors["card_bg"],
+            text_color=state.colors["text"],
+            border_color=state.colors["border"]
         )
         entry.insert(0, current_color)
         entry.pack(side="left", padx=(0, 10))
 
-        def update_preview(event=None):
-            print(f"[DEBUG] update_preview called")
-            color = entry.get().strip()
-            if color.startswith('#') and len(color) in [4, 7]:
-                try:
-                    preview.configure(fg_color=color)
-                except:
-                    pass
-
-        entry.bind("<KeyRelease>", update_preview)
+        preview = ctk.CTkLabel(
+            row_frame,
+            text="",
+            width=60,
+            height=25,
+            fg_color=current_color,
+            corner_radius=5
+        )
+        preview.pack(side="left", padx=(0, 10))
 
         def pick_color():
-            print(f"[DEBUG] pick_color called")
-            color = colorchooser.askcolor(
-                color=current_color,
-                title=f"Choose {state.color_labels[color_key]}"
-            )
+            color = colorchooser.askcolor(title=f"Choose {label_text}", initialcolor=current_color)
             if color[1]:
                 entry.delete(0, 'end')
                 entry.insert(0, color[1])
-                update_preview()
+                preview.configure(fg_color=color[1])
 
         picker_btn = ctk.CTkButton(
             row_frame,
-            text="🎨",
-            width=30,
+            text="Pick",
+            width=60,
             command=pick_color,
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"]
+            fg_color=state.colors["accent"],
+            hover_color=state.colors["accent_hover"]
         )
         picker_btn.pack(side="left")
 
@@ -657,3 +881,287 @@ class SettingsTab(ctk.CTkFrame):
                 messagebox.showwarning("Warning", message)
             else:
                 messagebox.showinfo("Info", message)
+
+
+class LanguageSelectorWindow(ctk.CTkToplevel):
+    """Language selection window with search functionality"""
+    
+    def __init__(self, parent, flags_dir, callback):
+        super().__init__(parent)
+        
+        print("[DEBUG] LanguageSelectorWindow.__init__ started")
+        
+        self.flags_dir = flags_dir
+        self.callback = callback
+        self.available_langs = get_available_languages()
+        self.current_lang = get_current_language()
+        self.closing = False
+        
+        # Window configuration
+        self.title("Select Language")
+        self.resizable(False, False)
+        self.configure(fg_color=state.colors["app_bg"])
+        
+        # Make this window stay on top of the parent window
+        self.transient(parent)
+        self.attributes('-topmost', True)
+        
+        # Center the window
+        self.update_idletasks()
+        width = 500
+        height = 600
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+        
+        # Debug flag directory
+        print(f"[DEBUG] Language selector flags_dir: {self.flags_dir}")
+        print(f"[DEBUG] Flags directory exists: {os.path.exists(self.flags_dir)}")
+        if os.path.exists(self.flags_dir):
+            files = os.listdir(self.flags_dir)
+            print(f"[DEBUG] Number of flag files: {len(files)}")
+        
+        print("[DEBUG] About to setup UI")
+        self._setup_ui()
+        print("[DEBUG] LanguageSelectorWindow.__init__ completed")
+        
+        # Set up close protocol after UI is ready
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        
+        # Focus and make modal
+        self.lift()
+        self.focus_force()
+        self.grab_set()
+    
+    def _on_close(self):
+        """Handle window close event"""
+        print("[DEBUG] _on_close called")
+        if not self.closing:
+            self.closing = True
+            try:
+                self.grab_release()
+            except:
+                pass
+            self.destroy()
+            print("[DEBUG] Window destroyed")
+    
+    def _setup_ui(self):
+        """Setup the language selector UI"""
+        from PIL import Image
+        
+        # Header
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", padx=20, pady=(20, 10))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="Select Language",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color=state.colors["text"]
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="Choose your preferred language",
+            font=ctk.CTkFont(size=12),
+            text_color=state.colors["text_secondary"]
+        ).pack(anchor="w", pady=(5, 0))
+        
+        # Search bar
+        search_frame = ctk.CTkFrame(self, fg_color="transparent")
+        search_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.search_entry = ctk.CTkEntry(
+            search_frame,
+            placeholder_text="Search languages...",
+            height=40,
+            fg_color=state.colors["card_bg"],
+            border_color=state.colors["border"],
+            text_color=state.colors["text"]
+        )
+        self.search_entry.pack(fill="x")
+        self.search_entry.bind("<KeyRelease>", self._on_search)
+        
+        # Scrollable frame for languages
+        self.languages_frame = ctk.CTkScrollableFrame(
+            self,
+            fg_color=state.colors["app_bg"],
+            scrollbar_button_color=state.colors["accent"],
+            scrollbar_button_hover_color=state.colors["accent_hover"]
+        )
+        self.languages_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Load all languages
+        self._display_languages()
+        
+        # Close button
+        close_btn = ctk.CTkButton(
+            self,
+            text="Cancel",
+            command=self._on_close,
+            fg_color=state.colors["card_bg"],
+            hover_color=state.colors["card_hover"],
+            text_color=state.colors["text"],
+            height=40
+        )
+        close_btn.pack(fill="x", padx=20, pady=(0, 20))
+    
+    def _display_languages(self, filter_text=""):
+        """Display language options with flags"""
+        from PIL import Image
+        
+        # Clear existing widgets
+        for widget in self.languages_frame.winfo_children():
+            widget.destroy()
+        
+        # Filter languages
+        filtered_langs = {}
+        for lang_code, lang_info in self.available_langs.items():
+            if filter_text.lower() in lang_info.get("native", "").lower() or \
+               filter_text.lower() in lang_info.get("name", "").lower():
+                filtered_langs[lang_code] = lang_info
+        
+        # Sort by native name
+        sorted_langs = sorted(filtered_langs.items(), key=lambda x: x[1].get("native", ""))
+        
+        # Display languages
+        for lang_code, lang_info in sorted_langs:
+            self._create_language_button(lang_code, lang_info)
+        
+        # Show "no results" if nothing found
+        if not filtered_langs:
+            ctk.CTkLabel(
+                self.languages_frame,
+                text="No languages found",
+                text_color=state.colors["text_secondary"],
+                font=ctk.CTkFont(size=14)
+            ).pack(pady=50)
+    
+    def _create_language_button(self, lang_code, lang_info):
+        """Create a button for a language option"""
+        from PIL import Image
+        
+        # Is this the current language?
+        is_current = (lang_code == self.current_lang)
+        
+        normal_color = state.colors["accent"] if is_current else state.colors["card_bg"]
+        hover_color  = state.colors["accent_hover"] if is_current else state.colors["card_hover"]
+
+        # Create button frame
+        btn_frame = ctk.CTkFrame(
+            self.languages_frame,
+            fg_color=normal_color,
+            corner_radius=8,
+            height=60
+        )
+        btn_frame.pack(fill="x", pady=5)
+        btn_frame.pack_propagate(False)
+
+        def _on_enter(e): btn_frame.configure(fg_color=hover_color)
+        def _on_leave(e): btn_frame.configure(fg_color=normal_color)
+
+        # Make the frame clickable
+        btn_frame.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        btn_frame.bind("<Enter>", _on_enter)
+        btn_frame.bind("<Leave>", _on_leave)
+        
+        # Inner container for flag and text
+        inner_frame = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        inner_frame.pack(fill="both", expand=True, padx=15, pady=10)
+        inner_frame.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        inner_frame.bind("<Enter>", _on_enter)
+        inner_frame.bind("<Leave>", _on_leave)
+        
+        # Flag image
+        flag_code = lang_info.get("flag", "US")
+        # Clean up flag code - remove spaces, underscores, convert to uppercase, take first 2 chars
+        flag_code = flag_code.replace(" ", "").replace("-", "").replace("_", "").upper()
+        if len(flag_code) > 2:
+            flag_code = flag_code[:2]
+        
+        # Special case: "EN" should map to "US"
+        if flag_code == "EN":
+            flag_code = "US"
+        
+        # Convert to lowercase for filename (flag files are lowercase)
+        flag_filename = flag_code.lower()
+        flag_path = os.path.join(self.flags_dir, f"{flag_filename}.png")
+        
+        # Only print if flag not found (reduce spam)
+        if not os.path.exists(flag_path):
+            print(f"[DEBUG] Creating button for {lang_code}, flag not found: {flag_filename}")
+        
+        if os.path.exists(flag_path):
+            try:
+                flag_image = Image.open(flag_path)
+                flag_image = flag_image.resize((32, 32), Image.Resampling.LANCZOS)
+                flag_photo = ctk.CTkImage(light_image=flag_image, dark_image=flag_image, size=(32, 32))
+                flag_label = ctk.CTkLabel(inner_frame, image=flag_photo, text="")
+                flag_label.image = flag_photo  # Keep reference
+                flag_label.pack(side="left", padx=(0, 15))
+                flag_label.bind("<Button-1>", lambda e: self._select_language(lang_code))
+                flag_label.bind("<Enter>", _on_enter)
+                flag_label.bind("<Leave>", _on_leave)
+            except Exception as e:
+                print(f"[ERROR] Failed to load flag image {flag_path}: {e}")
+        
+        # Text container
+        text_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
+        text_frame.pack(side="left", fill="both", expand=True)
+        text_frame.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        text_frame.bind("<Enter>", _on_enter)
+        text_frame.bind("<Leave>", _on_leave)
+        
+        # Native name
+        native_label = ctk.CTkLabel(
+            text_frame,
+            text=lang_info.get("native", lang_code),
+            font=ctk.CTkFont(size=16, weight="bold" if is_current else "normal"),
+            text_color="#ffffff" if is_current else state.colors["text"],
+            anchor="w"
+        )
+        native_label.pack(anchor="w")
+        native_label.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        native_label.bind("<Enter>", _on_enter)
+        native_label.bind("<Leave>", _on_leave)
+        
+        # English name
+        english_label = ctk.CTkLabel(
+            text_frame,
+            text=lang_info.get("name", ""),
+            font=ctk.CTkFont(size=12),
+            text_color="#e0e0e0" if is_current else state.colors["text_secondary"],
+            anchor="w"
+        )
+        english_label.pack(anchor="w")
+        english_label.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        english_label.bind("<Enter>", _on_enter)
+        english_label.bind("<Leave>", _on_leave)
+        
+        # Current indicator
+        if is_current:
+            indicator = ctk.CTkLabel(
+                inner_frame,
+                text="✓",
+                font=ctk.CTkFont(size=24, weight="bold"),
+                text_color="#ffffff"
+            )
+            indicator.pack(side="right")
+            indicator.bind("<Button-1>", lambda e: self._select_language(lang_code))
+            indicator.bind("<Enter>", _on_enter)
+            indicator.bind("<Leave>", _on_leave)
+    
+    def _on_search(self, event):
+        """Handle search input"""
+        filter_text = self.search_entry.get()
+        self._display_languages(filter_text)
+    
+    def _select_language(self, lang_code):
+        """Handle language selection"""
+        print(f"[DEBUG] _select_language called with {lang_code}")
+        if not self.closing:
+            self.closing = True
+            self.grab_release()
+            self.callback(lang_code)
+            self.destroy()
+            print("[DEBUG] Language selected and window destroyed")

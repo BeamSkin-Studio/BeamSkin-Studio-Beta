@@ -10,6 +10,7 @@ import json
 import os
 
 from gui.state import state
+from core.localization import t
 
 try:
     from utils.file_ops import load_added_vehicles_json
@@ -46,9 +47,11 @@ class GeneratorTab(ctk.CTkFrame):
         self.project_search_entry: Optional[ctk.CTkEntry] = None
         self.current_car_label: Optional[ctk.CTkLabel] = None
         self.dds_preview_label: Optional[ctk.CTkLabel] = None
+        self.color_map_preview_label: Optional[ctk.CTkLabel] = None
         self.progress_bar: Optional[ctk.CTkProgressBar] = None
         self.export_status_label: Optional[ctk.CTkLabel] = None
         self.skin_name_entry: Optional[ctk.CTkEntry] = None
+        self.dds_entry: Optional[ctk.CTkEntry] = None
         self.jpg_file_entry: Optional[ctk.CTkEntry] = None
         self.config_name_entry: Optional[ctk.CTkEntry] = None
 
@@ -68,6 +71,11 @@ class GeneratorTab(ctk.CTkFrame):
 
         self.pc_file_from_project = False
         self.jpg_file_from_project = False
+
+        # Colorable skin variables
+        self.use_colorable_var = ctk.BooleanVar(value=False)
+        self.data_map_path_var = ctk.StringVar()
+        self.color_map_path_var = ctk.StringVar()
 
         try:
             from utils.config_helper import load_config_types
@@ -93,6 +101,18 @@ class GeneratorTab(ctk.CTkFrame):
         self.car_id_list = self._build_car_id_list()
 
         self._setup_ui()
+    def refresh_ui(self):
+        """Refresh all UI text with current language"""
+        # Clear existing widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        # Reset search var so the old placeholder text doesn't persist as a search query
+        self.project_search_var.set("")
+
+        # Recreate UI with new translations
+        self._setup_ui()
+
         self._bind_search()
         self.refresh_project_display()
 
@@ -164,7 +184,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             sidebar_header,
-            text="PROJECT OVERVIEW",
+            text=t("project.project_overview"),
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=state.colors["text_secondary"]
         ).pack(side="top", fill="x", pady=(5, 0))
@@ -172,17 +192,26 @@ class GeneratorTab(ctk.CTkFrame):
         project_controls = ctk.CTkFrame(left_sidebar, fg_color="transparent")
         project_controls.pack(fill="x", padx=15, pady=(0, 10))
 
-        self._create_button(project_controls, "💾 Save", self.save_project, "primary", 90, 30).pack(side="left", padx=(0, 3))
-        self._create_button(project_controls, "📂 Load", self.load_project, "primary", 90, 30).pack(side="left", padx=(0, 3))
-        self._create_button(project_controls, "Clear", self.clear_project, "danger", 90, 30).pack(side="left")
+        # First row: Save and Load buttons
+        first_row = ctk.CTkFrame(project_controls, fg_color="transparent")
+        first_row.pack(fill="x", pady=(0, 3))
+        
+        self._create_button(first_row, text=t("project.save_project"), command=self.save_project, style="primary", height=30, font_size=13, font_weight="bold").pack(side="left", fill="x", expand=True, padx=(0, 3))
+        self._create_button(first_row, text=t("project.load_project"), command=self.load_project, style="primary", height=30, font_size=13, font_weight="bold").pack(side="left", fill="x", expand=True)
+        
+        # Second row: Clear button
+        second_row = ctk.CTkFrame(project_controls, fg_color="transparent")
+        second_row.pack(fill="x")
+        
+        self._create_button(second_row, text=t("project.clear_project"), command=self.clear_project, style="danger", height=30, font_size=13, font_weight="bold").pack(side="left", fill="x", expand=True)
 
         separator = ctk.CTkFrame(left_sidebar, height=2, fg_color=state.colors["border"])
         separator.pack(fill="x", padx=15, pady=(0, 10))
 
         ctk.CTkLabel(
             left_sidebar,
-            text="Vehicles",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            text=t("project.vehicles_in_project"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             text_color=state.colors["text"]
         ).pack(fill="x", padx=15, pady=(0, 5))
 
@@ -199,7 +228,7 @@ class GeneratorTab(ctk.CTkFrame):
             text_color="#888888"
         )
         self.project_search_entry.pack(fill="x")
-        self._setup_placeholder(self.project_search_entry, "🔍 Search cars...")
+        self._setup_placeholder(self.project_search_entry, t("common.search_vehicle"))
 
         self.project_overview_container = ctk.CTkScrollableFrame(
             left_sidebar,
@@ -240,7 +269,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             header_row,
-            text="Skin Name",
+            text=t("project.skin_name"),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=state.colors["text"]
         ).pack(side="left", anchor="w")
@@ -285,11 +314,11 @@ class GeneratorTab(ctk.CTkFrame):
             text_color=state.colors["text"]
         )
         self.skin_name_entry.pack(side="left", padx=(0, 10))
-        self._setup_placeholder(self.skin_name_entry, "Enter skin name...")
+        self._setup_placeholder(self.skin_name_entry, t("project.skin_name_placeholder"))
 
         self.config_name_label = ctk.CTkLabel(
             entry_row,
-            text="Config name:",
+            text=t("project.config_name"),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=state.colors["text"]
         )
@@ -302,13 +331,13 @@ class GeneratorTab(ctk.CTkFrame):
             border_color=state.colors["border"],
             text_color=state.colors["text"]
         )
-        self._setup_placeholder(self.config_name_entry, "Enter configuration name...")
+        self._setup_placeholder(self.config_name_entry, t("project.config_name_placeholder"))
 
         self.config_type_entry_row = ctk.CTkFrame(entry_row, fg_color="transparent")
 
         ctk.CTkLabel(
             self.config_type_entry_row,
-            text="Type:",
+            text=t("project.type"),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=state.colors["text"]
         ).pack(side="left", padx=(0, 8))
@@ -339,7 +368,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             pc_file_column,
-            text=".pc File (Vehicle Config)",
+            text=t("project.pc_file"),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=state.colors["text"]
         ).pack(anchor="w", pady=(0, 3))
@@ -349,7 +378,6 @@ class GeneratorTab(ctk.CTkFrame):
 
         self.pc_file_entry = ctk.CTkEntry(
             pc_input_row,
-            textvariable=self.pc_file_path_var,
             state="readonly",
             height=36,
             fg_color=state.colors["frame_bg"],
@@ -361,7 +389,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         pc_browse_btn = ctk.CTkButton(
             pc_input_row,
-            text="📁 Browse",
+            text=t("common.browse"),
             command=self._browse_pc_file,
             width=100,
             height=36,
@@ -378,7 +406,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             jpg_file_column,
-            text=".jpg File (Config Icon)",
+            text=t("project.jpg_file"),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=state.colors["text"]
         ).pack(anchor="w", pady=(0, 3))
@@ -388,7 +416,6 @@ class GeneratorTab(ctk.CTkFrame):
 
         self.jpg_file_entry = ctk.CTkEntry(
             jpg_input_row,
-            textvariable=self.jpg_file_path_var,
             state="readonly",
             height=36,
             fg_color=state.colors["frame_bg"],
@@ -400,7 +427,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         jpg_browse_btn = ctk.CTkButton(
             jpg_input_row,
-            text="📁 Browse",
+            text=t("common.browse"),
             command=self._browse_jpg_file,
             width=100,
             height=36,
@@ -419,7 +446,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         ctk.CTkLabel(
             material_toggle_row,
-            text="Edit Material Properties",
+            text=t("project.edit_materials"),
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=state.colors["text"]
         ).pack(side="left", padx=(0, 8))
@@ -445,6 +472,33 @@ class GeneratorTab(ctk.CTkFrame):
             height=450
         )
 
+        # Colorable skin toggle
+        colorable_toggle_row = ctk.CTkFrame(skin_card, fg_color="transparent")
+        colorable_toggle_row.pack(fill="x", padx=15, pady=(10, 5))
+        self.colorable_toggle_row = colorable_toggle_row  # Store reference
+
+        ctk.CTkLabel(
+            colorable_toggle_row,
+            text=t("project.colorable"),
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=state.colors["text"]
+        ).pack(side="left", padx=(0, 8))
+
+        colorable_toggle = ctk.CTkSwitch(
+            colorable_toggle_row,
+            text="",
+            variable=self.use_colorable_var,
+            command=self._toggle_colorable,
+            onvalue=True,
+            offvalue=False,
+            fg_color="#3A3A3A",
+            progress_color=state.colors["accent"],
+            button_color=state.colors["text"],
+            button_hover_color=state.colors["border"]
+        )
+        colorable_toggle.pack(side="left")
+
+        # DDS Texture section (shown when colorable is OFF)
         self.dds_texture_label = ctk.CTkLabel(
             skin_card,
             text="DDS Texture",
@@ -455,22 +509,22 @@ class GeneratorTab(ctk.CTkFrame):
 
         dds_row = ctk.CTkFrame(skin_card, fg_color="transparent")
         dds_row.pack(fill="x", padx=15, pady=(0, 5))
+        self.dds_row = dds_row  # Store reference
 
-        dds_entry = ctk.CTkEntry(
+        self.dds_entry = ctk.CTkEntry(
             dds_row,
-            textvariable=self.dds_path_var,
             state="readonly",
             height=36,
             fg_color=state.colors["frame_bg"],
             border_color=state.colors["border"],
             text_color=state.colors["text"]
         )
-        dds_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self._setup_placeholder(dds_entry, "No file selected...")
+        self.dds_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self._setup_placeholder(self.dds_entry, "No file selected...")
 
         dds_browse = ctk.CTkButton(
             dds_row,
-            text="📁 Browse",
+            text=t("common.browse"),
             command=self.browse_dds,
             width=100,
             height=36,
@@ -482,6 +536,80 @@ class GeneratorTab(ctk.CTkFrame):
         )
         dds_browse.pack(side="right")
 
+        # PNG inputs for colorable mode (shown in same place as DDS, but when colorable is ON)
+        # Data Map input
+        self.data_map_label = ctk.CTkLabel(
+            skin_card,
+            text=t("project.base_Color_Map"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=state.colors["text"]
+        )
+
+        data_map_row = ctk.CTkFrame(skin_card, fg_color="transparent")
+        self.data_map_row = data_map_row  # Store reference
+
+        self.data_map_entry = ctk.CTkEntry(
+            data_map_row,
+            state="readonly",
+            height=36,
+            fg_color=state.colors["frame_bg"],
+            border_color=state.colors["border"],
+            text_color=state.colors["text"]
+        )
+        self.data_map_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self._setup_placeholder(self.data_map_entry, t("common.nofile_selected"))
+
+        data_map_browse_btn = ctk.CTkButton(
+            data_map_row,
+            text=t("common.browse"),
+            command=self._browse_data_map,
+            width=100,
+            height=36,
+            fg_color=state.colors["accent"],
+            hover_color=state.colors["accent_hover"],
+            text_color=state.colors["accent_text"],
+            font=ctk.CTkFont(size=11, weight="bold"),
+            corner_radius=8
+        )
+        data_map_browse_btn.pack(side="right")
+
+        # Color Map input
+        self.color_map_label = ctk.CTkLabel(
+            skin_card,
+            text=t("project.color_Palette_Map"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=state.colors["text"]
+        )
+
+        color_map_row = ctk.CTkFrame(skin_card, fg_color="transparent")
+        self.color_map_row = color_map_row  # Store reference
+
+        self.color_map_entry = ctk.CTkEntry(
+            color_map_row,
+            state="readonly",
+            height=36,
+            fg_color=state.colors["frame_bg"],
+            border_color=state.colors["border"],
+            text_color=state.colors["text"]
+        )
+        self.color_map_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self._setup_placeholder(self.color_map_entry, t("common.nofile_selected"))
+
+        color_map_browse_btn = ctk.CTkButton(
+            color_map_row,
+            text=t("common.browse"),
+            command=self._browse_color_map,
+            width=100,
+            height=36,
+            fg_color=state.colors["accent"],
+            hover_color=state.colors["accent_hover"],
+            text_color=state.colors["accent_text"],
+            font=ctk.CTkFont(size=11, weight="bold"),
+            corner_radius=8
+        )
+        color_map_browse_btn.pack(side="right")
+
+        # DDS preview (shown for both modes)
         self.dds_preview_label = ctk.CTkLabel(
             skin_card,
             text="",
@@ -491,14 +619,26 @@ class GeneratorTab(ctk.CTkFrame):
         )
         self.dds_preview_label.pack(padx=15, pady=(5, 5))
 
-        self.material_properties_container.pack(fill="x", padx=15, pady=(10, 10), before=self.dds_texture_label)
+        # Color map preview (only shown in colorable mode)
+        self.color_map_preview_label = ctk.CTkLabel(
+            skin_card,
+            text="",
+            image=None,
+            width=800,
+            height=400
+        )
+        # Not packed initially – shown only when colorable mode is active
+
+        # Pack material properties container before the colorable toggle
+        self.material_properties_container.pack(fill="x", padx=15, pady=(10, 10), before=colorable_toggle_row)
 
         skin_button_frame = ctk.CTkFrame(skin_card, fg_color="transparent")
         skin_button_frame.pack(fill="x", padx=15, pady=(5, 15))
+        self.skin_button_frame = skin_button_frame  # Store reference for toggle method
 
         self.add_skin_btn = ctk.CTkButton(
             skin_button_frame,
-            text="➕ Add Skin",
+            text=t("project.add_skin"),
             command=self.add_skin_to_selected_car,
             height=40,
             fg_color=state.colors["accent"],
@@ -547,7 +687,7 @@ class GeneratorTab(ctk.CTkFrame):
             border_color=state.colors["border"]
         )
 
-    def _create_button(self, parent, text: str, command, style: str = "primary", width: int = 120, height: int = 36) -> ctk.CTkButton:
+    def _create_button(self, parent, text: str, command, style: str = "primary", width: int = 120, height: int = 36, font_size: int = 12, font_weight: str = "bold") -> ctk.CTkButton:
         """Create a styled button"""
         if style == "primary":
             fg_color = state.colors["accent"]
@@ -556,7 +696,7 @@ class GeneratorTab(ctk.CTkFrame):
         elif style == "danger":
             fg_color = state.colors["error"]
             hover_color = state.colors["error_hover"]
-            text_color = "white"
+            text_color = state.colors["accent_text"]
         else:
             fg_color = state.colors["card_bg"]
             hover_color = state.colors["card_hover"]
@@ -572,7 +712,7 @@ class GeneratorTab(ctk.CTkFrame):
             hover_color=hover_color,
             text_color=text_color,
             corner_radius=8,
-            font=ctk.CTkFont(size=12, weight="bold")
+            font=ctk.CTkFont(size=font_size, weight=font_weight)
         )
 
     def _setup_placeholder(self, entry: ctk.CTkEntry, placeholder: str):
@@ -583,20 +723,26 @@ class GeneratorTab(ctk.CTkFrame):
             entry.configure(text_color="#888888")
 
         def on_focus_in(event):
-
             print(f"[DEBUG] on_focus_in called")
             if entry.get() == placeholder:
                 entry.delete(0, "end")
                 entry.configure(text_color=state.colors["text"])
 
-        def on_focus_out(event):
+        def on_key(event):
+            # Ensure text color switches to normal the moment the user starts typing,
+            # even if the entry was reset while focused (car switch scenario)
+            if entry.get() != placeholder:
+                entry.configure(text_color=state.colors["text"])
 
+        def on_focus_out(event):
             print(f"[DEBUG] on_focus_out called")
-            if not entry.get():
+            if not entry.get() or entry.get() == placeholder:
+                entry.delete(0, "end")
                 entry.insert(0, placeholder)
                 entry.configure(text_color="#888888")
 
         entry.bind("<FocusIn>", on_focus_in)
+        entry.bind("<Key>", on_key)
         entry.bind("<FocusOut>", on_focus_out)
 
     def _bind_search(self):
@@ -610,13 +756,13 @@ class GeneratorTab(ctk.CTkFrame):
         print(f"[DEBUG] Adding car to project: {display_name} ({carid})")
 
         if carid in self.project_data["cars"]:
-            self.show_notification(f"{display_name} is already in the project", "warning")
+            self.show_notification(f"{display_name} {t('project.notification.already_in_project')}", "warning")
             self.select_car_for_skin(carid)
             return
 
         for car_id in self.project_data["cars"].keys():
             if car_id.startswith(f"{carid}_"):
-                self.show_notification(f"{display_name} is already in the project", "warning")
+                self.show_notification(f"{display_name} {t('project.notification.already_in_project')}", "warning")
                 existing_car_id = carid if carid in self.project_data["cars"] else car_id
                 self.select_car_for_skin(existing_car_id)
                 return
@@ -628,11 +774,13 @@ class GeneratorTab(ctk.CTkFrame):
             "temp_dds_path": ""
         }
 
-        self.show_notification(f"Added {display_name} to project", "success")
+        self.show_notification(f"{t('project.notification.added_car').format(display_name=display_name)}",)
 
         print(f"[DEBUG] Selected car for skins: {carid}")
 
         self.select_car_for_skin(carid)
+        
+        self.refresh_project_display()
 
     def remove_car_from_project(self, car_instance_id: str):
 
@@ -653,7 +801,7 @@ class GeneratorTab(ctk.CTkFrame):
                     self.add_skin_section_card.pack_forget()
 
             car_name = state.vehicle_ids.get(base_carid, base_carid)
-            self.show_notification(f"Removed {car_name}", "info")
+            self.show_notification(f"{t('project.notification.removed_car').format(display_name=car_name)}", "info")
 
             self.refresh_project_display()
 
@@ -674,7 +822,9 @@ class GeneratorTab(ctk.CTkFrame):
         """Select a car to add skins to"""
         if car_instance_id in self.project_data["cars"]:
 
-            if self.editing_mode and self.selected_car_for_skin != car_instance_id:
+            is_same_car = (self.selected_car_for_skin == car_instance_id)
+
+            if self.editing_mode and not is_same_car:
                 print(f"[DEBUG] Canceling editing mode - switching from {self.selected_car_for_skin} to {car_instance_id}")
                 self.editing_mode = False
                 self.selected_skin_index = None
@@ -682,14 +832,15 @@ class GeneratorTab(ctk.CTkFrame):
 
             self.selected_car_for_skin = car_instance_id
             print(f"[DEBUG] Selected car for adding skins: {car_instance_id}")
-            
+
             # Show the add skin section
             if self.add_skin_section_label:
                 self.add_skin_section_label.pack(anchor="w", padx=20, pady=(20, 5))
             if self.add_skin_section_card:
                 self.add_skin_section_card.pack(fill="x", padx=20, pady=(0, 15))
 
-            if not self.editing_mode:
+            # Only reset the form if switching to a different car (preserve typed input)
+            if not self.editing_mode and not is_same_car:
                 self._reset_skin_form_fields()
 
             self.refresh_project_display()
@@ -704,28 +855,62 @@ class GeneratorTab(ctk.CTkFrame):
             return
 
         if not self.selected_car_for_skin:
-            self.show_notification("Please select a car first", "warning")
+            self.show_notification(t("project.notification.select_car"), "warning",4000)
             return
 
         skin_name = self.skin_name_var.get().strip()
-        dds_path = self.dds_path_var.get().strip()
 
-        if not skin_name or skin_name == "Enter skin name...":
-            self.show_notification("Please enter a skin name", "warning")
+        if not skin_name or skin_name == t("project.skin_name_placeholder"):
+            self.show_notification(t("project.notification.please_skin_name"), "warning",4000)
             return
 
-        if not dds_path or dds_path == "No file selected...":
-            self.show_notification("Please select a DDS file", "warning")
-            return
+        # Check if we're in colorable mode
+        is_colorable = self.use_colorable_var.get()
 
-        if not os.path.exists(dds_path):
-            self.show_notification("DDS file does not exist", "error")
-            return
+        if is_colorable:
+            # Colorable mode - validate PNG files
+            data_map_path = self.data_map_path_var.get().strip()
+            color_map_path = self.color_map_path_var.get().strip()
 
-        skin_data = {
-            "name": skin_name,
-            "dds_path": dds_path
-        }
+            if not data_map_path or data_map_path == "No data map selected...":
+                self.show_notification(t("project.notification.please_select_datamap"), "warning",4000)
+                return
+
+            if not color_map_path or color_map_path == "No color map selected...":
+                self.show_notification(t("project.notification.please_select_colormap"), "warning",4000)
+                return
+
+            if not os.path.exists(data_map_path):
+                self.show_notification(t("project.notification.datamap_not_exist"), "error",4000)
+                return
+
+            if not os.path.exists(color_map_path):
+                self.show_notification(t("project.notification.colormap_not_exist"), "error",4000)
+                return
+
+            skin_data = {
+                "name": skin_name,
+                "is_colorable": True,
+                "data_map_path": data_map_path,
+                "color_map_path": color_map_path
+            }
+        else:
+            # Normal DDS mode - validate DDS file
+            dds_path = self.dds_path_var.get().strip()
+
+            if not dds_path or dds_path == "No file selected...":
+                self.show_notification(t("project.notification.please_select_dds"), "warning",4000)
+                return
+
+            if not os.path.exists(dds_path):
+                self.show_notification(t("project.notification.dds_not_exist"), "error",4000)
+                return
+
+            skin_data = {
+                "name": skin_name,
+                "is_colorable": False,
+                "dds_path": dds_path
+            }
 
         if self.add_config_data_var.get():
             config_type = self.config_type_var.get()
@@ -743,17 +928,17 @@ class GeneratorTab(ctk.CTkFrame):
                 entry_value = self.pc_file_entry.get()
                 print(f"[DEBUG] PC Entry widget value: '{entry_value}'")
 
-            if not config_name or config_name == "Enter configuration name...":
-                self.show_notification("Please enter a configuration name", "warning")
+            if not config_name or config_name == t("project.config_name_placeholder"):
+                self.show_notification(t("project.notification.please_config_name"), "warning",4000)
                 return
 
-            if not pc_path or pc_path == "No .pc file selected...":
+            if not pc_path or pc_path == t("project.pc_file_placeholder"):
                 print(f"[DEBUG] PC path validation FAILED: empty or placeholder")
-                self.show_notification("Please select a .pc file for config data", "warning")
+                self.show_notification(t("project.notification.please_select_pc"), "warning",4000)
                 return
 
-            if not jpg_path or jpg_path == "No .jpg file selected...":
-                self.show_notification("Please select a .jpg file for config data", "warning")
+            if not jpg_path or jpg_path == t("project.jpg_file_placeholder"):
+                self.show_notification(t("project.notification.please_select_jpg"), "warning",4000)
                 return
 
             print(f"[DEBUG] Checking if PC path exists: {pc_path}")
@@ -765,12 +950,12 @@ class GeneratorTab(ctk.CTkFrame):
                 print(f"[DEBUG] Path attempted: '{pc_path}'")
                 print(f"[DEBUG] Path length: {len(pc_path)}")
                 print(f"[DEBUG] Path repr: {repr(pc_path)}")
-                self.show_notification(".pc file does not exist", "error")
+                self.show_notification(t("project.notification.pc_not_exist"), "error",4000)
                 return
 
             if not os.path.exists(jpg_path):
                 print(f"[DEBUG] JPG FILE PATH DOES NOT EXIST!")
-                self.show_notification(".jpg file does not exist", "error")
+                self.show_notification(t("project.notification.jpg_not_exist"), "error",4000)
                 return
 
             skin_data["config_data"] = {
@@ -796,6 +981,15 @@ class GeneratorTab(ctk.CTkFrame):
         self.config_name_var.set("")
         self.pc_file_path_var.set("")
         self.jpg_file_path_var.set("")
+        # Restore DDS entry placeholder (entry has no textvariable so must be done manually)
+        if hasattr(self, "dds_entry") and self.dds_entry:
+            try:
+                self.dds_entry.configure(state="normal")
+                self.dds_entry.delete(0, "end")
+                self.dds_entry.insert(0, "No file selected...")
+                self.dds_entry.configure(text_color="#888888", state="readonly")
+            except Exception as e:
+                print(f"[DEBUG] Error restoring DDS placeholder: {e}")
 
         try:
             if hasattr(self, 'dds_preview_label') and self.dds_preview_label:
@@ -811,12 +1005,10 @@ class GeneratorTab(ctk.CTkFrame):
 
         try:
             if self.skin_name_entry:
-                self.skin_name_entry.master.focus()
+                self.focus()  # Force focus away so on_focus_in can't undo the reset
                 self.skin_name_entry.delete(0, "end")
-                self.skin_name_entry.insert(0, "Enter skin name...")
+                self.skin_name_entry.insert(0, t("project.skin_name_placeholder"))
                 self.skin_name_entry.configure(text_color="#888888")
-                if hasattr(self.skin_name_entry, '_placeholder'):
-                    self.skin_name_entry.event_generate("<FocusOut>")
                 print(f"[DEBUG] Skin name entry reset with placeholder")
         except Exception as e:
             print(f"[DEBUG] Error resetting skin name: {e}")
@@ -824,7 +1016,7 @@ class GeneratorTab(ctk.CTkFrame):
         try:
             if self.config_name_entry:
                 self.config_name_entry.delete(0, "end")
-                self.config_name_entry.insert(0, "Enter configuration name...")
+                self.config_name_entry.insert(0, t("project.config_name_placeholder"))
                 self.config_name_entry.configure(text_color="#888888")
         except Exception as e:
             print(f"[DEBUG] Error resetting config name: {e}")
@@ -833,7 +1025,7 @@ class GeneratorTab(ctk.CTkFrame):
             if self.pc_file_entry:
                 self.pc_file_entry.configure(state="normal")
                 self.pc_file_entry.delete(0, "end")
-                self.pc_file_entry.insert(0, "No .pc file selected...")
+                self.pc_file_entry.insert(0, t("project.pc_file_placeholder"))
                 self.pc_file_entry.configure(text_color="#888888", state="readonly")
         except Exception as e:
             print(f"[DEBUG] Error resetting pc entry: {e}")
@@ -842,12 +1034,12 @@ class GeneratorTab(ctk.CTkFrame):
             if self.jpg_file_entry:
                 self.jpg_file_entry.configure(state="normal")
                 self.jpg_file_entry.delete(0, "end")
-                self.jpg_file_entry.insert(0, "No .jpg file selected...")
+                self.jpg_file_entry.insert(0, t("project.jpg_file_placeholder"))
                 self.jpg_file_entry.configure(text_color="#888888", state="readonly")
         except Exception as e:
             print(f"[DEBUG] Error resetting jpg entry: {e}")
 
-        self.show_notification(f"Added skin '{skin_name}'", "success")
+        self.show_notification(f"{t('project.notification.added_skin')}'{skin_name}'", "success")
 
         print(f"[DEBUG] Starting deselect/reselect refresh...")
 
@@ -945,9 +1137,60 @@ class GeneratorTab(ctk.CTkFrame):
         except Exception as e:
             print(f"[DEBUG] Error setting skin name: {e}")
 
+        # Populate colorable fields if editing a colorable skin
         try:
-            if 'dds_path' in skin:
+            if skin.get('is_colorable', False):
+                self.use_colorable_var.set(True)
+                self._toggle_colorable()
+                data_map = skin.get('data_map_path', '')
+                color_map = skin.get('color_map_path', '')
+                self.data_map_path_var.set(data_map)
+                self.color_map_path_var.set(color_map)
+                if self.data_map_entry and data_map:
+                    self.data_map_entry.configure(state="normal")
+                    self.data_map_entry.delete(0, "end")
+                    self.data_map_entry.insert(0, os.path.basename(data_map))
+                    self.data_map_entry.configure(text_color=state.colors["text"], state="readonly")
+                if self.color_map_entry and color_map:
+                    self.color_map_entry.configure(state="normal")
+                    self.color_map_entry.delete(0, "end")
+                    self.color_map_entry.insert(0, os.path.basename(color_map))
+                    self.color_map_entry.configure(text_color=state.colors["text"], state="readonly")
+
+                # Load data map preview
+                if data_map and os.path.exists(data_map):
+                    try:
+                        img = Image.open(data_map)
+                        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                        photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                        self.dds_preview_label.image = photo
+                        self.dds_preview_label.configure(image=photo, text="")
+                        print(f"[DEBUG] Loaded data map preview for editing: {data_map}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not load data map preview: {e}")
+
+                # Load color map preview
+                if color_map and os.path.exists(color_map):
+                    try:
+                        img = Image.open(color_map)
+                        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                        photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                        self.color_map_preview_label.image = photo
+                        self.color_map_preview_label.configure(image=photo, text="")
+                        print(f"[DEBUG] Loaded color map preview for editing: {color_map}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not load color map preview: {e}")
+        except Exception as e:
+            print(f"[DEBUG] Error setting colorable fields: {e}")
+
+        try:
+            if 'dds_path' in skin and not skin.get('is_colorable', False):
                 self.dds_path_var.set(skin['dds_path'])
+                if hasattr(self, "dds_entry") and self.dds_entry:
+                    self.dds_entry.configure(state="normal")
+                    self.dds_entry.delete(0, "end")
+                    self.dds_entry.insert(0, os.path.basename(skin['dds_path']))
+                    self.dds_entry.configure(text_color=state.colors["text"], state="readonly")
 
                 try:
                     img = Image.open(skin['dds_path'])
@@ -1039,21 +1282,21 @@ class GeneratorTab(ctk.CTkFrame):
 
                 if self.config_name_entry:
                     self.config_name_entry.delete(0, "end")
-                    self.config_name_entry.insert(0, "Enter configuration name...")
+                    self.config_name_entry.insert(0, t("project.config_name_placeholder"))
                     self.config_name_entry.configure(text_color="#888888")
 
                 self.pc_file_path_var.set("")
                 if self.pc_file_entry:
                     self.pc_file_entry.configure(state="normal")
                     self.pc_file_entry.delete(0, "end")
-                    self.pc_file_entry.insert(0, "No .pc file selected...")
+                    self.pc_file_entry.insert(0, t("project.pc_file_placeholder"))
                     self.pc_file_entry.configure(text_color="#888888", state="readonly")
 
                 self.jpg_file_path_var.set("")
                 if self.jpg_file_entry:
                     self.jpg_file_entry.configure(state="normal")
                     self.jpg_file_entry.delete(0, "end")
-                    self.jpg_file_entry.insert(0, "No .jpg file selected...")
+                    self.jpg_file_entry.insert(0, t("project.jpg_file_placeholder"))
                     self.jpg_file_entry.configure(text_color="#888888", state="readonly")
 
                 self._toggle_config_data()
@@ -1099,11 +1342,11 @@ class GeneratorTab(ctk.CTkFrame):
         """Update the Add/Update button text and show/hide cancel button based on editing mode"""
         if self.editing_mode:
 
-            self.add_skin_btn.configure(text="💾 Update Skin")
+            self.add_skin_btn.configure(text=t("project.update_skin"),)
             self.cancel_edit_btn.pack(side="left", padx=(5, 0))
         else:
 
-            self.add_skin_btn.configure(text="➕ Add Skin")
+            self.add_skin_btn.configure(text=t("project.add_skin"))
             self.cancel_edit_btn.pack_forget()
 
     def cancel_skin_editing(self):
@@ -1134,16 +1377,27 @@ class GeneratorTab(ctk.CTkFrame):
             self.cancel_skin_editing()
             return
 
-        skin_name = self.get_real_value(self.skin_name_entry, "Enter skin name...").strip()
-        dds_path = self.dds_path_var.get().strip()
+        skin_name = self.get_real_value(self.skin_name_entry, t("project.skin_name_placeholder")).strip()
+        is_colorable = self.use_colorable_var.get()
 
         if not skin_name:
             self.show_notification("Skin name is required", "error")
             return
 
-        if not dds_path or not os.path.exists(dds_path):
-            self.show_notification("Please select a valid DDS file", "error")
-            return
+        if is_colorable:
+            data_map_path = self.data_map_path_var.get().strip()
+            color_map_path = self.color_map_path_var.get().strip()
+            if not data_map_path or not os.path.exists(data_map_path):
+                self.show_notification("Please select a valid data map PNG", "error")
+                return
+            if not color_map_path or not os.path.exists(color_map_path):
+                self.show_notification("Please select a valid color palette map PNG", "error")
+                return
+        else:
+            dds_path = self.dds_path_var.get().strip()
+            if not dds_path or not os.path.exists(dds_path):
+                self.show_notification("Please select a valid DDS file", "error")
+                return
 
         skins = self.project_data["cars"][self.selected_car_for_skin]["skins"]
         if self.selected_skin_index >= len(skins):
@@ -1155,10 +1409,18 @@ class GeneratorTab(ctk.CTkFrame):
         old_name = skin['name']
 
         skin['name'] = skin_name
-        skin['dds_path'] = dds_path
+        skin['is_colorable'] = is_colorable
+        if is_colorable:
+            skin['data_map_path'] = data_map_path
+            skin['color_map_path'] = color_map_path
+            skin.pop('dds_path', None)
+        else:
+            skin['dds_path'] = dds_path
+            skin.pop('data_map_path', None)
+            skin.pop('color_map_path', None)
 
         if self.add_config_data_var.get():
-            config_name = self.get_real_value(self.config_name_entry, "Enter configuration name...").strip()
+            config_name = self.get_real_value(self.config_name_entry, t("project.config_name_placeholder")).strip()
             pc_file_path = self.pc_file_path_var.get().strip()
             jpg_file_path = self.jpg_file_path_var.get().strip()
 
@@ -1266,24 +1528,54 @@ class GeneratorTab(ctk.CTkFrame):
     def _reset_skin_form_fields(self):
         """Reset all skin form fields to their placeholder state"""
         try:
-
             if self.skin_name_entry:
+                # Force focus away first so on_focus_in can't undo the placeholder reset
+                self.focus()
                 self.skin_name_entry.delete(0, "end")
-                self.skin_name_entry.insert(0, "Enter skin name...")
+                self.skin_name_entry.insert(0, t("project.skin_name_placeholder"))
                 self.skin_name_entry.configure(text_color="#888888")
-                if hasattr(self.skin_name_entry, '_placeholder'):
-                    self.skin_name_entry.event_generate("<FocusOut>")
         except Exception as e:
             print(f"[DEBUG] Error resetting skin name: {e}")
 
         try:
-
             self.dds_path_var.set("")
+            if hasattr(self, "dds_entry") and self.dds_entry:
+                self.dds_entry.configure(state="normal")
+                self.dds_entry.delete(0, "end")
+                self.dds_entry.insert(0, t("common.nofile_selected"))
+                self.dds_entry.configure(text_color="#888888", state="readonly")
             if self.dds_preview_label:
                 self.dds_preview_label.image = None
-                self.dds_preview_label.configure(image=None, text="No DDS selected")
+                self.dds_preview_label.configure(image=None, text=t("project.preview_file"))
+            if hasattr(self, 'color_map_preview_label') and self.color_map_preview_label:
+                self.color_map_preview_label.image = None
+                self.color_map_preview_label.configure(image=None, text="")
+            self._data_map_photo_stash = None
         except Exception as e:
             print(f"[DEBUG] Error resetting DDS: {e}")
+
+        try:
+            # Reset colorable PNG fields
+            self.data_map_path_var.set("")
+            self.color_map_path_var.set("")
+            
+            if hasattr(self, 'data_map_entry') and self.data_map_entry:
+                self.data_map_entry.configure(state="normal")
+                self.data_map_entry.delete(0, "end")
+                self.data_map_entry.insert(0, t("common.nofile_selected"))
+                self.data_map_entry.configure(text_color="#888888", state="readonly")
+            
+            if hasattr(self, 'color_map_entry') and self.color_map_entry:
+                self.color_map_entry.configure(state="normal")
+                self.color_map_entry.delete(0, "end")
+                self.color_map_entry.insert(0, t("common.nofile_selected"))
+                self.color_map_entry.configure(text_color="#888888", state="readonly")
+                
+            # Reset colorable toggle to off
+            self.use_colorable_var.set(False)
+            self._toggle_colorable()  # Update UI visibility
+        except Exception as e:
+            print(f"[DEBUG] Error resetting colorable fields: {e}")
 
         try:
 
@@ -1295,7 +1587,7 @@ class GeneratorTab(ctk.CTkFrame):
 
             if self.config_name_entry:
                 self.config_name_entry.delete(0, "end")
-                self.config_name_entry.insert(0, "Enter configuration name...")
+                self.config_name_entry.insert(0, t("project.config_name_placeholder"))
                 self.config_name_entry.configure(text_color="#888888")
         except Exception as e:
             print(f"[DEBUG] Error resetting config name: {e}")
@@ -1308,7 +1600,7 @@ class GeneratorTab(ctk.CTkFrame):
             if self.pc_file_entry:
                 self.pc_file_entry.configure(state="normal")
                 self.pc_file_entry.delete(0, "end")
-                self.pc_file_entry.insert(0, "No .pc file selected...")
+                self.pc_file_entry.insert(0, t("project.pc_file_placeholder"))
                 self.pc_file_entry.configure(text_color="#888888", state="readonly")
         except Exception as e:
             print(f"[DEBUG] Error resetting PC file: {e}")
@@ -1321,7 +1613,7 @@ class GeneratorTab(ctk.CTkFrame):
             if self.jpg_file_entry:
                 self.jpg_file_entry.configure(state="normal")
                 self.jpg_file_entry.delete(0, "end")
-                self.jpg_file_entry.insert(0, "No .jpg file selected...")
+                self.jpg_file_entry.insert(0, t("project.jpg_file_placeholder"))
                 self.jpg_file_entry.configure(text_color="#888888", state="readonly")
         except Exception as e:
             print(f"[DEBUG] Error resetting JPG file: {e}")
@@ -1355,7 +1647,7 @@ class GeneratorTab(ctk.CTkFrame):
             if 0 <= skin_index < len(skins):
                 skin_name = skins[skin_index]["name"]
                 del skins[skin_index]
-                self.show_notification(f"Removed skin '{skin_name}'", "info")
+                self.show_notification(f"{t('project.notification.removed_skin')} '{skin_name}'", "info",4000)
                 self.refresh_project_display()
                 self.update_idletasks()
                 if hasattr(self, 'project_overview_frame') and self.project_overview_frame:
@@ -1373,6 +1665,11 @@ class GeneratorTab(ctk.CTkFrame):
 
         if filename:
             self.dds_path_var.set(filename)
+            if hasattr(self, "dds_entry") and self.dds_entry:
+                self.dds_entry.configure(state="normal")
+                self.dds_entry.delete(0, "end")
+                self.dds_entry.insert(0, os.path.basename(filename))
+                self.dds_entry.configure(text_color=state.colors["text"], state="readonly")
 
             try:
                 img = Image.open(filename)
@@ -1450,10 +1747,13 @@ class GeneratorTab(ctk.CTkFrame):
         )
 
         if filename:
-
             self.pc_file_path_var.set(filename)
-
             self.pc_file_from_project = False
+            if self.pc_file_entry:
+                self.pc_file_entry.configure(state="normal")
+                self.pc_file_entry.delete(0, "end")
+                self.pc_file_entry.insert(0, os.path.basename(filename))
+                self.pc_file_entry.configure(text_color=state.colors["text"], state="readonly")
             print(f"[DEBUG] Selected .pc file: {filename}")
             print(f"[DEBUG] File exists: {os.path.exists(filename)}")
             print(f"[DEBUG] StringVar value set to: {self.pc_file_path_var.get()}")
@@ -1486,13 +1786,172 @@ class GeneratorTab(ctk.CTkFrame):
         )
 
         if filename:
-
             self.jpg_file_path_var.set(filename)
-
             self.jpg_file_from_project = False
+            if self.jpg_file_entry:
+                self.jpg_file_entry.configure(state="normal")
+                self.jpg_file_entry.delete(0, "end")
+                self.jpg_file_entry.insert(0, os.path.basename(filename))
+                self.jpg_file_entry.configure(text_color=state.colors["text"], state="readonly")
             print(f"[DEBUG] Selected .jpg file: {filename}")
+
+    def _toggle_colorable(self):
+        """Toggle visibility of colorable PNG inputs vs DDS input"""
+        if self.use_colorable_var.get():
+            # Hide DDS input
+            self.dds_texture_label.pack_forget()
+            self.dds_row.pack_forget()
+
+            # Show PNG inputs right after the colorable toggle (before preview)
+            self.data_map_label.pack(anchor="w", padx=15, pady=(5, 5), after=self.colorable_toggle_row)
+            self.data_map_row.pack(fill="x", padx=15, pady=(0, 5), after=self.data_map_label)
+            self.color_map_label.pack(anchor="w", padx=15, pady=(5, 5), after=self.data_map_row)
+            self.color_map_row.pack(fill="x", padx=15, pady=(0, 5), after=self.color_map_label)
+
+            # Show the second (color map) preview below the first (data map) preview
+            self.color_map_preview_label.pack(padx=15, pady=(0, 5), after=self.dds_preview_label)
+
+            # Restore data map preview from stashed photo, falling back to disk
+            stashed = getattr(self, '_data_map_photo_stash', None)
+            if stashed:
+                self.dds_preview_label.image = stashed
+                self.dds_preview_label.configure(image=stashed, text="")
+            else:
+                data_map_path = self.data_map_path_var.get().strip()
+                if data_map_path and os.path.exists(data_map_path):
+                    try:
+                        img = Image.open(data_map_path)
+                        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                        photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                        self.dds_preview_label.image = photo
+                        self.dds_preview_label.configure(image=photo, text="")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not restore data map preview: {e}")
+
+            # color_map_preview_label image is preserved — just re-packing it is enough.
+            # Fallback: load from path if image was never set (e.g. fresh edit mode).
+            if not getattr(self.color_map_preview_label, 'image', None):
+                color_map_path = self.color_map_path_var.get().strip()
+                if color_map_path and os.path.exists(color_map_path):
+                    try:
+                        img = Image.open(color_map_path)
+                        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                        photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                        self.color_map_preview_label.image = photo
+                        self.color_map_preview_label.configure(image=photo, text="")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not restore color map preview: {e}")
+
+            print("[DEBUG] Colorable mode enabled - showing PNG inputs")
+        else:
+            # Hide PNG inputs
+            self.data_map_label.pack_forget()
+            self.data_map_row.pack_forget()
+            self.color_map_label.pack_forget()
+            self.color_map_row.pack_forget()
+
+            # Stash the data map photo before clearing, so it survives re-enable
+            self._data_map_photo_stash = getattr(self.dds_preview_label, 'image', None)
+
+            # Hide second preview — keep color_map image reference intact for re-enable
+            self.color_map_preview_label.pack_forget()
+
+            # Clear dds_preview_label so data map PNG doesn't bleed into DDS mode
+            try:
+                self.dds_preview_label.image = None
+                self.dds_preview_label.configure(image="", text="")
+            except Exception:
+                pass
+
+            # Show DDS input right after the colorable toggle (before preview)
+            self.dds_texture_label.pack(anchor="w", padx=15, pady=(5, 5), after=self.colorable_toggle_row)
+            self.dds_row.pack(fill="x", padx=15, pady=(0, 5), after=self.dds_texture_label)
+
+            print("[DEBUG] Colorable mode disabled - showing DDS input")
+
+    def _browse_data_map(self):
+        """Browse for data map PNG file"""
+        filename = filedialog.askopenfilename(
+            title="Select Data Map (PNG)",
+            filetypes=[("PNG files", "*.png"), ("All files", "*.*")]
+        )
+
+        if filename:
+            self.data_map_path_var.set(filename)
+            if self.data_map_entry:
+                self.data_map_entry.configure(state="normal")
+                self.data_map_entry.delete(0, "end")
+                self.data_map_entry.insert(0, os.path.basename(filename))
+                self.data_map_entry.configure(text_color=state.colors["text"], state="readonly")
+            print(f"[DEBUG] Selected data map: {filename}")
+
+            # Try to show preview
+            try:
+                img = Image.open(filename)
+                img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+
+                try:
+                    self.dds_preview_label.configure(image=None, text="")
+                except:
+                    pass
+
+                self.dds_preview_label.image = photo
+
+                try:
+                    self.dds_preview_label.configure(image=photo)
+                except:
+                    pass
+
+                print(f"[DEBUG] Data map preview loaded: {filename}")
+            except Exception as e:
+                print(f"[DEBUG] Could not load data map preview: {e}")
+
+    def _browse_color_map(self):
+        """Browse for color palette map PNG file"""
+        filename = filedialog.askopenfilename(
+            title="Select Color Palette Map (PNG)",
+            filetypes=[("PNG files", "*.png"), ("All files", "*.*")]
+        )
+
+        if filename:
+            self.color_map_path_var.set(filename)
+            if self.color_map_entry:
+                self.color_map_entry.configure(state="normal")
+                self.color_map_entry.delete(0, "end")
+                self.color_map_entry.insert(0, os.path.basename(filename))
+                self.color_map_entry.configure(text_color=state.colors["text"], state="readonly")
+            print(f"[DEBUG] Selected color map: {filename}")
             print(f"[DEBUG] File exists: {os.path.exists(filename)}")
-            print(f"[DEBUG] StringVar value set to: {self.jpg_file_path_var.get()}")
+            print(f"[DEBUG] StringVar value set to: {self.color_map_path_var.get()}")
+
+            # Show preview in the color map preview label
+            try:
+                img = Image.open(filename)
+                img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                photo = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+
+                try:
+                    self.color_map_preview_label.configure(image=None, text="")
+                except Exception:
+                    pass
+
+                self.color_map_preview_label.image = photo
+
+                try:
+                    self.color_map_preview_label.configure(image=photo)
+                except Exception:
+                    pass
+
+                print(f"[DEBUG] Color map preview loaded: {filename}")
+            except Exception as e:
+                print(f"[DEBUG] Could not load color map preview: {e}")
+                try:
+                    if self.color_map_preview_label:
+                        self.color_map_preview_label.image = None
+                        self.color_map_preview_label.configure(text="Preview unavailable")
+                except Exception:
+                    pass
 
     def _toggle_material_properties(self):
         """Toggle visibility and populate material properties section"""
@@ -1976,7 +2435,7 @@ class GeneratorTab(ctk.CTkFrame):
         print(f"[DEBUG] save_project called")
         """Save current project to file"""
         if not self.project_data["cars"]:
-            self.show_notification("No cars in project to save", "warning")
+            self.show_notification(t("project.notification.no_cars_save"), "warning")
             return
 
         mod_name = ""
@@ -2066,7 +2525,7 @@ class GeneratorTab(ctk.CTkFrame):
         print(f"[DEBUG] clear_project called")
         """Clear the current project"""
         if not self.project_data["cars"]:
-            self.show_notification("Project is already empty", "info")
+            self.show_notification(t("project.notification.already_empty"), "info")
             return
 
         from gui.components.dialogs import show_confirmation_dialog
@@ -2123,7 +2582,7 @@ class GeneratorTab(ctk.CTkFrame):
         if not self.project_data["cars"]:
             empty_label = ctk.CTkLabel(
                 self.project_overview_frame,
-                text="No cars in project. Add cars from the sidebar →",
+                text=t("project.add_from_sidebar"),
                 font=ctk.CTkFont(size=13),
                 text_color=state.colors["text_secondary"]
             )
@@ -2133,6 +2592,14 @@ class GeneratorTab(ctk.CTkFrame):
             return
 
         search_query = self.project_search_var.get().lower().strip()
+        # Check if the search is the placeholder text
+        if hasattr(self.project_search_entry, '_placeholder'):
+            if search_query == self.project_search_entry._placeholder.lower():
+                search_query = ""
+        # Check for localization key format (in case placeholder wasn't translated)
+        if search_query.startswith("project.search"):
+            search_query = ""
+        # Legacy check for old placeholder
         if search_query == "🔍 search cars...":
             search_query = ""
 
@@ -2188,7 +2655,7 @@ class GeneratorTab(ctk.CTkFrame):
                 instance_num = car_instance_id.split("_")[-1]
                 display_text = f"{car_name} (Instance #{instance_num})"
 
-            display_text += f"  •  {len(car_info['skins'])} skins"
+            display_text += f"  •  {len(car_info['skins'])} " + (t("project.skin") if len(car_info['skins']) == 1 else t("project.skins"))
 
             car_button = ctk.CTkButton(
                 car_container,
@@ -2228,7 +2695,7 @@ class GeneratorTab(ctk.CTkFrame):
 
                 skins_header = ctk.CTkLabel(
                     skins_container,
-                    text="Skins:",
+                    text=t("project.skins_header"),
                     font=ctk.CTkFont(size=10, weight="bold"),
                     text_color=state.colors["text_secondary"],
                     anchor="w"
@@ -2369,19 +2836,24 @@ class GeneratorTab(ctk.CTkFrame):
         print("[DEBUG] MULTI-SKIN MOD GENERATION INITIATED")
         print("[DEBUG] ="*50)
 
-        mod_name = ""
-        author_name = ""
-        if self.mod_name_entry_sidebar:
-            mod_name = self.get_real_value(self.mod_name_entry_sidebar, "Enter mod name...").strip()
-        if self.author_entry_sidebar:
-            author_name = self.get_real_value(self.author_entry_sidebar, "Your name...").strip()
+        # Check sidebar references are wired up before anything else
+        if self.mod_name_entry_sidebar is None or self.author_entry_sidebar is None:
+            self.show_notification("Internal error: sidebar entries not initialized.", "error")
+            return
+
+        mod_name = self.get_real_value(self.mod_name_entry_sidebar, t("project.mod_name_placeholder")).strip()
+        author_name = self.get_real_value(self.author_entry_sidebar, t("project.author_name_placeholder")).strip()
 
         if not mod_name:
-            self.show_notification("Please enter a ZIP name", "error")
+            self.show_notification(t("project.notification.no_zip_name"), "error")
+            return
+
+        if not author_name:
+            self.show_notification(t("project.notification.no_author_name"), "error")
             return
 
         if not self.project_data["cars"]:
-            self.show_notification("Please add at least one car to the project", "error")
+            self.show_notification(t("project.notification.please_add_vehicle"), "error")
             return
 
         cars_without_skins = []
@@ -2390,15 +2862,28 @@ class GeneratorTab(ctk.CTkFrame):
                 cars_without_skins.append(carid)
 
         if cars_without_skins:
-            self.show_notification(f"Please add skins to: {', '.join(cars_without_skins)}", "error", 4000)
+            self.show_notification(f"{t('project.notification.please_add_skin')} {', '.join(cars_without_skins)}", "error", 4000)
             return
 
         missing_files = []
         for carid, car_info in self.project_data["cars"].items():
             for skin in car_info["skins"]:
+                skin_name = skin.get("name", "Unknown")
+                
+                # Check for colorable skin files
+                if skin.get("is_colorable", False):
+                    data_map_path = skin.get("data_map_path")
+                    color_map_path = skin.get("color_map_path")
+                    
+                    if data_map_path and not os.path.exists(data_map_path):
+                        missing_files.append(f"'{skin_name}' - data map: {os.path.basename(data_map_path)}")
+                    
+                    if color_map_path and not os.path.exists(color_map_path):
+                        missing_files.append(f"'{skin_name}' - color map: {os.path.basename(color_map_path)}")
+                
+                # Check for config data files
                 if "config_data" in skin:
                     config_data = skin["config_data"]
-                    skin_name = skin.get("name", "Unknown")
 
                     pc_path = config_data.get("pc_file_path")
                     if pc_path and not os.path.exists(pc_path):
@@ -2424,7 +2909,7 @@ class GeneratorTab(ctk.CTkFrame):
 
             output_path = custom_output_var.get()
             if not output_path:
-                self.show_notification("Please select a custom output location", "error")
+                self.show_notification(t("project.notification.please_select_custom_output"), "error")
                 return
             print(f"[DEBUG] Output mode: Custom - {output_path}")
         elif output_mode == "steam":
@@ -2434,16 +2919,16 @@ class GeneratorTab(ctk.CTkFrame):
                 output_path = get_mods_folder_path()
 
                 if not output_path:
-                    self.show_notification("Mods folder not configured. Please set it in Settings.", "error", 4000)
+                    self.show_notification(t("project.notification.mod_folder_not_configured"), "error", 4000)
                     return
 
                 if not os.path.exists(output_path):
-                    self.show_notification(f"Mods folder does not exist: {output_path}", "error", 4000)
+                    self.show_notification(f"{t('project.notification.mod_folder_not_exist')} {output_path}", "error", 4000)
                     return
 
                 print(f"[DEBUG] Output mode: Steam - {output_path}")
             except ImportError:
-                self.show_notification("Could not load settings. Please configure mods folder path.", "error", 4000)
+                self.show_notification(t("project.notification.load_settings_failed"), "error", 4000)
                 return
         else:
 
@@ -2451,7 +2936,7 @@ class GeneratorTab(ctk.CTkFrame):
             print(f"[DEBUG] Output mode: Default/Unknown")
 
         self.project_data["mod_name"] = mod_name
-        self.project_data["author"] = author_name if author_name else "Unknown"
+        self.project_data["author"] = author_name
 
         print(f"[DEBUG] Mod Name: {mod_name}")
         print(f"[DEBUG] Author: {self.project_data['author']}")
@@ -2504,9 +2989,7 @@ class GeneratorTab(ctk.CTkFrame):
                     update_status("Export completed successfully!")
                     print("[DEBUG] Mod generation completed successfully!")
                     print("[DEBUG] ="*50 + "\n")
-                    self.show_notification(f"✓ Mod '{mod_name}' created with {total_skins} skins!", "success", 5000)
-
-                    self.after(2000, lambda: self.show_notification("Project kept. Click 'Clear Project' to start new one.", "info", 4000))
+                    self.show_notification(f"{t('project.notification.multi_skin_mod').format(mod_name=mod_name, total_skins=total_skins)}", "success", 5000)
                 else:
                     update_status("Error: Generation function not available")
                     self.show_notification("Error: generate_multi_skin_mod function not found", "error", 5000)

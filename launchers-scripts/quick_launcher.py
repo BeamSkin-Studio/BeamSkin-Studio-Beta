@@ -15,7 +15,7 @@ COLORS = {
     "bg": "#0a0a0a",
     "frame_bg": "#141414",
     "card": "#1e1e1e",
-    "accent": "#39E09B",
+    "accent": "#e67e22",
     "text": "#f5f5f5",
     "text_secondary": "#999999"
 }

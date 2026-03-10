@@ -7,6 +7,7 @@ from tkinter import filedialog
 import os
 import platform
 from gui.state import state
+from core.localization import t
 from core.settings import (
     set_beamng_paths,
     get_beamng_install_path,
@@ -16,16 +17,9 @@ from core.settings import (
 from utils.config_helper import get_beamng_default_install_paths, get_beamng_mods_default_paths
 
 class PathConfigurationSection:
-    """Section for configuring BeamNG.drive paths - Cross-platform"""
 
     def __init__(self, parent, notification_callback=None):
-        """
-        Create path configuration section
-
-        Args:
-            parent: Parent frame
-            notification_callback: Optional callback for showing notifications
-        """
+        
         self.notification_callback = notification_callback
         self.system = platform.system()
 
@@ -36,7 +30,7 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             header_frame,
-            text="🎮 BeamNG.drive Paths",
+            text=t("settings.beamng_paths"),
             font=ctk.CTkFont(size=18, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
@@ -58,8 +52,8 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             self.frame,
-            text="Configure paths for BeamNG.drive installation and mods folder",
-            font=ctk.CTkFont(size=12),
+            text=t("settings.beamng_paths_desc"),
+            font=ctk.CTkFont(size=16),
             text_color=state.colors["text_secondary"],
             anchor="w"
         ).pack(fill="x", padx=20, pady=(0, 20))
@@ -71,7 +65,6 @@ class PathConfigurationSection:
         self._load_current_paths()
 
     def _create_beamng_path_config(self):
-        """Create BeamNG installation path configuration"""
         config_frame = ctk.CTkFrame(self.frame, fg_color=state.colors["frame_bg"], corner_radius=8)
         config_frame.pack(fill="x", padx=20, pady=(0, 15))
 
@@ -80,7 +73,7 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             label_frame,
-            text="BeamNG.drive Installation",
+            text=t("settings.beamng_install"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
@@ -88,8 +81,8 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             config_frame,
-            text="Required for extracting UV maps from vehicle files",
-            font=ctk.CTkFont(size=11),
+            text=t("settings.beamng_uvpath_desc"),
+            font=ctk.CTkFont(size=14),
             text_color=state.colors["text_secondary"],
             anchor="w"
         ).pack(fill="x", padx=15, pady=(0, 10))
@@ -99,7 +92,7 @@ class PathConfigurationSection:
 
         self.beamng_entry = ctk.CTkEntry(
             path_frame,
-            placeholder_text="No path set",
+            placeholder_text="beamng_uvpath_desc",
             font=ctk.CTkFont(size=12),
             height=35,
             fg_color=state.colors["card_bg"],
@@ -112,7 +105,7 @@ class PathConfigurationSection:
 
         ctk.CTkButton(
             btn_frame,
-            text="Browse",
+            text=t("common.browse"),
             command=self._browse_beamng,
             width=80,
             height=35,
@@ -121,18 +114,6 @@ class PathConfigurationSection:
             text_color=state.colors["accent_text"],
             font=ctk.CTkFont(size=12, weight="bold")
         ).pack(side="left", padx=(0, 5))
-
-        ctk.CTkButton(
-            btn_frame,
-            text="Clear",
-            command=self._clear_beamng,
-            width=70,
-            height=35,
-            fg_color=state.colors["card_hover"],
-            hover_color=state.colors["border"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=12)
-        ).pack(side="left")
 
         self.beamng_status = ctk.CTkLabel(
             config_frame,
@@ -144,7 +125,7 @@ class PathConfigurationSection:
         self.beamng_status.pack(fill="x", padx=15, pady=(0, 10))
 
     def _create_mods_path_config(self):
-        """Create mods folder path configuration"""
+
         config_frame = ctk.CTkFrame(self.frame, fg_color=state.colors["frame_bg"], corner_radius=8)
         config_frame.pack(fill="x", padx=20, pady=(0, 20))
 
@@ -153,7 +134,7 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             label_frame,
-            text="BeamNG Mods Folder",
+            text=t("settings.beamng_modpath"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=state.colors["text"],
             anchor="w"
@@ -161,8 +142,8 @@ class PathConfigurationSection:
 
         ctk.CTkLabel(
             config_frame,
-            text="Used for 'Save to Steam' option when generating mods",
-            font=ctk.CTkFont(size=11),
+            text=t("settings.beamng_modpath_desc"),
+            font=ctk.CTkFont(size=14),
             text_color=state.colors["text_secondary"],
             anchor="w"
         ).pack(fill="x", padx=15, pady=(0, 10))
@@ -185,7 +166,7 @@ class PathConfigurationSection:
 
         ctk.CTkButton(
             btn_frame,
-            text="Browse",
+            text=t("common.browse"),
             command=self._browse_mods,
             width=80,
             height=35,
@@ -194,18 +175,6 @@ class PathConfigurationSection:
             text_color=state.colors["accent_text"],
             font=ctk.CTkFont(size=12, weight="bold")
         ).pack(side="left", padx=(0, 5))
-
-        ctk.CTkButton(
-            btn_frame,
-            text="Clear",
-            command=self._clear_mods,
-            width=70,
-            height=35,
-            fg_color=state.colors["card_hover"],
-            hover_color=state.colors["border"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=12)
-        ).pack(side="left")
 
         self.mods_status = ctk.CTkLabel(
             config_frame,
@@ -217,7 +186,6 @@ class PathConfigurationSection:
         self.mods_status.pack(fill="x", padx=15, pady=(0, 10))
 
     def _load_current_paths(self):
-        """Load and display current paths from settings"""
         beamng_path = get_beamng_install_path()
         mods_path = get_mods_folder_path()
 
@@ -232,12 +200,10 @@ class PathConfigurationSection:
             self._validate_mods_path(mods_path, show_success=False)
 
     def reload_paths(self):
-        """Public method to reload paths from settings (can be called externally)"""
         print("[DEBUG] PathConfigurationSection.reload_paths called")
         self._load_current_paths()
 
     def _browse_beamng(self):
-        """Browse for BeamNG.drive installation folder"""
         print("[DEBUG] PathConfiguration._browse_beamng called")
 
         initial_dir = get_beamng_install_path()
@@ -280,7 +246,6 @@ class PathConfigurationSection:
             print("[DEBUG] User cancelled dialog")
 
     def _browse_mods(self):
-        """Browse for BeamNG mods folder"""
         print("[DEBUG] PathConfiguration._browse_mods called")
 
         initial_dir = get_mods_folder_path()

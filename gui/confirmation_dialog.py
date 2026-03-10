@@ -2,6 +2,7 @@
 Custom themed confirmation dialogs for BeamSkin Studio
 """
 import customtkinter as ctk
+from gui.icon_helper import set_window_icon
 from typing import Callable, Optional
 
 class ConfirmationDialog:
@@ -27,6 +28,7 @@ class ConfirmationDialog:
         self.colors = colors
 
         self.dialog = ctk.CTkToplevel(parent)
+        set_window_icon(self.dialog)
         self.dialog.title(title)
         self.dialog.geometry("600x350")
         self.dialog.resizable(False, False)
@@ -162,6 +164,7 @@ class InfoDialog:
         self.colors = colors
 
         self.dialog = ctk.CTkToplevel(parent)
+        set_window_icon(self.dialog)
         self.dialog.title(title)
         self.dialog.geometry("600x350")
         self.dialog.resizable(False, False)

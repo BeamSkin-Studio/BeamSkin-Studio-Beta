@@ -7,6 +7,7 @@ from PIL import Image
 import os
 
 from gui.state import state
+from core.localization import t, get_localization
 from gui.components.preview import HoverPreviewManager
 from gui.components.navigation import Sidebar, Topbar
 from gui.components.dialogs import show_update_dialog, show_wip_warning, show_notification
@@ -17,17 +18,75 @@ from gui.tabs.howto import HowToTab
 from gui.tabs.add_vehicles import AddVehiclesTab, load_added_vehicles_at_startup
 from gui.tabs.about import AboutTab
 
+class OnlineUnavailableTab(ctk.CTkFrame):
+
+    def __init__(self, parent, **kwargs):
+        kwargs.pop("notification_callback", None)
+        super().__init__(parent, fg_color=state.colors["app_bg"], corner_radius=0)
+        self._build_overlay()
+
+    def _build_overlay(self):
+        overlay = ctk.CTkFrame(
+            self,
+            fg_color=state.colors["app_bg"],
+            corner_radius=0,
+        )
+        overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+        card = ctk.CTkFrame(
+            overlay,
+            fg_color=state.colors["frame_bg"],
+            corner_radius=16,
+            border_width=1,
+            border_color=state.colors["border"],
+        )
+        card.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(
+            card,
+            text="🚧",
+            font=ctk.CTkFont(size=52),
+        ).pack(padx=48, pady=(36, 8))
+
+        ctk.CTkLabel(
+            card,
+            text=t("online.unavailable"),
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=state.colors["text"],
+        ).pack(padx=48, pady=(0, 6))
+
+        ctk.CTkLabel(
+            card,
+            text=t("online.online_server"),
+            font=ctk.CTkFont(size=13),
+            text_color=state.colors["text_secondary"],
+            justify="center",
+        ).pack(padx=48, pady=(0, 28))
+
+    def refresh_ui(self):
+        """Called during language/theme rebuilds — recreate the overlay labels."""
+        for widget in self.winfo_children():
+            widget.destroy()
+        self.configure(fg_color=state.colors["app_bg"])
+        self._build_overlay()
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 from utils.debug import setup_universal_scroll_handler
 
 print(f"[DEBUG] Loading class: BeamSkinStudioApp")
 
 class BeamSkinStudioApp(ctk.CTk):
-    """Main application window"""
 
     def __init__(self):
 
         print(f"[DEBUG] __init__ called")
         super().__init__()
+        self.withdraw()
+
+        # Load current language immediately
+        localization = get_localization()
+        print(f"[DEBUG] Loaded language: {localization.current_language}")
 
         self.title("BeamSkin Studio")
 
@@ -69,22 +128,16 @@ class BeamSkinStudioApp(ctk.CTk):
         self._setup_ui()
         self._update_output_icons()
 
+        self.after(150, self._apply_startup_language)
+
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     def show_notification(self, message: str, type: str = "info", duration: int = 3000):
 
         print(f"[DEBUG] show_notification called")
-        """Show a notification at the top of the app
-
-        Args:
-            message: Notification message
-            type: Notification type ('info', 'success', 'warning', 'error')
-            duration: How long to show notification in milliseconds
-        """
         show_notification(self, message, type, duration)
 
     def _create_preview_overlay(self) -> ctk.CTkFrame:
-        """Create the preview overlay frame"""
         preview_overlay = ctk.CTkFrame(
             self,
             fg_color=state.colors["card_bg"],
@@ -95,7 +148,6 @@ class BeamSkinStudioApp(ctk.CTk):
         return preview_overlay
 
     def _load_output_icons(self):
-        """Load output icons for both themes"""
         icon_dir = os.path.join("gui", "Icons")
         icon_size = (20, 20)
 
@@ -142,7 +194,6 @@ class BeamSkinStudioApp(ctk.CTk):
             print(f"[ERROR] Failed to load output icons: {e}")
 
     def _load_logos(self):
-        """Load logo images for both themes"""
         icon_dir = os.path.join("gui", "Icons")
 
         logo_size = (100, 100)
@@ -171,7 +222,6 @@ class BeamSkinStudioApp(ctk.CTk):
             print(f"[ERROR] Failed to load logos: {e}")
 
     def _update_output_icons(self):
-        """Update icon labels and logo based on current theme"""
         if self.sidebar:
             if state.current_theme == "dark":
                 steam_icon = self.steam_icon_white
@@ -190,7 +240,6 @@ class BeamSkinStudioApp(ctk.CTk):
             print(f"[DEBUG] Updated logo for {state.current_theme} theme")
 
     def _setup_ui(self):
-        """Set up the main UI"""
         current_logo = self.logo_white if state.current_theme == "dark" else self.logo_black
 
         self.topbar = Topbar(
@@ -223,7 +272,6 @@ class BeamSkinStudioApp(ctk.CTk):
         self.after(50, lambda: setup_universal_scroll_handler(self))
 
     def _create_tabs(self):
-        """Create all application tabs"""
 
         self.tabs["generator"] = GeneratorTab(
             self.main_container,
@@ -250,26 +298,28 @@ class BeamSkinStudioApp(ctk.CTk):
 
         self.tabs["about"] = AboutTab(self.main_container)
 
+        self.tabs["online_tab"] = OnlineUnavailableTab(
+            self.main_container,
+            notification_callback=self.show_notification
+        )
+
     def switch_view(self, view_name: str):
 
         print(f"[DEBUG] switch_view called")
-        """Switch between main views"""
         print(f"[DEBUG] Switching to view: {view_name}")
 
         for btn_name, btn in self.topbar.menu_buttons.items():
             if btn_name == view_name:
-
                 btn.configure(
-                    fg_color=state.colors["accent"],
-                    hover_color=state.colors["accent"],
-                    text_color=state.colors["accent_text"],
+                    fg_color=state.colors["tab_selected"],
+                    hover_color=state.colors["tab_selected_hover"],
+                    text_color=state.colors["text"],
                     font=ctk.CTkFont(size=12, weight="bold")
                 )
             else:
-
                 btn.configure(
-                    fg_color="transparent",
-                    hover_color=state.colors["card_hover"],
+                    fg_color=state.colors["tab_unselected"],
+                    hover_color=state.colors["tab_unselected_hover"],
                     text_color=state.colors["text_secondary"],
                     font=ctk.CTkFont(size=12, weight="normal")
                 )
@@ -300,7 +350,6 @@ class BeamSkinStudioApp(ctk.CTk):
         self.after(50, lambda: setup_universal_scroll_handler(self))
 
     def _generate_mod(self):
-        """Generate mod - calls the generator tab's method"""
         print("[DEBUG] Generate mod button clicked")
 
         generator_tab = self.tabs.get("generator")
@@ -315,15 +364,6 @@ class BeamSkinStudioApp(ctk.CTk):
             print("[DEBUG] ERROR: Generator tab not found or wrong type")
 
     def _add_vehicle_to_project_from_sidebar(self, carid: str, display_name: str):
-        """Add a vehicle to the project from sidebar
-
-        This is called when user clicks "Add to Project" in the sidebar.
-        It forwards the request to the GeneratorTab.
-
-        Args:
-            carid: Vehicle ID (e.g., "etk800")
-            display_name: Display name (e.g., "ETK 800 Series")
-        """
         print(f"[DEBUG] Sidebar: Add vehicle clicked - {display_name} ({carid})")
 
         generator_tab = self.tabs.get("generator")
@@ -342,19 +382,48 @@ class BeamSkinStudioApp(ctk.CTk):
         else:
             print(f"[DEBUG] ERROR: Could not find generator tab")
 
+    def _apply_startup_language(self):
+        try:
+            from core.localization import get_localization, set_language
+            from core.settings import app_settings
+
+            loc        = get_localization()
+            saved_lang = app_settings.get("language", "en_US")
+
+            print(f"[DEBUG] _apply_startup_language: saved={saved_lang!r}  current={loc.current_language!r}")
+            if saved_lang != loc.current_language or not loc.translations:
+                ok = set_language(saved_lang)
+                print(f"[DEBUG] set_language({saved_lang!r}) -> {ok}")
+
+            # Always refresh all widgets on startup so the UI reflects the
+            # loaded language even when saved_lang == current_language.
+            settings_tab = self.tabs.get("settings")
+            if settings_tab and hasattr(settings_tab, "_refresh_all_ui"):
+                settings_tab._refresh_all_ui()
+                print("[DEBUG] _apply_startup_language: full UI refresh done")
+            else:
+                for tab_name, tab in self.tabs.items():
+                    if hasattr(tab, "refresh_ui"):
+                        try:
+                            tab.refresh_ui()
+                        except Exception as e:
+                            print(f"[ERROR] refresh_ui failed for {tab_name}: {e}")
+
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] _apply_startup_language failed: {e}")
+            traceback.print_exc()
+
     def _on_closing(self):
-        """Handle window closing"""
         print("[DEBUG] \nShutting down BeamSkin Studio...")
         self.destroy()
 
     def show_startup_warning(self):
 
         print(f"[DEBUG] show_startup_warning called")
-        """Show WIP warning dialog"""
         show_wip_warning(self)
 
     def show_setup_wizard(self):
-        """Show first-time setup wizard"""
         print("[DEBUG] Showing first-time setup wizard...")
 
         from gui.components.setup_wizard import show_setup_wizard
@@ -369,6 +438,31 @@ class BeamSkinStudioApp(ctk.CTk):
             )
 
             mark_setup_complete()
+
+            # Apply the language chosen in the wizard to all already-built tabs.
+            # _apply_startup_language fired 150 ms after launch (while the wizard
+            # was still open) and saw no change at that point, so we must do the
+            # refresh here now that the wizard has finished.
+            from core.localization import get_localization
+            from core.settings import app_settings as _app_settings
+            _chosen_lang = _app_settings.get("language", "en_US")
+            _loc = get_localization()
+            print(f"[DEBUG] on_setup_complete: refreshing UI for language={_chosen_lang!r}")
+            # Ensure the localization object is loaded with the chosen language
+            if _loc.current_language != _chosen_lang:
+                _loc.set_language(_chosen_lang)
+            settings_tab = self.tabs.get("settings")
+            if settings_tab and hasattr(settings_tab, "_refresh_all_ui"):
+                settings_tab._refresh_all_ui()
+                print("[DEBUG] on_setup_complete: full UI refresh via _refresh_all_ui")
+            else:
+                for _tab_name, _tab in self.tabs.items():
+                    if hasattr(_tab, "refresh_ui"):
+                        try:
+                            _tab.refresh_ui()
+                        except Exception as _e:
+                            print(f"[ERROR] refresh_ui failed for {_tab_name}: {_e}")
+                print("[DEBUG] on_setup_complete: individual tab refresh done")
 
             if "settings" in self.tabs:
                 settings_tab = self.tabs["settings"]
@@ -390,20 +484,24 @@ class BeamSkinStudioApp(ctk.CTk):
                     duration=3000
                 )
 
-            self.after(500, self.show_startup_warning)
+            def _post_setup_startup():
+                self.show_startup_warning()  # blocks (wait_window) until dismissed
+                from gui.components.changelog_dialog import show_changelog_if_needed
+                from core.updater import CURRENT_VERSION
+                show_changelog_if_needed(self, CURRENT_VERSION)
+
+            self.after(500, _post_setup_startup)
 
         show_setup_wizard(self, state.colors, on_setup_complete)
 
     def prompt_update(self, new_version: str):
 
         print(f"[DEBUG] prompt_update called")
-        """Show update notification"""
         show_update_dialog(self, new_version)
 
 def main():
 
     print(f"[DEBUG] main called")
-    """Entry point for the application"""
     print("[DEBUG] Starting BeamSkin Studio...")
 
     print("[DEBUG] Loading custom vehicles from added_vehicles.json...")

@@ -6,6 +6,7 @@ import customtkinter as ctk
 from PIL import Image
 import os
 from gui.state import state
+from core.localization import t
 
 class HoverPreviewManager:
     """Manages hover preview windows for vehicle cards"""
@@ -78,7 +79,7 @@ class HoverPreviewManager:
             else:
                 print(f"[DEBUG]   Found in vehicle_ids: {vehicle_name}")
 
-            header_text = f"Name: {vehicle_name} | ID: {carid}"
+            header_text = f"{t('project.display_name')}: {vehicle_name} | {t('project.car_id')}: {carid}"
             print(f"[DEBUG]   Header text: {header_text}")
 
             ctk.CTkLabel(header, text=header_text, text_color=state.colors["accent_text"], font=("Segoe UI", 15, "bold")).pack()

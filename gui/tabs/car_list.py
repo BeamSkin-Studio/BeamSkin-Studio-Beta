@@ -8,6 +8,7 @@ import re
 from tkinter import filedialog
 import customtkinter as ctk
 from gui.state import state
+from core.localization import t
 from gui.components.preview import HoverPreviewManager
 from gui.components.dialogs import show_notification
 
@@ -30,6 +31,21 @@ class CarListTab(ctk.CTkFrame):
         self.carlist_scroll: ctk.CTkScrollableFrame = None
 
         self._setup_ui()
+        # Populate car list after UI is setup
+        self._populate_car_list()
+    def refresh_ui(self):
+        """Refresh all UI text with current language"""
+        # Clear existing widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+        
+        # Clear carlist items state to avoid duplicates
+        state.carlist_items.clear()
+        
+        # Recreate UI with new translations
+        self._setup_ui()
+        
+        # Repopulate the car list
         self._populate_car_list()
 
     def _setup_ui(self):
@@ -157,7 +173,7 @@ class CarListTab(ctk.CTkFrame):
                 text="🖼 UV Map",
                 width=110,
                 height=36,
-                fg_color=state.colors["success"],
+                fg_color=state.colors["accent"],
                 hover_color=state.colors["accent_hover"],
                 text_color=state.colors["accent_text"],
                 corner_radius=10,
