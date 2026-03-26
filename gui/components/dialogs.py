@@ -112,23 +112,32 @@ def show_notification(app, message, type="info", duration=3000):
     color_scheme = colors_map.get(type, colors_map["info"])
     icon = icons.get(type, "ℹ")
 
-    base_width = 100
-    char_width = 9
-    calculated_width = base_width + (len(message) * char_width)
+    # Cap width: short messages stay compact, long ones wrap within MAX_WIDTH.
+    MAX_WIDTH   = 560   # px — notification never wider than this
+    ICON_SPACE  = 60    # px reserved for the icon column + padding
+    CHAR_WIDTH  = 8     # rough px per character at font size 13
+    TEXT_AREA   = MAX_WIDTH - ICON_SPACE - 30  # usable text width
 
-    min_width = 300
-    max_width = 1200
-    notification_width = max(min_width, min(calculated_width, max_width))
+    # Decide wraplength: only wrap when the text is actually long
+    single_line_px = len(message) * CHAR_WIDTH
+    if single_line_px <= TEXT_AREA:
+        # Fits on one line — no wrapping needed, shrink the box to content
+        notification_width = max(300, ICON_SPACE + single_line_px + 30)
+        wrap = 0  # 0 = no wrapping
+    else:
+        # Too long for one line — pin to MAX_WIDTH and let text wrap
+        notification_width = MAX_WIDTH
+        wrap = TEXT_AREA
 
     notification_content = ctk.CTkFrame(
         app.notification_frame,
         fg_color=color_scheme["bg"],
         corner_radius=12,
         width=notification_width,
-        height=50
     )
+    # Do NOT call pack_propagate(False) — let the frame grow vertically to
+    # fit wrapped text instead of clipping it.
     notification_content.pack(padx=0, pady=10)
-    notification_content.pack_propagate(False)
 
     ctk.CTkLabel(
         notification_content,
@@ -136,15 +145,17 @@ def show_notification(app, message, type="info", duration=3000):
         font=ctk.CTkFont(size=20, weight="bold"),
         text_color=color_scheme["text"],
         width=40
-    ).pack(side="left", padx=(15, 5))
+    ).pack(side="left", anchor="n", padx=(15, 5), pady=12)
 
     ctk.CTkLabel(
         notification_content,
         text=message,
         font=ctk.CTkFont(size=13, weight="bold"),
         text_color=color_scheme["text"],
-        anchor="w"
-    ).pack(side="left", fill="x", expand=True, padx=(5, 15))
+        anchor="w",
+        justify="left",
+        wraplength=wrap if wrap else 0,
+    ).pack(side="left", fill="x", expand=True, padx=(5, 15), pady=12)
 
     app.notification_frame.place(relx=0.5, y=60, anchor="n")
     app.notification_frame.lift()

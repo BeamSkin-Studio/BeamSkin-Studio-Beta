@@ -40,29 +40,7 @@ def separator() -> Entry:
 
 # ── CHANGELOG DATA ─────────────────────────────────────────────────────────── #
 
-CHANGELOGS = [
-    {
-        "version": "0.7.0.Beta",
-        "date": "10-03-2026",
-        "entries": [
-            title("🚀 New Features"),
-            subtitle("Colorable Skins"),
-            item("colorable skins are now supported, allowing you to create skins that can be recolored."),
-            subtitle("Online Tab"),
-            item("a new online tab has been added, where you can report issues, upload and download skins. It will be availbe when I have a dedicated server up and running."),
-            subtitle("Language Selection"),
-            item("you can now select your preferred language in the settings. download tab and changelog window has a translator button that uses GoogleTranslator that will hopefully translate to your selected language."),
-            item("more languages will be added in future updates."),
-            separator(),
-
-            title("🐛 Bug Fixes"),
-            subtitle("Citybus Texture Fix"),
-            item("Fixed so citybus use the newly named textures"),
-            separator(),
-        ]
-    },
-
-    # ════════════════════════════════════════════════════════════════════════ #
+# ════════════════════════════════════════════════════════════════════════ #
     #  TEMPLATE
     # ════════════════════════════════════════════════════════════════════════ #
     # {
@@ -84,6 +62,41 @@ CHANGELOGS = [
     #     ]
     # },
 
+CHANGELOGS = [
+
+    {
+        "version": "0.7.1.Beta",
+        "date": "10-03-2026",
+        "entries": [
+            title("🐛 Bug Fixes"),
+            subtitle("Generate button fixed"),
+            item("the generate button should now work properly."),
+            separator(),
+            subtitle("Load and save buttons fixed"),
+            item("the load and save buttons should now work properly."),
+        ]
+    },
+
+    {
+        "version": "0.7.0.Beta",
+        "date": "10-03-2026",
+        "entries": [
+            title("🚀 New Features"),
+            subtitle("Colorable Skins"),
+            item("colorable skins are now supported, allowing you to create skins that can be recolored."),
+            subtitle("Online Tab"),
+            item("a new online tab has been added, where you can report issues, upload and download skins. It will be availbe when I have a dedicated server up and running."),
+            subtitle("Language Selection"),
+            item("you can now select your preferred language in the settings. download tab and changelog window has a translator button that uses GoogleTranslator that will hopefully translate to your selected language."),
+            item("more languages will be added in future updates."),
+            separator(),
+
+            title("🐛 Bug Fixes"),
+            subtitle("Citybus Texture Fix"),
+            item("Fixed so citybus use the newly named textures"),
+            separator(),
+        ]
+    },
 ]
 
 

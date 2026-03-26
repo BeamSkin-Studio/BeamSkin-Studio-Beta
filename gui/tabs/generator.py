@@ -41,6 +41,7 @@ class GeneratorTab(ctk.CTkFrame):
 
         self.mod_name_entry_sidebar = None
         self.author_entry_sidebar = None
+        self._sidebar = None  # stable reference to the Sidebar object (never destroyed)
 
         self.generator_scroll: Optional[ctk.CTkScrollableFrame] = None
         self.project_overview_frame: Optional[ctk.CTkFrame] = None
@@ -116,12 +117,35 @@ class GeneratorTab(ctk.CTkFrame):
         self._bind_search()
         self.refresh_project_display()
 
-    def set_sidebar_references(self, mod_name_entry, author_entry):
+    def set_sidebar_references(self, mod_name_entry, author_entry, sidebar=None):
 
         print(f"[DEBUG] set_sidebar_references called")
-        """Called by main window to provide sidebar entry references"""
+        """Called by main window to provide sidebar entry references.
+
+        sidebar: the Sidebar object itself -- its children (entries) are
+        destroyed and recreated on every language/theme change, but the
+        Sidebar object is stable.  Storing it lets us always look up the
+        *current* entry rather than a stale, destroyed widget.
+        """
         self.mod_name_entry_sidebar = mod_name_entry
         self.author_entry_sidebar = author_entry
+        self._sidebar = sidebar
+
+    # ------------------------------------------------------------------
+    # Helpers that always return the *live* entry widgets, even after a
+    # language / theme change that destroyed and recreated sidebar children.
+    # ------------------------------------------------------------------
+    def _mod_name_entry(self):
+        """Return the current mod-name CTkEntry from the sidebar."""
+        if self._sidebar is not None:
+            return self._sidebar.mod_name_entry
+        return self.mod_name_entry_sidebar
+
+    def _author_entry(self):
+        """Return the current author CTkEntry from the sidebar."""
+        if self._sidebar is not None:
+            return self._sidebar.author_entry
+        return self.author_entry_sidebar
 
     def _fallback_notification(self, message: str, type: str = "info", duration: int = 3000):
         """Fallback notification if none provided"""
@@ -2439,12 +2463,12 @@ class GeneratorTab(ctk.CTkFrame):
             return
 
         mod_name = ""
-        if self.mod_name_entry_sidebar:
-            mod_name = self.get_real_value(self.mod_name_entry_sidebar, "Enter mod name...").strip()
+        if self._is_widget_alive(self._mod_name_entry()):
+            mod_name = self.get_real_value(self._mod_name_entry(), "Enter mod name...").strip()
 
         author = ""
-        if self.author_entry_sidebar:
-            author = self.get_real_value(self.author_entry_sidebar, "Your name...").strip()
+        if self._is_widget_alive(self._author_entry()):
+            author = self.get_real_value(self._author_entry(), "Your name...").strip()
 
         self.project_data["mod_name"] = mod_name
         self.project_data["author"] = author if author else "Unknown"
@@ -2465,6 +2489,22 @@ class GeneratorTab(ctk.CTkFrame):
             except Exception as e:
                 print(f"[DEBUG] Error saving project: {e}")
                 self.show_notification(f"Error saving project: {str(e)}", "error")
+
+    def _is_widget_alive(self, widget) -> bool:
+        """Return True if the widget is alive and usable.
+
+        winfo_exists() is not sufficient for CTkEntry: it checks the outer
+        CTk container frame (which may survive), but the inner tk.Entry
+        command is deleted when the widget is destroyed.  Calling .get()
+        exercises the real underlying command and raises TclError if dead.
+        """
+        if widget is None:
+            return False
+        try:
+            widget.get()
+            return True
+        except Exception:
+            return False
 
     def load_project(self):
 
@@ -2494,15 +2534,15 @@ class GeneratorTab(ctk.CTkFrame):
 
                 self._reset_skin_form_fields()
 
-                if "mod_name" in loaded_data and self.mod_name_entry_sidebar:
-                    self.mod_name_entry_sidebar.delete(0, "end")
-                    self.mod_name_entry_sidebar.insert(0, loaded_data["mod_name"])
-                    self.mod_name_entry_sidebar.configure(text_color=state.colors["text"])
+                if "mod_name" in loaded_data and self._is_widget_alive(self._mod_name_entry()):
+                    self._mod_name_entry().delete(0, "end")
+                    self._mod_name_entry().insert(0, loaded_data["mod_name"])
+                    self._mod_name_entry().configure(text_color=state.colors["text"])
 
-                if "author" in loaded_data and self.author_entry_sidebar:
-                    self.author_entry_sidebar.delete(0, "end")
-                    self.author_entry_sidebar.insert(0, loaded_data["author"])
-                    self.author_entry_sidebar.configure(text_color=state.colors["text"])
+                if "author" in loaded_data and self._is_widget_alive(self._author_entry()):
+                    self._author_entry().delete(0, "end")
+                    self._author_entry().insert(0, loaded_data["author"])
+                    self._author_entry().configure(text_color=state.colors["text"])
                 
                 # Hide the add skin section if loaded project has no cars
                 if not loaded_data.get("cars"):
@@ -2554,16 +2594,16 @@ class GeneratorTab(ctk.CTkFrame):
             if self.add_skin_section_card:
                 self.add_skin_section_card.pack_forget()
 
-            if self.mod_name_entry_sidebar:
-                self.mod_name_entry_sidebar.delete(0, "end")
-                self.mod_name_entry_sidebar.insert(0, "Enter mod name...")
-                self.mod_name_entry_sidebar.configure(text_color="#888888")
+            if self._is_widget_alive(self._mod_name_entry()):
+                self._mod_name_entry().delete(0, "end")
+                self._mod_name_entry().insert(0, "Enter mod name...")
+                self._mod_name_entry().configure(text_color="#888888")
                 print(f"[DEBUG] Cleared mod name entry and restored placeholder")
 
-            if self.author_entry_sidebar:
-                self.author_entry_sidebar.delete(0, "end")
-                self.author_entry_sidebar.insert(0, "Your name...")
-                self.author_entry_sidebar.configure(text_color="#888888")
+            if self._is_widget_alive(self._author_entry()):
+                self._author_entry().delete(0, "end")
+                self._author_entry().insert(0, "Your name...")
+                self._author_entry().configure(text_color="#888888")
                 print(f"[DEBUG] Cleared author entry and restored placeholder")
 
             self.show_notification("Project cleared", "info")
@@ -2837,12 +2877,12 @@ class GeneratorTab(ctk.CTkFrame):
         print("[DEBUG] ="*50)
 
         # Check sidebar references are wired up before anything else
-        if self.mod_name_entry_sidebar is None or self.author_entry_sidebar is None:
+        if self._mod_name_entry() is None or self._author_entry() is None:
             self.show_notification("Internal error: sidebar entries not initialized.", "error")
             return
 
-        mod_name = self.get_real_value(self.mod_name_entry_sidebar, t("project.mod_name_placeholder")).strip()
-        author_name = self.get_real_value(self.author_entry_sidebar, t("project.author_name_placeholder")).strip()
+        mod_name = self.get_real_value(self._mod_name_entry(), t("project.mod_name_placeholder")).strip()
+        author_name = self.get_real_value(self._author_entry(), t("project.author_name_placeholder")).strip()
 
         if not mod_name:
             self.show_notification(t("project.notification.no_zip_name"), "error")

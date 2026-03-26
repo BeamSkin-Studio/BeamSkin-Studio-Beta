@@ -264,7 +264,8 @@ class BeamSkinStudioApp(ctk.CTk):
         if generator_tab and isinstance(generator_tab, GeneratorTab):
             generator_tab.set_sidebar_references(
                 self.sidebar.mod_name_entry,
-                self.sidebar.author_entry
+                self.sidebar.author_entry,
+                self.sidebar  # stable object; entries looked up dynamically after rebuilds
             )
 
         self.switch_view("generator")
@@ -414,6 +415,10 @@ class BeamSkinStudioApp(ctk.CTk):
             print(f"[ERROR] _apply_startup_language failed: {e}")
             traceback.print_exc()
 
+        # Sidebar.refresh_ui() destroys and recreates entry widgets; re-wire
+        # the generator tab's references so load/save/clear project still work.
+        self._rewire_sidebar_references()
+
     def _on_closing(self):
         print("[DEBUG] \nShutting down BeamSkin Studio...")
         self.destroy()
@@ -484,6 +489,10 @@ class BeamSkinStudioApp(ctk.CTk):
                     duration=3000
                 )
 
+            # Re-wire sidebar references in case the setup wizard triggered a
+            # language change that caused Sidebar.refresh_ui() to run.
+            self._rewire_sidebar_references()
+
             def _post_setup_startup():
                 self.show_startup_warning()  # blocks (wait_window) until dismissed
                 from gui.components.changelog_dialog import show_changelog_if_needed
@@ -493,6 +502,26 @@ class BeamSkinStudioApp(ctk.CTk):
             self.after(500, _post_setup_startup)
 
         show_setup_wizard(self, state.colors, on_setup_complete)
+
+    def _rewire_sidebar_references(self):
+        """Re-wire generator tab's sidebar entry references after any sidebar rebuild.
+
+        Must be called any time Sidebar.refresh_ui() is invoked, because that
+        method destroys and recreates mod_name_entry / author_entry.  Holding a
+        stale reference to a destroyed widget causes the 'invalid command name'
+        error when load_project (or clear_project) tries to manipulate those entries.
+        """
+        generator_tab = self.tabs.get("generator")
+        if generator_tab and isinstance(generator_tab, GeneratorTab) and self.sidebar:
+            try:
+                generator_tab.set_sidebar_references(
+                    self.sidebar.mod_name_entry,
+                    self.sidebar.author_entry,
+                    self.sidebar  # stable object; entries looked up dynamically after rebuilds
+                )
+                print("[DEBUG] _rewire_sidebar_references: sidebar references updated")
+            except Exception as e:
+                print(f"[ERROR] _rewire_sidebar_references failed: {e}")
 
     def prompt_update(self, new_version: str):
 
