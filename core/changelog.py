@@ -65,7 +65,7 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
-        "version": "0.7.21.Beta",
+        "version": "0.7.11.Beta",
         "date": "27-03-2026",
         "entries": [
             title("🐛 Bug Fixes"),
