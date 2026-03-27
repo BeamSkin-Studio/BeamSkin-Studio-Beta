@@ -65,15 +65,12 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
-        "version": "0.7.1.Beta",
-        "date": "10-03-2026",
+        "version": "0.7.21.Beta",
+        "date": "27-03-2026",
         "entries": [
             title("🐛 Bug Fixes"),
-            subtitle("Generate button fixed"),
-            item("the generate button should now work properly."),
-            separator(),
-            subtitle("Load and save buttons fixed"),
-            item("the load and save buttons should now work properly."),
+            subtitle("First Launch setup fixed"),
+            item("The Next button now works correctly."),
         ]
     },
 

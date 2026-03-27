@@ -32,6 +32,7 @@ class SetupWizard:
         self.current_step = 1  # 1 = Language, 2 = Paths
         self._lang_scroll = None
         self._search_var = None
+        self._search_trace_id = None
 
         # Create dialog
         self.dialog = ctk.CTkToplevel(parent)
@@ -120,8 +121,14 @@ class SetupWizard:
         # Initial render (no filter)
         self._render_language_list("")
 
-        # Wire up live search
-        self._search_var.trace_add("write", lambda *_: self._render_language_list(self._search_var.get()))
+        # Wire up live search — remove any previous trace first to avoid accumulation.
+        # _show_language_step() is called on every language click, so without cleanup
+        # each call leaves an orphaned callback referencing the old StringVar.
+        def _on_search_change(*_):
+            if self._search_var is not None:
+                self._render_language_list(self._search_var.get())
+
+        self._search_trace_id = self._search_var.trace_add("write", _on_search_change)
 
         # Buttons
         self._create_buttons_language()
@@ -288,17 +295,29 @@ class SetupWizard:
         
         print(f"[DEBUG] Moving to paths step with language: {self.selected_language}")
         
-        # Save language to settings
-        from core.settings import app_settings, save_settings
-        app_settings["language"] = self.selected_language
-        save_settings()
+        # Save language to settings (non-fatal — still proceed on error)
+        try:
+            from core.settings import app_settings, save_settings
+            app_settings["language"] = self.selected_language
+            save_settings()
+        except Exception as e:
+            print(f"[ERROR] Failed to save language setting: {e}")
         
         # Move to paths step
         self._show_paths_step()
 
     def _show_paths_step(self):
         print("[DEBUG] Showing paths configuration step")
-        
+
+        # Nullify lang-step state BEFORE destroying widgets. If any in-flight
+        # StringVar trace fires during widget teardown it will hit the
+        # `if self._lang_scroll is None: return` guard in _render_language_list
+        # and exit cleanly instead of crashing on a destroyed frame (silent TclError
+        # is what caused the Next button to appear to do nothing).
+        self._lang_scroll = None
+        self._search_var = None
+        self._search_trace_id = None
+
         # Clear main frame
         for widget in self.main_frame.winfo_children():
             widget.destroy()
@@ -564,8 +583,23 @@ class SetupWizard:
 
     def _on_paths_finish(self):
         print(f"[DEBUG] Setup wizard: Complete with paths: {self.paths}")
-        self.on_complete(self.paths)
-        self.dialog.destroy()
+
+        # Destroy the dialog FIRST so it always closes regardless of what
+        # on_complete does. The old order was on_complete() then destroy():
+        # any exception thrown inside the callback (UI refresh, path reload,
+        # language change, etc.) is silently swallowed by Tkinter, leaving
+        # the wizard frozen on screen with the button appearing to do nothing.
+        try:
+            self.dialog.destroy()
+        except Exception as e:
+            print(f"[ERROR] Failed to destroy setup wizard dialog: {e}")
+
+        try:
+            self.on_complete(self.paths)
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] on_complete callback raised an exception: {e}")
+            traceback.print_exc()
 
     def show(self):
         self.dialog.wait_window()
