@@ -1,5 +1,9 @@
 # BeamSkin Studio
 
+> [!WARNING]
+> This is very much WIP(Work In Progress), it is not extensively tested or in any way a stable finished product.
+> If you decide to use this, expect possible issues / crashes (especially after game updates)
+
 ## Installation
 
 1. **Download BeamSkin Studio**
