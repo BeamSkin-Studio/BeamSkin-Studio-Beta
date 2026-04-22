@@ -119,10 +119,41 @@
         .aspect-ratio { width: 100%; height: 100%; background: #000; }
         .aspect-ratio iframe { width: 100%; height: 100%; border: 0; display: block; }
 
+        .gallery-section-label {
+            font-size: 0.68rem;
+            font-weight: 900;
+            color: var(--text-mute);
+            letter-spacing: 0.1em;
+            text-align: left;
+            padding: 2px 2px 0;
+            margin-top: 4px;
+        }
+
+        .gallery-section-label i { color: var(--accent); margin-right: 4px; }
+
         .gallery-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 8px;
+            width: 100%;
+        }
+
+        .gallery-videos { grid-template-columns: repeat(3, 1fr); }
+
+        .gallery-videos .nav-card img,
+        .gallery-images .nav-card img {
+            height: auto;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            border-radius: 7px;
+        }
+
+            height: auto;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            opacity: 0.5;
+            transition: 0.3s;
+            pointer-events: none;
             width: 100%;
         }
 
@@ -140,6 +171,7 @@
             width: 100%; height: 70px;
             object-fit: cover; opacity: 0.5;
             transition: 0.3s; pointer-events: none;
+            border-radius: 7px;
         }
 
         .nav-card:hover { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
@@ -262,7 +294,7 @@
             <div class="wip-header">
                 <i class="fas fa-triangle-exclamation"></i> WORK IN PROGRESS
             </div>
-            BeamSkin Studio is <strong>usable but still in active development</strong><br>• crashes are rare, but bugs are possible.<br><br>
+            BeamSkin Studio is <strong>usable but still in active development</strong><br>crashes are rare, but bugs are possible.<br><br>
             <strong>Known limitations:</strong><br>
             • <strong>Game updates</strong> may rename textures, breaking some skins until patched.<br>
             • <strong>Vehicle variants</strong> (box trucks, ambulances, etc.) are not supported.<br>
@@ -286,27 +318,36 @@
             <div id="displayBox" class="display-wrapper">
                 <div id="videoContainer" class="display-content active-content">
                     <div class="aspect-ratio">
-                        <iframe src="https://www.youtube.com/embed/N1M8Tsnlodw" allowfullscreen></iframe>
+                        <iframe src="https://www.youtube.com/embed/Ik4mn3TPTeQ" allowfullscreen></iframe>
                     </div>
                 </div>
                 <img id="imageDisplay" class="display-content" src="" alt="Screenshot">
             </div>
 
-            <div class="gallery-grid">
-                <div class="nav-card" onclick="showVideo()">
+            <div class="gallery-section-label"><i class="fab fa-youtube"></i> VIDEOS</div>
+            <div class="gallery-grid gallery-videos">
+                <div class="nav-card" onclick="showVideo('Ik4mn3TPTeQ')">
+                    <img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg">
+                    <span>VIDEO 3</span>
+                </div>
+                <div class="nav-card" onclick="showVideo('b9bhjc8zTok')">
+                    <img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg">
+                    <span>VIDEO 2</span>
+                </div>
+                <div class="nav-card" onclick="showVideo('N1M8Tsnlodw')">
                     <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg">
                     <span>PREVIEW VIDEO</span>
                 </div>
+            </div>
+
+            <div class="gallery-section-label"><i class="fas fa-images"></i> SCREENSHOTS</div>
+            <div class="gallery-grid gallery-images">
                 <div class="nav-card" onclick="showImage('image1.png')"><img src="image1.png"><span>UI PREVIEW</span></div>
                 <div class="nav-card" onclick="showImage('image2.png')"><img src="image2.png"><span>USER GUIDE</span></div>
                 <div class="nav-card" onclick="showImage('image3.png')"><img src="image3.png"><span>CAR DATABASE</span></div>
                 <div class="nav-card" onclick="showImage('image4.png')"><img src="image4.png"><span>MOD TOOLS</span></div>
                 <div class="nav-card" onclick="showImage('image5.png')"><img src="image5.png"><span>APP SETTINGS</span></div>
                 <div class="nav-card" onclick="showImage('image6.png')"><img src="image6.png"><span>VERSION INFO</span></div>
-                <div class="nav-card" onclick="window.open('https://github.com/BeamSkin-Studio', '_blank')">
-                    <img src="https://opengraph.githubassets.com/1/BeamSkin-Studio">
-                    <span>VIEW SOURCE</span>
-                </div>
             </div>
 
             <!-- Download Buttons -->
@@ -326,6 +367,11 @@
             <div style="font-size: 0.8rem; color: var(--text-mute); text-align: center;">
                 <i class="fas fa-download" style="color: var(--accent); font-size: 0.7rem;"></i>
                 All-time downloads: <span id="grand-total" style="color: var(--text); font-weight: 600;">Loading...</span>
+            </div>
+
+            <div style="font-size: 0.8rem; color: var(--text-mute); text-align: center;">
+                <i class="fab fa-github" style="color: var(--accent); font-size: 0.7rem;"></i>
+                <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 600;">View all repositories on GitHub</a>
             </div>
         </div>
 
@@ -413,8 +459,9 @@
         imageDisplay.style.display = 'block';
     }
 
-    function showVideo() {
+    function showVideo(id) {
         imageDisplay.style.display = 'none';
+        videoContainer.querySelector('iframe').src = `https://www.youtube.com/embed/${id}`;
         videoContainer.style.display = 'block';
     }
 
