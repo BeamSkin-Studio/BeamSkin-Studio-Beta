@@ -29,8 +29,8 @@
 
         .container {
             width: 100%;
-            max-width: 1200px;
-            padding: 0 20px;
+            max-width: 1800px;
+            padding: 0 30px;
             box-sizing: border-box;
             text-align: center;
         }
@@ -44,7 +44,7 @@
         /* ── Three-column top layout ─────────────────────────────────────── */
         .top-layout {
             display: grid;
-            grid-template-columns: 440px 1fr 440px;
+            grid-template-columns: 7fr 14fr 7fr;
             gap: 14px;
             width: 100%;
             margin-bottom: 15px;
@@ -199,17 +199,17 @@
         .changelog-box::-webkit-scrollbar-track { background: transparent; }
         .changelog-box::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
 
-        /* ── Download row (now inside middle-col) ────────────────────────── */
+        /* ── Download row ────────────────────────────────────────────────── */
         .download-row {
             display: flex;
-            justify-content: center;
-            gap: 15px;
+            justify-content: space-evenly;
+            gap: 0;
             width: 100%;
             box-sizing: border-box;
         }
 
         .dl-btn {
-            flex: 1;
+            flex: 0 0 38%;
             min-width: 0;
             padding: 12px;
             border-radius: 10px;
@@ -309,7 +309,7 @@
                 </div>
             </div>
 
-            <!-- Download Buttons (now inside middle-col, constrained to viewer width) -->
+            <!-- Download Buttons -->
             <div class="download-row">
                 <button id="winBtn" class="dl-btn btn-win">
                     <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
