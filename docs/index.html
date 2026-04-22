@@ -131,8 +131,54 @@
         .count-tag { font-size: 11px; font-weight: 400; margin-top: 2px; opacity: 0.8; }
         .count-tag i { font-size: 9px; }
         
-        /* Icon spacing */
-        .dl-btn i { margin-bottom: 2px; font-size: 0.8rem; }
+        .dl-btn i { margin-bottom: 2px; font-size: 0.75rem; }
+
+        /* ── Changelog ─────────────────────────────────────────────────────── */
+        .changelog-box {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 15px;
+            padding: 14px 16px;
+            border-radius: 8px;
+            border: 1px solid #222;
+            border-left: 4px solid var(--accent);
+            background: var(--surface);
+            text-align: left;
+            font-size: 0.82rem;
+            line-height: 1.7;
+        }
+        .changelog-box .cl-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .changelog-box .cl-version {
+            font-weight: 900; color: var(--accent); font-size: 0.9rem;
+        }
+        .changelog-box .cl-date {
+            color: var(--text-mute); font-size: 0.75rem;
+        }
+        .changelog-box .cl-title {
+            font-weight: 800; color: var(--text); font-size: 0.85rem;
+            margin-top: 8px; margin-bottom: 2px;
+        }
+        .changelog-box .cl-subtitle {
+            font-weight: 700; color: var(--accent); font-size: 0.78rem;
+            margin-top: 5px;
+        }
+        .changelog-box .cl-item {
+            color: var(--text-mute); padding-left: 12px;
+        }
+        .changelog-box .cl-item::before {
+            content: "• "; color: var(--accent);
+        }
+        .changelog-box .cl-note {
+            font-style: italic; color: var(--text-mute); font-size: 0.75rem;
+            margin-top: 4px;
+        }
+        .changelog-box .cl-separator {
+            border: none; border-top: 1px solid #222;
+            margin: 8px 0;
+        }
 
         .footer { margin-top: 20px; color: var(--text-mute); font-size: 0.8rem; padding-bottom: 15px; }
         .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
@@ -186,10 +232,15 @@
         line-height: 1.6;
     ">
         <div style="font-weight: 700; color: #f39c12; margin-bottom: 5px; font-size: 0.88rem;">
-            <i class="fas fa-triangle-exclamation"></i> WARNING
+            <i class="fas fa-triangle-exclamation"></i> WORK IN PROGRESS — READ BEFORE USING
         </div>
-        This is very much <strong style="color: var(--text);">WIP (Work In Progress)</strong> — it is not extensively tested or in any way a stable finished product.<br>
-        If you decide to use this, expect possible <strong style="color: var(--text);">issues / crashes</strong>, especially after game updates.
+        BeamSkin Studio is <strong style="color: var(--text);">usable but still in active development</strong> — crashes are rare, but bugs are possible.<br><br>
+        <strong style="color: var(--text);">Current known limitations:</strong><br>
+        • <strong style="color: var(--text);">Game updates</strong> may rename textures, causing some skins to break until a fix is released.<br>
+        • <strong style="color: var(--text);">Vehicle variants</strong> (box trucks, ambulances, etc.) are not currently supported.<br>
+        • <strong style="color: var(--text);">Mod support</strong> is present but limited — not all mods will work correctly.<br>
+        • Some features are still <strong style="color: var(--text);">missing or incomplete</strong>.<br><br>
+        <span style="font-style: italic;">The tool is actively being improved — if something breaks, check back for updates.</span>
     </div>
 
     <div class="download-row">
@@ -208,6 +259,14 @@
     <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-mute); text-align: center;">
         <i class="fas fa-download" style="color: var(--accent); font-size: 0.7rem;"></i>
         All-time downloads: <span id="grand-total" style="color: var(--text); font-weight: 600;">Loading...</span>
+    </div>
+
+    <div id="changelogBox" class="changelog-box">
+        <div class="cl-header">
+            <span class="cl-version">📋 Latest Changelog</span>
+            <span id="clDate" class="cl-date">Loading...</span>
+        </div>
+        <div id="clEntries">Loading changelog...</div>
     </div>
 
     <div class="footer">
@@ -303,7 +362,74 @@
         videoContainer.style.display = 'block';
     }
 
+    async function fetchChangelog() {
+        try {
+            const res = await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
+            if (!res.ok) throw new Error('Failed to fetch');
+            const text = await res.text();
+
+            // Find start of CHANGELOGS list
+            const listStart = text.indexOf('CHANGELOGS = [');
+            if (listStart === -1) throw new Error('No CHANGELOGS found');
+
+            // Extract the first { ... } block (first/latest version entry)
+            const content = text.slice(listStart);
+            let depth = 0, start = -1, end = -1;
+            for (let i = 0; i < content.length; i++) {
+                if (content[i] === '{') { if (depth === 0) start = i; depth++; }
+                else if (content[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+            }
+            if (start === -1 || end === -1) throw new Error('Could not parse entry');
+
+            const block = content.slice(start, end + 1);
+
+            const version = (block.match(/"version":\s*"([^"]+)"/) || [])[1] || '?';
+            const date    = (block.match(/"date":\s*"([^"]+)"/)    || [])[1] || '';
+
+            // Parse all entry calls: title("..."), item("..."), separator(), etc.
+            const entries = [];
+            const re = /(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
+            let m;
+            while ((m = re.exec(block)) !== null) {
+                entries.push({ type: m[1], text: m[2] || '' });
+            }
+
+            document.getElementById('clDate').textContent = `v${version}  •  ${date}`;
+
+            const container = document.getElementById('clEntries');
+            container.innerHTML = '';
+            for (const entry of entries) {
+                if (entry.type === 'title') {
+                    const el = document.createElement('div');
+                    el.className = 'cl-title'; el.textContent = entry.text;
+                    container.appendChild(el);
+                } else if (entry.type === 'subtitle') {
+                    const el = document.createElement('div');
+                    el.className = 'cl-subtitle'; el.textContent = entry.text;
+                    container.appendChild(el);
+                } else if (entry.type === 'item') {
+                    const el = document.createElement('div');
+                    el.className = 'cl-item'; el.textContent = entry.text;
+                    container.appendChild(el);
+                } else if (entry.type === 'note') {
+                    const el = document.createElement('div');
+                    el.className = 'cl-note'; el.textContent = '💡 ' + entry.text;
+                    container.appendChild(el);
+                } else if (entry.type === 'separator') {
+                    const el = document.createElement('hr');
+                    el.className = 'cl-separator';
+                    container.appendChild(el);
+                }
+            }
+        } catch (err) {
+            console.error('Changelog error:', err);
+            document.getElementById('clEntries').textContent = 'Could not load changelog.';
+            document.getElementById('clDate').textContent = '';
+        }
+    }
+
     init();
+    fetchChangelog();
 </script>
 
 </body>
