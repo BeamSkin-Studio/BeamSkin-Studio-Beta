@@ -146,14 +146,6 @@
             aspect-ratio: 16 / 9;
             object-fit: cover;
             border-radius: 7px;
-        }
-
-            height: auto;
-            aspect-ratio: 16 / 9;
-            object-fit: cover;
-            opacity: 0.5;
-            transition: 0.3s;
-            pointer-events: none;
             width: 100%;
         }
 
@@ -165,6 +157,9 @@
             cursor: pointer;
             transition: 0.2s;
             position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .nav-card img {
@@ -182,6 +177,8 @@
             position: absolute; bottom: 4px; width: 100%;
             font-size: 8px; font-weight: 900; color: var(--accent);
             text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         /* ── Changelog (right) ───────────────────────────────────────────── */
