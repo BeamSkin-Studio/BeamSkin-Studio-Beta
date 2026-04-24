@@ -268,14 +268,112 @@
         .footer { margin-top: 20px; color: var(--text-mute); font-size: 0.8rem; padding-bottom: 15px; }
         .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
 
-        /* ── Responsive ──────────────────────────────────────────────────── */
-        @media (max-width: 900px) {
-            .top-layout { grid-template-columns: 1fr; }
-            .changelog-box { max-height: none; }
+        /* ══════════════════════════════════════════════════════════════════
+           MOBILE STYLES  (≤ 768px)
+           Desktop layout is completely unchanged above this point.
+        ══════════════════════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+
+            /* Tighter container padding on small screens */
+            .container {
+                padding: 0 14px;
+            }
+
+            /* Smaller logo */
+            .logo {
+                width: 150px;
+                margin: 8px 0 4px;
+            }
+
+            /* Stack all three columns into one, reorder so
+               viewer comes first, WIP second, changelog last */
+            .top-layout {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                margin-bottom: 12px;
+            }
+
+            .middle-col  { order: 1; }
+            .wip-box     { order: 2; }
+            .changelog-box {
+                order: 3;
+                max-height: none; /* let it expand fully */
+            }
+
+            /* ── Video / image viewer ── */
+            .display-wrapper {
+                border-radius: 8px;
+            }
+
+            /* ── Gallery cards — 2 columns on mobile ── */
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 7px;
+            }
+
+            /* Videos also 2 cols (was 3) */
+            .gallery-videos {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Taller tap target on gallery thumbnails */
+            .nav-card img {
+                height: 60px;
+            }
+
+            /* Label text for gallery cards slightly bigger so it's readable */
+            .nav-card span {
+                font-size: 9px;
+                bottom: 5px;
+            }
+
+            /* ── Download buttons — stack vertically, full width ── */
+            .download-row {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+
+            .dl-btn {
+                flex: none;
+                width: 100%;
+                padding: 14px 12px;
+                font-size: 1rem;
+                border-radius: 10px;
+            }
+
+            .ver-tag   { font-size: 14px; }
+            .count-tag { font-size: 12px; }
+
+            /* ── Footer ── */
+            .footer {
+                font-size: 0.75rem;
+                margin-top: 16px;
+                padding-bottom: 24px; /* extra breathing room at bottom */
+            }
+
+            /* ── WIP box ── */
+            .wip-box {
+                font-size: 0.78rem;
+            }
+
+            /* ── Changelog ── */
+            .changelog-box {
+                font-size: 0.78rem;
+            }
         }
 
-        @media (max-width: 600px) {
-            .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+        /* Extra-small screens (≤ 380px) */
+        @media (max-width: 380px) {
+            .container {
+                padding: 0 10px;
+            }
+            .logo {
+                width: 130px;
+            }
+            .dl-btn {
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
