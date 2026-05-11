@@ -2,6 +2,8 @@ import os
 import sys
 import threading
 import platform
+import io
+import tkinter as tk
 
 from gui.components.dialogs import run_startup_sequence
 
@@ -9,6 +11,51 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print(f"[DEBUG] Working directory: {os.getcwd()}")
 print(f"[DEBUG] Platform: {platform.system()}")
+
+
+# ─── Suppress harmless CustomTkinter widget destruction errors ─────────────────
+"""
+CustomTkinter's CTkEntry widgets fire textvariable callbacks after the widget
+is destroyed during UI refresh cycles. These TclErrors from CustomTkinter's
+internal code are harmless. We filter them from stderr.
+"""
+class _ErrorFilter(io.StringIO):
+    """Filter that suppresses harmless widget destruction errors."""
+    def __init__(self, original_stderr):
+        super().__init__()
+        self.original_stderr = original_stderr
+        
+    def write(self, message: str) -> int:
+        # Suppress harmless CustomTkinter entry widget destruction errors
+        if "_tkinter.TclError: invalid command name" in message and ".!entry" in message:
+            return len(message)
+        if "_tkinter.TclError: bad window path name" in message and ".!ctkscrollableframe" in message:
+            return len(message)
+        # Write all other messages normally
+        self.original_stderr.write(message)
+        return len(message)
+    
+    def flush(self):
+        self.original_stderr.flush()
+
+_original_stderr = sys.stderr
+sys.stderr = _ErrorFilter(_original_stderr)
+
+
+# ─── Override Tkinter callback exception handling for harmless widget teardown errors ──
+_original_report_callback_exception = tk.Tk.report_callback_exception
+
+def _patched_report_callback_exception(self, exc, val, tb):
+    if isinstance(val, tk.TclError):
+        message = str(val)
+        if "invalid command name" in message and ".!entry" in message:
+            return
+        if "bad window path name" in message and ".!ctkscrollableframe" in message:
+            return
+    return _original_report_callback_exception(self, exc, val, tb)
+
+tk.Tk.report_callback_exception = _patched_report_callback_exception
+
 
 # ─── Error popup helper (works even if customtkinter isn't available) ──────────
 def show_error_and_exit(title, message, detail=None):
@@ -31,7 +78,6 @@ def show_error_and_exit(title, message, detail=None):
         messagebox.showerror(f"BeamSkin Studio — {title}", full_message)
         root.destroy()
     except Exception:
-        # If even tkinter fails, the .bat will show the log
         pass
 
     sys.exit(1)
@@ -186,8 +232,6 @@ if __name__ == "__main__":
     center_window(app)
 
     print(f"[DEBUG] Bringing window to front...")
-    # Window is withdrawn; it will be revealed in show_startup_sequence.
-    # No topmost juggling needed here.
 
     print(f"[DEBUG] Initializing scroll handler...")
     app.after(100, lambda: setup_universal_scroll_handler(app))
@@ -249,8 +293,7 @@ if __name__ == "__main__":
         print("[DEBUG] Checking server connection in background...")
         threading.Thread(target=_do_connection_check_bg, daemon=True).start()
 
-        # Reveal the window now — all widgets are built and the language refresh
-        # (scheduled at 150 ms) has already run.  Users see a fully-loaded UI.
+
         print("[DEBUG] Revealing main window...")
         app.deiconify()
         app.lift()

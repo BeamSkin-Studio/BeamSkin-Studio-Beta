@@ -65,33 +65,23 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.7.15.Beta",
+        "date": "12-05-2026",
+        "entries": [
+            title("⚙️ Improvements"),
+            subtitle("Updater"),
+            item("Improved the updater to be the same as the upcoming V.0.8.0.Beta updater so that it is ready for the V.0.8.0.Beta release"),
+        ]
+    },
+
+
+    {
         "version": "0.7.11.Beta",
         "date": "27-03-2026",
         "entries": [
             title("🐛 Bug Fixes"),
             subtitle("First Launch setup fixed"),
             item("The Next button now works correctly."),
-        ]
-    },
-
-    {
-        "version": "0.7.0.Beta",
-        "date": "10-03-2026",
-        "entries": [
-            title("🚀 New Features"),
-            subtitle("Colorable Skins"),
-            item("colorable skins are now supported, allowing you to create skins that can be recolored."),
-            subtitle("Online Tab"),
-            item("a new online tab has been added, where you can report issues, upload and download skins. It will be availbe when I have a dedicated server up and running."),
-            subtitle("Language Selection"),
-            item("you can now select your preferred language in the settings. download tab and changelog window has a translator button that uses GoogleTranslator that will hopefully translate to your selected language."),
-            item("more languages will be added in future updates."),
-            separator(),
-
-            title("🐛 Bug Fixes"),
-            subtitle("Citybus Texture Fix"),
-            item("Fixed so citybus use the newly named textures"),
-            separator(),
         ]
     },
 ]

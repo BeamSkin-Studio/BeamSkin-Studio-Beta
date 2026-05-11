@@ -1,182 +1,367 @@
-"""GitHub update checker with custom UI - OS-specific repository support"""
-import requests
-from tkinter import messagebox
-import webbrowser
-import customtkinter as ctk
-from gui.icon_helper import set_window_icon
-import re
+"""
+updater.py — GitHub update checker with in-app download/extract/restart
+(customtkinter edition)
+"""
+from __future__ import annotations
+
 import os
+import re
 import sys
+import shutil
+import zipfile
+import logging
+import threading
 import subprocess
-import platform
+import webbrowser
+
+import requests
+import customtkinter as ctk
+from tkinter import messagebox
+from gui.icon_helper import set_window_icon
 from core.localization import t
 
+try:
+    import core.settings as _settings
+except ImportError:
+    _settings = None
+
+log = logging.getLogger(__name__)
 
 
+# ── path helpers ──────────────────────────────────────────────────────────── #
 
-
-def get_github_repo():
-    """Get the appropriate GitHub repository URL based on the operating system"""
-    if sys.platform == 'win32':
+def get_github_repo() -> str:
+    if sys.platform == "win32":
         return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta"
-    else:  # Linux and other platforms
-        return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta"
+    return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta"
 
-def get_github_raw_url():
-    """Get the raw GitHub URL for version.txt based on the operating system"""
-    if sys.platform == 'win32':
+def get_github_raw_url() -> str:
+    if sys.platform == "win32":
         return "https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/version.txt"
-    else:  # Linux and other platforms
-        return "https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/main/version.txt"
+    return "https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/main/version.txt"
 
-def get_base_path():
-    """Get the base path for resources (works in dev and PyInstaller)"""
-    print(f"[DEBUG] get_base_path called")
-    print(f"[DEBUG] Platform: {sys.platform}")
-    print(f"[DEBUG] Using repo: {get_github_repo()}")
-    if getattr(sys, 'frozen', False):
-        return sys._MEIPASS
-    else:
-        return os.path.dirname(os.path.abspath(__file__))
+def get_zip_url() -> str:
+    repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
+    return f"https://github.com/BeamSkin-Studio/{repo}/archive/refs/heads/main.zip"
 
-def read_version():
-    """Read version from version.txt and return formatted version string"""
-    print(f"[DEBUG] read_version called")
-    print(f"[DEBUG] ========== READING VERSION FILE ==========")
+def get_base_path() -> str:
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.dirname(os.path.abspath(__file__))
 
-    possible_paths = [
-        os.path.join(get_base_path(), 'version.txt'),
-        os.path.join(os.getcwd(), 'version.txt'),
-        'version.txt',
-    ]
+def get_app_dir() -> str:
+    """Return the application root directory (works frozen and dev)."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    # updater.py lives in core/ — parent of parent is app root
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    for version_path in possible_paths:
-        if os.path.exists(version_path):
+def get_downloads_folder() -> str:
+    if sys.platform == "win32":
+        try:
+            import winreg
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+            ) as key:
+                return winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")[0]
+        except Exception:
+            pass
+    return os.path.join(os.path.expanduser("~"), "Downloads")
+
+
+# ── version helpers ───────────────────────────────────────────────────────── #
+
+def _format_version_string(raw: str) -> str:
+    """Parse a raw version.txt string into a canonical 'M.m.p.Status' form."""
+    content = raw.strip().replace("Version:", "").strip()
+    parts = content.split(".")
+    if len(parts) >= 3:
+        major, minor, patch = parts[0], parts[1], parts[2]
+        if len(parts) >= 4:
             try:
-                with open(version_path, 'r') as f:
-                    content = f.read().strip()
-                    print(f"[DEBUG] Raw version content: {content}")
+                build  = int(parts[3])
+                status = "Beta" if build == 0 else f"Build {build}"
+            except ValueError:
+                status = parts[3].capitalize()
+        else:
+            status = "Stable"
+        return f"{major}.{minor}.{patch}.{status}"
+    return content
 
-                    if "Version:" in content:
-                        content = content.replace("Version:", "").strip()
 
-                    parts = content.split('.')
-
-                    if len(parts) >= 3:
-                        major, minor, patch = parts[0], parts[1], parts[2]
-
-                        if len(parts) >= 4:
-                            try:
-                                build = int(parts[3])
-                                if build == 0:
-                                    status = "Beta"
-                                else:
-                                    status = f"Build {build}"
-                            except ValueError:
-                                status = parts[3].capitalize()
-                        else:
-                            status = "Stable"
-
-                        version = f"{major}.{minor}.{patch}.{status}"
-                    else:
-                        version = content
-
-                    print(f"[DEBUG] Version loaded from: {version_path}")
-                    print(f"[DEBUG] Formatted version: {version}")
-                    return version
-            except Exception as e:
-                print(f"[DEBUG] Failed to read {version_path}: {e}")
-                continue
-
-    print(f"[DEBUG] WARNING: version.txt not found in any location")
-    print(f"[DEBUG] Searched paths:")
-    for path in possible_paths:
-        print(f"[DEBUG]   - {path}")
+def read_version() -> str:
+    log.debug("read_version called")
+    for p in [
+        os.path.join(get_base_path(), "version.txt"),
+        os.path.join(os.getcwd(), "version.txt"),
+        "version.txt",
+    ]:
+        if not os.path.exists(p):
+            continue
+        try:
+            with open(p, "r") as f:
+                return _format_version_string(f.read())
+        except Exception as e:
+            log.debug("Failed to read %s: %s", p, e)
     return "0.0.0.Unknown"
+
+
+def parse_version(s: str):
+    s = s.lower().strip().replace("version:", "").replace("v", "").strip()
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)\.?(.*)", s)
+    if m:
+        major, minor, patch, suffix = m.groups()
+        prio = {"stable": 0, "": 0, "rc": 1, "beta": 2, "alpha": 3}.get(
+            (suffix or "stable").lower().strip(), 2)
+        return (int(major), int(minor), int(patch), prio)
+    return (0, 0, 0, 999)
+
+
+def is_newer_version(remote: str, current: str) -> bool:
+    try:
+        r, c = parse_version(remote), parse_version(current)
+        log.debug("Parsed current: %s -> %s", current, c)
+        log.debug("Parsed remote:  %s -> %s", remote, r)
+        return r[:3] > c[:3] if r[:3] != c[:3] else r[3] < c[3]
+    except Exception as e:
+        log.debug("Version comparison error: %s", e)
+        return remote != current
+
 
 CURRENT_VERSION = read_version()
 
 _app_instance = None
-_colors = None
+_colors       = None
 
 def set_app_instance(app, colors):
-    """Set the app instance and colors for update prompts"""
-    print(f"[DEBUG] set_app_instance called")
     global _app_instance, _colors
     _app_instance = app
-    _colors = colors
+    _colors       = colors
+    log.debug("set_app_instance called")
 
-def parse_version(version_string):
-    """
-    Parse version string into comparable tuple.
-    Examples:
-        "0.3.6.Beta" -> (0, 3, 6, 2)
-        "0.4.0.Beta" -> (0, 4, 0, 2)
-        "1.0.0.Stable" -> (1, 0, 0, 0)
-    """
-    print(f"[DEBUG] parse_version called")
 
-    version_string = version_string.lower().strip()
-    version_string = version_string.replace('version:', '').replace('v', '').strip()
+# ── skip-version helpers ──────────────────────────────────────────────────── #
 
-    match = re.match(r'(\d+)\.(\d+)\.(\d+)\.?(.*)', version_string)
-    if match:
-        major, minor, patch, suffix = match.groups()
-        major, minor, patch = int(major), int(minor), int(patch)
-
-        suffix = suffix.lower().strip() if suffix else 'stable'
-
-        suffix_priority = {
-            'stable': 0,
-            '': 0,
-            'rc': 1,
-            'beta': 2,
-            'alpha': 3
-        }.get(suffix, 2)
-
-        return (major, minor, patch, suffix_priority)
-
-    return (0, 0, 0, 999)
-
-def is_newer_version(remote_version, current_version):
-    """
-    Compare two version strings to see if remote is newer.
-    Returns True if remote_version is newer than current_version.
-    """
-    print(f"[DEBUG] is_newer_version called")
+def get_skipped_version() -> str:
+    """Return the version string the user chose to skip, or '' if none."""
     try:
-        remote_tuple = parse_version(remote_version)
-        current_tuple = parse_version(current_version)
+        if _settings:
+            return _settings.app_settings.get("skipped_update_version", "")
+    except Exception:
+        pass
+    return ""
 
-        print(f"[DEBUG] Parsed current: {current_version} -> {current_tuple}")
-        print(f"[DEBUG] Parsed remote: {remote_version} -> {remote_tuple}")
 
-        if remote_tuple[:3] != current_tuple[:3]:
-            # Different version numbers
-            return remote_tuple[:3] > current_tuple[:3]
-        else:
-            # Same version, check stability (lower = more stable)
-            return remote_tuple[3] < current_tuple[3]
-
+def set_skipped_version(version: str) -> None:
+    """Persist the version the user wants to skip (pass '' to clear)."""
+    log.debug("set_skipped_version: %r", version)
+    try:
+        if _settings:
+            _settings.app_settings["skipped_update_version"] = version
+            _settings.save_settings()
     except Exception as e:
-        print(f"[DEBUG] Version comparison error: {e}")
-        # Fallback: just check if strings differ
-        return remote_version != current_version
+        log.warning("set_skipped_version: could not persist: %s", e)
 
-def prompt_update(new_version, on_done=None):
 
-    print(f"[DEBUG] prompt_update called")
-    print(f"\n[DEBUG] ========== UPDATE PROMPT ==========")
-    print(f"[DEBUG] Showing update dialog for version: {new_version}")
+# ── file-protection rules (mirrors _ExtractWorker in PySide6 edition) ─────── #
+
+# Tier 1 — individual files backed up before overwrite and restored afterwards.
+_PRESERVE: set = {
+    os.path.join("data",     "app_settings.json"),
+    os.path.join("vehicles", "added_vehicles.json"),
+}
+
+# Tier 2 — directory prefixes NEVER written to during the copy step.
+#   The files already on disk are left completely intact.
+#   • data/ — every file here is user state; the zip must not touch any of it.
+_NEVER_OVERWRITE_PREFIXES: frozenset = frozenset({
+    "data",
+})
+
+# Tier 3 — directory prefixes where existing files are NEVER deleted during
+#   cleanup, even if the new zip no longer ships them.
+#   New files from the update ARE still copied in — only deletions are blocked.
+#   • data/               — all user settings / state (also Tier 2)
+#   • vehicles/           — vehicle template trees (may have user-created ones)
+#   • gui/images/vehicles — bundled vehicle preview images
+_NEVER_DELETE_PREFIXES: frozenset = frozenset({
+    "data",
+    "vehicles",
+    os.path.join("gui", "images", "vehicles"),
+})
+
+
+def _is_overwrite_protected(rel_norm: str) -> bool:
+    """Return True if this path must never be overwritten by the zip."""
+    parts = rel_norm.split(os.sep)
+    for prefix in _NEVER_OVERWRITE_PREFIXES:
+        prefix_parts = prefix.split(os.sep)
+        if parts[: len(prefix_parts)] == prefix_parts:
+            return True
+    return False
+
+
+def _is_deletion_protected(rel_norm: str) -> bool:
+    """Return True if this on-disk relative path must never be deleted."""
+    parts = rel_norm.split(os.sep)
+    # Always keep __pycache__ and compiled bytecode — not shipped in zip.
+    if "__pycache__" in parts or rel_norm.endswith(".pyc"):
+        return True
+    for prefix in _NEVER_DELETE_PREFIXES:
+        prefix_parts = prefix.split(os.sep)
+        if parts[: len(prefix_parts)] == prefix_parts:
+            return True
+    return False
+
+
+# ── extract + install logic ───────────────────────────────────────────────── #
+
+def _extract_and_install(
+    zip_path:    str,
+    new_version: str,
+    on_status:   "callable[[str], None] | None" = None,
+) -> int:
+    """
+    Extract *zip_path* and install it over the live app directory.
+
+    Applies the three-tier protection rules:
+      Tier 1 — PRESERVE files are backed up and restored unchanged.
+      Tier 2 — NEVER_OVERWRITE_PREFIXES directories are never written to.
+      Tier 3 — NEVER_DELETE_PREFIXES directories are never cleaned up.
+
+    Returns the number of files updated.
+    Raises on fatal error.
+    """
+    def _status(msg: str):
+        log.debug("extract: %s", msg)
+        if on_status:
+            on_status(msg)
+
+    app_dir   = get_app_dir()
+    dl_folder = os.path.dirname(zip_path)
+    temp_dir  = os.path.join(dl_folder, f"BeamSkin-Studio-temp-{new_version}")
+
+    # ── 1. Extract zip to a temp location ────────────────────────────────── #
+    _status("Extracting archive…")
+    with zipfile.ZipFile(zip_path, "r") as z:
+        z.extractall(temp_dir)
+
+    contents = os.listdir(temp_dir)
+    source   = (os.path.join(temp_dir, contents[0])
+                if len(contents) == 1 and
+                   os.path.isdir(os.path.join(temp_dir, contents[0]))
+                else temp_dir)
+
+    # ── 2. Collect every relative path the new version ships ─────────────── #
+    incoming: set = set()
+    for root, _, files in os.walk(source):
+        for fname in files:
+            rel = os.path.relpath(os.path.join(root, fname), source)
+            incoming.add(rel.replace("/", os.sep).replace("\\", os.sep))
+
+    # ── 3. Back up Tier-1 preserved files ────────────────────────────────── #
+    backups: dict = {}
+    preserve_norm = {p.replace("/", os.sep).replace("\\", os.sep)
+                     for p in _PRESERVE}
+    for rel in preserve_norm:
+        full = os.path.join(app_dir, rel)
+        if os.path.exists(full):
+            try:
+                with open(full, "r", encoding="utf-8") as f:
+                    backups[rel] = f.read()
+                log.debug("Backed up: %s", rel)
+            except Exception as e:
+                log.debug("Could not backup %s: %s", rel, e)
+
+    # ── 4. Copy new / changed files into app_dir ──────────────────────────── #
+    _status("Copying files…")
+    updated = 0
+    for root, _, files in os.walk(source):
+        rel_dir    = os.path.relpath(root, source)
+        target_dir = app_dir if rel_dir == "." else os.path.join(app_dir, rel_dir)
+        os.makedirs(target_dir, exist_ok=True)
+        for fname in files:
+            rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
+            rel_norm = rel_file.replace("/", os.sep).replace("\\", os.sep)
+            if rel_norm in preserve_norm:
+                continue   # restored from backup in step 6
+            if _is_overwrite_protected(rel_norm):
+                continue   # Tier 2 — entire directory is off-limits for writes
+            try:
+                shutil.copy2(os.path.join(root, fname),
+                             os.path.join(target_dir, fname))
+                updated += 1
+            except Exception as e:
+                log.debug("Could not copy %s: %s", rel_norm, e)
+
+    # ── 5. Remove files the new version no longer ships ───────────────────── #
+    #       Skips anything covered by _is_deletion_protected().
+    _status("Removing obsolete files…")
+    for root, dirs, files in os.walk(app_dir, topdown=False):
+        for fname in files:
+            full     = os.path.join(root, fname)
+            rel_norm = os.path.relpath(full, app_dir)
+            if rel_norm in incoming:
+                continue   # still present in new version — keep
+            if rel_norm in preserve_norm:
+                continue   # handled separately
+            if _is_deletion_protected(rel_norm):
+                continue   # Tier 3 — protected tree
+            try:
+                os.remove(full)
+                log.debug("Removed obsolete file: %s", rel_norm)
+            except Exception as e:
+                log.warning("Could not remove %s: %s", rel_norm, e)
+
+        # Remove empty directories that are not inside a protected tree.
+        for dname in dirs:
+            dpath    = os.path.join(root, dname)
+            rel_norm = os.path.relpath(dpath, app_dir)
+            if _is_deletion_protected(os.path.join(rel_norm, ".keep")):
+                continue
+            try:
+                if not os.listdir(dpath):
+                    os.rmdir(dpath)
+            except Exception:
+                pass
+
+    # ── 6. Restore Tier-1 preserved files ────────────────────────────────── #
+    for rel, content in backups.items():
+        full = os.path.join(app_dir, rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        try:
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(content)
+            log.debug("Restored: %s", rel)
+        except Exception as e:
+            log.debug("Could not restore %s: %s", rel, e)
+
+    # ── 7. Clean up temp extraction folder and downloaded zip ────────────── #
+    try:
+        shutil.rmtree(temp_dir)
+    except Exception:
+        pass
+    try:
+        os.remove(zip_path)
+    except Exception:
+        pass
+
+    return updated
+
+
+# ── prompt_update (main update dialog) ───────────────────────────────────── #
+
+def prompt_update(new_version: str, on_done=None):
+    log.debug("prompt_update — showing dialog for %s", new_version)
 
     if _app_instance is None or _colors is None:
-
         response = messagebox.askyesno(
             "Update Available",
             f"A new version is available!\n\n"
             f"Current: {CURRENT_VERSION}\n"
-            f"Latest: {new_version}\n\n"
-            f"Would you like to download it now?"
+            f"Latest:  {new_version}\n\n"
+            f"Would you like to download it now?",
         )
         if response:
             webbrowser.open(get_github_repo())
@@ -184,13 +369,20 @@ def prompt_update(new_version, on_done=None):
             on_done()
         return
 
+    # ── window setup ──────────────────────────────────────────────────────── #
     update_window = ctk.CTkToplevel(_app_instance)
-    update_window.title("Update Available")
-    update_window.geometry("500x360") 
+    update_window.title(t("update.title", default="Update Available"))
+    update_window.geometry("500x360")
     update_window.resizable(False, False)
     update_window.transient(_app_instance)
     update_window.grab_set()
     set_window_icon(update_window)
+
+    _WIN_W, _WIN_H = 500, 360
+    update_window.update_idletasks()
+    x = (update_window.winfo_screenwidth()  // 2) - (_WIN_W // 2)
+    y = (update_window.winfo_screenheight() // 2) - (_WIN_H // 2)
+    update_window.geometry(f"{_WIN_W}x{_WIN_H}+{x}+{y}")
 
     # Fire on_done exactly once, regardless of how the window is closed
     _done_fired = [False]
@@ -201,628 +393,529 @@ def prompt_update(new_version, on_done=None):
                 _app_instance.after(0, on_done)
     update_window.bind("<Destroy>", _fire_on_done)
 
-    update_window.update_idletasks()
-    _WIN_W, _WIN_H = 500, 360
-    x = (update_window.winfo_screenwidth()  // 2) - (_WIN_W // 2)
-    y = (update_window.winfo_screenheight() // 2) - (_WIN_H // 2)
-    update_window.geometry(f"{_WIN_W}x{_WIN_H}+{x}+{y}")
-
+    # ── main frame ────────────────────────────────────────────────────────── #
     main_frame = ctk.CTkFrame(update_window, fg_color=_colors["frame_bg"])
     main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
     title_label = ctk.CTkLabel(
         main_frame,
-        text=t("update.title"),
+        text=t("update.title", default="Update Available"),
         font=ctk.CTkFont(size=20, weight="bold"),
-        text_color=_colors["accent"]
+        text_color=_colors["accent"],
     )
     title_label.pack(pady=(5, 15))
 
     info_frame = ctk.CTkFrame(main_frame, fg_color=_colors["card_bg"], corner_radius=10)
     info_frame.pack(fill="x", padx=10, pady=10)
 
-    current_label = ctk.CTkLabel(
+    ctk.CTkLabel(
         info_frame,
-        text=t(f"update.current_version").format(CURRENT_VERSION=CURRENT_VERSION),
+        text=t("update.current_version", default="Current Version: {CURRENT_VERSION}").format(
+            CURRENT_VERSION=CURRENT_VERSION
+        ),
         font=ctk.CTkFont(size=15),
-        text_color=_colors["text"]
-    )
-    current_label.pack(pady=(10, 5))
+        text_color=_colors["text"],
+    ).pack(pady=(10, 5))
 
-    arrow_label = ctk.CTkLabel(
+    ctk.CTkLabel(
         info_frame,
         text="↓",
         font=ctk.CTkFont(size=16, weight="bold"),
-        text_color=_colors["accent"]
-    )
-    arrow_label.pack(pady=2)
+        text_color=_colors["accent"],
+    ).pack(pady=2)
 
-    new_label = ctk.CTkLabel(
+    ctk.CTkLabel(
         info_frame,
-        text=t(f"update.new_version").format(new_version=new_version),
+        text=t("update.new_version", default="New Version: {new_version}").format(
+            new_version=new_version
+        ),
         font=ctk.CTkFont(size=18, weight="bold"),
-        text_color=_colors["accent"]
-    )
-    new_label.pack(pady=(5, 10))
+        text_color=_colors["accent"],
+    ).pack(pady=(5, 10))
 
-    message_label = ctk.CTkLabel(
+    ctk.CTkLabel(
         main_frame,
-        text=t("update.update_message"),
-        font=ctk.CTkFont(size=16),
+        text=t("update.update_message",
+               default="⚙  Your settings and custom data will be preserved."),
+        font=ctk.CTkFont(size=13),
         text_color=_colors["text"],
-        justify="center"
-    )
-    message_label.pack(pady=15)
+        justify="center",
+    ).pack(pady=(0, 10))
 
+    # ── button area ───────────────────────────────────────────────────────── #
     button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-    button_frame.pack(pady=10, fill="x", padx=20)
+    button_frame.pack(pady=5, fill="x", padx=20)
 
+    # ── skip-version link ─────────────────────────────────────────────────── #
+    def _skip_this_version():
+        log.debug("Skipping version %r", new_version)
+        set_skipped_version(new_version)
+        update_window.destroy()
+
+    skip_version_btn = ctk.CTkButton(
+        main_frame,
+        text=t("update.skip_version", default="Skip this version"),
+        command=_skip_this_version,
+        fg_color="transparent",
+        hover_color=_colors.get("card_hover", _colors["card_bg"]),
+        text_color=_colors["text_secondary"],
+        height=24,
+        font=ctk.CTkFont(size=11),
+    )
+    # Packed after buttons are created below
+
+    # ── download action ───────────────────────────────────────────────────── #
     def download_update():
-        """Download the latest repository ZIP"""
-        print(f"[DEBUG] download_update called")
-        print(f"[DEBUG] Downloading latest version ZIP from: {get_github_repo()}")
-        
-        # Expand the window to fit the download progress area
-        _WIN_W = 500
-        _WIN_H_EXPANDED = 400
-        x = (update_window.winfo_screenwidth()  // 2) - (_WIN_W // 2)
-        y = (update_window.winfo_screenheight() // 2) - (_WIN_H_EXPANDED // 2)
-        update_window.geometry(f"{_WIN_W}x{_WIN_H_EXPANDED}+{x}+{y}")
+        filename       = f"BeamSkin-Studio-{new_version}.zip"
+        downloads_folder = get_downloads_folder()
+        filepath       = os.path.join(downloads_folder, filename)
 
-        # Update button to show downloading status
-        download_btn.configure(text="Downloading Update...", state="disabled")
-        skip_btn.configure(state="disabled")
+        log.debug("Starting download: %s → %s", get_zip_url(), filepath)
+
+        # Resize window for progress area
+        update_window.geometry(f"500x420+{x}+{y}")
+        download_btn.configure(text="Downloading Update…", state="disabled")
+        maybe_later_btn.configure(state="disabled")
+        skip_version_btn.configure(state="disabled")
         update_window.update()
 
-        # Add status label
         status_label = ctk.CTkLabel(
             main_frame,
-            text="Downloading update, please wait...",
+            text="Starting download…",
             font=ctk.CTkFont(size=11),
             text_color=_colors["text"],
-            wraplength=450  # Ensure text wraps properly
+            wraplength=450,
         )
         status_label.pack(pady=(0, 5))
+
+        progress_bar = ctk.CTkProgressBar(main_frame, width=420)
+        progress_bar.set(0)
+        progress_bar.pack(pady=(0, 5))
         update_window.update()
-        
-        try:
-            # Determine the correct repository name based on OS
-            if sys.platform == 'win32':
-                repo_name = "BeamSkin-Studio-Beta"
-            else:
-                repo_name = "BeamSkin-Studio-Linux-Beta"
-            
-            # GitHub repository ZIP URL
-            zip_url = f"https://github.com/BeamSkin-Studio/{repo_name}/archive/refs/heads/main.zip"
-            print(f"[DEBUG] Download URL: {zip_url}")
-            
-            # Get user's Downloads folder
-            if sys.platform == 'win32':
-                import winreg
-                sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
-                downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
-                    downloads_folder = winreg.QueryValueEx(key, downloads_guid)[0]
-            else:
-                downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
-            
-            # Create filename with version
-            filename = f"BeamSkin-Studio-{new_version}.zip"
-            filepath = os.path.join(downloads_folder, filename)
-            
-            # Download the file
-            status_label.configure(text=f"Downloading {filename}...")
-            update_window.update()
-            
-            response = requests.get(zip_url, stream=True, timeout=30)
-            response.raise_for_status()
-            
-            total_size = int(response.headers.get('content-length', 0))
-            
-            with open(filepath, 'wb') as f:
-                if total_size == 0:
-                    f.write(response.content)
-                else:
-                    downloaded = 0
-                    for chunk in response.iter_content(chunk_size=8192):
+
+        def _dl_thread():
+            try:
+                resp = requests.get(get_zip_url(), stream=True, timeout=30)
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length", 0))
+                done  = 0
+                with open(filepath, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
                         f.write(chunk)
-                        downloaded += len(chunk)
-                        # Update progress
-                        progress_mb = downloaded / (1024 * 1024)
-                        total_mb = total_size / (1024 * 1024)
-                        status_label.configure(
-                            text=f"Downloading {filename}... {progress_mb:.1f}MB / {total_mb:.1f}MB"
+                        done += len(chunk)
+                        if total > 0:
+                            pct = done / total
+                            progress_mb  = done  / 1_048_576
+                            total_mb     = total / 1_048_576
+                            msg = f"Downloading {filename}… {progress_mb:.1f} MB / {total_mb:.1f} MB"
+                        else:
+                            pct = 0
+                            msg = f"Downloading {filename}… {done/1_048_576:.1f} MB"
+                        _app_instance.after(
+                            0,
+                            lambda m=msg, p=pct: (
+                                status_label.configure(text=m),
+                                progress_bar.set(p),
+                            ),
                         )
-                        update_window.update()
-            
-            print(f"[DEBUG] Download complete: {filepath}")
-            status_label.configure(text="Download complete!")
-            update_window.update()
+                _app_instance.after(0, lambda: _on_dl_success(filepath, downloads_folder))
+            except Exception as e:
+                log.debug("Download failed: %s", e)
+                _app_instance.after(0, lambda err=str(e): _on_dl_failed(err))
 
-            # Hide the update window — success_window takes over.
-            # We withdraw rather than destroy so _fire_on_done doesn't fire yet;
-            # it will fire once the user closes success_window (which destroys update_window).
+        def _on_dl_success(fp: str, dl_folder: str):
+            log.debug("Download complete: %s", fp)
             update_window.withdraw()
+            _show_downloaded_window(fp, dl_folder, new_version, update_window, _fire_on_done)
 
-            # Show success window — parented to _app_instance, not update_window,
-            # so it stays visible even though update_window is hidden.
-            success_window = ctk.CTkToplevel(_app_instance)
-            set_window_icon(success_window)
-            success_window.title("Download Complete")
-            success_window.geometry("450x300")
-            success_window.resizable(False, False)
-            success_window.transient(_app_instance)
-            success_window.grab_set()
-
-            def _close_all():
-                """Destroy both success_window and update_window (triggers on_done)."""
-                try:
-                    success_window.destroy()
-                except Exception:
-                    pass
-                try:
-                    update_window.destroy()
-                except Exception:
-                    pass
-
-            # If the user closes via the X button, also clean up update_window
-            success_window.protocol("WM_DELETE_WINDOW", _close_all)
-
-            # Center window
-            success_window.update_idletasks()
-            width = success_window.winfo_width()
-            height = success_window.winfo_height()
-            x = (success_window.winfo_screenwidth() // 2) - (width // 2)
-            y = (success_window.winfo_screenheight() // 2) - (height // 2)
-            success_window.geometry(f"{width}x{height}+{x}+{y}")
-            
-            frame = ctk.CTkFrame(success_window, fg_color=_colors["frame_bg"])
-            frame.pack(fill="both", expand=True, padx=15, pady=15)
-            
-            # Success icon
-            ctk.CTkLabel(
-                frame,
-                text="✓",
-                font=ctk.CTkFont(size=40, weight="bold"),
-                text_color=_colors["accent"]
-            ).pack(pady=(10, 5))
-            
-            ctk.CTkLabel(
-                frame,
-                text="Download Complete!",
-                font=ctk.CTkFont(size=16, weight="bold"),
-                text_color=_colors["text"]
-            ).pack(pady=(0, 10))
-            
-            ctk.CTkLabel(
-                frame,
-                text=f"Update file saved to:\n{filepath}",
-                font=ctk.CTkFont(size=11),
-                text_color=_colors["text_secondary"],
-                justify="center"
-            ).pack(pady=10)
-            
-            def extract_and_update():
-                """Extract ZIP and update application files"""
-                import zipfile
-                import shutil
-                from pathlib import Path
-                
-                try:
-                    # Update button to show extraction status
-                    extract_btn.configure(text="Extracting...", state="disabled")
-                    success_window.update()
-                    
-                    # Get current application directory (root of the app)
-                    if getattr(sys, 'frozen', False):
-                        # Running as compiled exe - get the directory containing the exe
-                        app_dir = os.path.dirname(sys.executable)
-                    else:
-                        # Running as script - get the directory containing main.py
-                        # Go up from core/updater.py to the root
-                        current_file = os.path.abspath(__file__)
-                        # updater.py is in core/, so parent of parent is root
-                        app_dir = os.path.dirname(os.path.dirname(current_file))
-                    
-                    print(f"[DEBUG] Application root directory: {app_dir}")
-                    
-                    # Create temporary extraction directory
-                    temp_extract_dir = os.path.join(downloads_folder, f"BeamSkin-Studio-temp-{new_version}")
-                    
-                    # Extract ZIP
-                    print(f"[DEBUG] Extracting to: {temp_extract_dir}")
-                    with zipfile.ZipFile(filepath, 'r') as zip_ref:
-                        zip_ref.extractall(temp_extract_dir)
-                    
-                    # Find the extracted folder (GitHub adds a folder like "BeamSkin-Studio-main")
-                    extracted_contents = os.listdir(temp_extract_dir)
-                    if len(extracted_contents) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_contents[0])):
-                        source_dir = os.path.join(temp_extract_dir, extracted_contents[0])
-                    else:
-                        source_dir = temp_extract_dir
-                    
-                    print(f"[DEBUG] Source directory: {source_dir}")
-                    print(f"[DEBUG] Target directory: {app_dir}")
-                    
-                    # Files to preserve (don't overwrite)
-                    preserve_relative_paths = {
-                        os.path.join('data', 'app_settings.json'),
-                        os.path.join('vehicles', 'added_vehicles.json')
-                    }
-                    
-                    # Backup user data before updating
-                    backup_data = {}
-                    for preserve_path in preserve_relative_paths:
-                        full_path = os.path.join(app_dir, preserve_path)
-                        if os.path.exists(full_path):
-                            try:
-                                with open(full_path, 'r', encoding='utf-8') as f:
-                                    backup_data[preserve_path] = f.read()
-                                print(f"[DEBUG] Backed up: {preserve_path}")
-                            except Exception as e:
-                                print(f"[DEBUG] Could not backup {preserve_path}: {e}")
-                    
-                    # Copy new files, overwriting old ones
-                    files_updated = 0
-                    for root, dirs, files in os.walk(source_dir):
-                        # Calculate relative path from source_dir
-                        rel_dir = os.path.relpath(root, source_dir)
-                        
-                        # Determine target directory
-                        if rel_dir == '.':
-                            target_dir = app_dir
-                        else:
-                            target_dir = os.path.join(app_dir, rel_dir)
-                        
-                        # Create directory if it doesn't exist
-                        os.makedirs(target_dir, exist_ok=True)
-                        
-                        # Copy files
-                        for file in files:
-                            source_file = os.path.join(root, file)
-                            
-                            # Calculate relative path for this file
-                            if rel_dir == '.':
-                                rel_file_path = file
-                            else:
-                                rel_file_path = os.path.join(rel_dir, file)
-                            
-                            # Normalize path separators
-                            rel_file_path_normalized = rel_file_path.replace('/', os.sep).replace('\\', os.sep)
-                            
-                            # Check if this file should be preserved
-                            should_preserve = False
-                            for preserve_path in preserve_relative_paths:
-                                preserve_normalized = preserve_path.replace('/', os.sep).replace('\\', os.sep)
-                                if rel_file_path_normalized == preserve_normalized:
-                                    should_preserve = True
-                                    break
-                            
-                            if should_preserve:
-                                print(f"[DEBUG] Skipping preserved file: {rel_file_path}")
-                                continue
-                            
-                            target_file = os.path.join(target_dir, file)
-                            
-                            try:
-                                # Copy file and preserve metadata
-                                shutil.copy2(source_file, target_file)
-                                files_updated += 1
-                                if files_updated <= 10:  # Only print first 10 to avoid spam
-                                    print(f"[DEBUG] Updated: {rel_file_path}")
-                            except Exception as e:
-                                print(f"[DEBUG] Could not update {rel_file_path}: {e}")
-                    
-                    print(f"[DEBUG] Total files updated: {files_updated}")
-                    
-                    # Restore preserved files
-                    for preserve_path, content in backup_data.items():
-                        full_path = os.path.join(app_dir, preserve_path)
-                        try:
-                            # Ensure directory exists
-                            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                            with open(full_path, 'w', encoding='utf-8') as f:
-                                f.write(content)
-                            print(f"[DEBUG] Restored: {preserve_path}")
-                        except Exception as e:
-                            print(f"[DEBUG] Could not restore {preserve_path}: {e}")
-                    
-                    # Clean up temp directory
-                    try:
-                        shutil.rmtree(temp_extract_dir)
-                        print(f"[DEBUG] Cleaned up temp directory")
-                    except Exception as e:
-                        print(f"[DEBUG] Could not clean up temp directory: {e}")
-                    
-                    # Delete the downloaded ZIP file
-                    try:
-                        os.remove(filepath)
-                        print(f"[DEBUG] Deleted downloaded ZIP file: {filepath}")
-                    except Exception as e:
-                        print(f"[DEBUG] Could not delete ZIP file: {e}")
-                    
-                    print(f"[DEBUG] Update complete!")
-                    
-                    # Show completion message
-                    success_window.destroy()
-                    
-                    completion_window = ctk.CTkToplevel(_app_instance)
-                    set_window_icon(completion_window)
-                    completion_window.title("Update Complete")
-                    completion_window.geometry("450x280")  # INCREASED HEIGHT from 220 to 280
-                    completion_window.resizable(False, False)
-                    completion_window.transient(_app_instance)
-                    completion_window.grab_set()
-                    
-                    # Center window
-                    completion_window.update_idletasks()
-                    w = completion_window.winfo_width()
-                    h = completion_window.winfo_height()
-                    x = (completion_window.winfo_screenwidth() // 2) - (w // 2)
-                    y = (completion_window.winfo_screenheight() // 2) - (h // 2)
-                    completion_window.geometry(f"{w}x{h}+{x}+{y}")
-                    
-                    comp_frame = ctk.CTkFrame(completion_window, fg_color=_colors["frame_bg"])
-                    comp_frame.pack(fill="both", expand=True, padx=15, pady=15)
-                    
-                    ctk.CTkLabel(
-                        comp_frame,
-                        text="✓ Update Complete!",
-                        font=ctk.CTkFont(size=18, weight="bold"),
-                        text_color=_colors["accent"]
-                    ).pack(pady=(10, 5))
-                    
-                    ctk.CTkLabel(
-                        comp_frame,
-                        text=f"Updated {files_updated} files to version {new_version}\n\n"
-                             "Your settings and custom vehicles have been preserved.\n\n"
-                             "Please restart BeamSkin Studio to use the new version.",
-                        font=ctk.CTkFont(size=11),
-                        text_color=_colors["text"],
-                        justify="center"
-                    ).pack(pady=10)
-                    
-                    def restart_app():
-                        """Restart the application using the batch launcher if available"""
-                        print(f"[DEBUG] Restarting application...")
-                        
-                        # Get current directory
-                        if getattr(sys, 'frozen', False):
-                            # Running as executable - restart the exe
-                            subprocess.Popen([sys.executable])
-                            completion_window.destroy()
-                            _app_instance.destroy()
-                            sys.exit(0)
-                        else:
-                            # Running as script - check for launcher
-                            # Try batch file first (Windows)
-                            batch_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.bat")
-                            py_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.py")
-                            main_script = os.path.join(app_dir, "main.py")
-                            
-                            print(f"[DEBUG] Batch launcher: {batch_launcher}")
-                            print(f"[DEBUG] Python launcher: {py_launcher}")
-                            print(f"[DEBUG] Main script: {main_script}")
-                            
-                            completion_window.destroy()
-                            _app_instance.destroy()
-                            
-                            if os.path.exists(batch_launcher) and sys.platform == 'win32':
-                                print(f"[DEBUG] Using batch launcher")
-                                subprocess.Popen([batch_launcher], cwd=app_dir, shell=True)
-                            elif os.path.exists(py_launcher):
-                                print(f"[DEBUG] Using Python launcher")
-                                if sys.platform == 'win32':
-                                    subprocess.Popen(["pythonw", py_launcher], cwd=app_dir)
-                                else:
-                                    subprocess.Popen([sys.executable, py_launcher], cwd=app_dir)
-                            else:
-                                print(f"[DEBUG] Using main.py")
-                                subprocess.Popen([sys.executable, main_script], cwd=app_dir)
-                            
-                            sys.exit(0)
-                    
-                    ctk.CTkButton(
-                        comp_frame,
-                        text="Restart Now",
-                        command=restart_app,
-                        fg_color=_colors["accent"],
-                        hover_color=_colors["accent_hover"],
-                        text_color=_colors["accent_text"],
-                        height=35
-                    ).pack(pady=(5, 5))
-                    
-                    ctk.CTkButton(
-                        comp_frame,
-                        text="Restart Later",
-                        command=completion_window.destroy,
-                        fg_color=_colors["card_bg"],
-                        hover_color=_colors["card_hover"],
-                        text_color=_colors["text"],
-                        height=35
-                    ).pack(pady=(0, 10))
-                    
-                except Exception as e:
-                    print(f"[DEBUG] Extraction/update failed: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    
-                    extract_btn.configure(text="Extract & Update", state="normal")
-                    
-                    # Show error
-                    error_label = ctk.CTkLabel(
-                        frame,
-                        text=f"Update failed: {str(e)}",
-                        font=ctk.CTkFont(size=10),
-                        text_color="red"
-                    )
-                    error_label.pack(pady=5)
-            
-            def open_folder():
-                if sys.platform == 'win32':
-                    os.startfile(downloads_folder)
-                elif sys.platform == 'darwin':
-                    os.system(f'open "{downloads_folder}"')
-                else:
-                    os.system(f'xdg-open "{downloads_folder}"')
-                _close_all()
-            
-            # Button frame with 3 buttons
-            button_container = ctk.CTkFrame(frame, fg_color="transparent")
-            button_container.pack(pady=(5, 10), fill="x", padx=10)
-            
-            extract_btn = ctk.CTkButton(
-                button_container,
-                text=t("update.update_button"),
-                command=extract_and_update,
-                fg_color=_colors["accent"],
-                hover_color=_colors["accent_hover"],
-                text_color=_colors["accent_text"],
-                height=35,
-                font=ctk.CTkFont(size=12, weight="bold")
+        def _on_dl_failed(err: str):
+            log.debug("Download failed — showing error")
+            download_btn.configure(text=t("update.download_update", default="Download Update"), state="normal")
+            maybe_later_btn.configure(state="normal")
+            skip_version_btn.configure(state="normal")
+            progress_bar.pack_forget()
+            status_label.configure(
+                text=f"Download failed: {err}\n\nOpening GitHub page instead…",
+                text_color="red",
             )
-            extract_btn.pack(fill="x", pady=(0, 5))
-            
-            ctk.CTkButton(
-                button_container,
-                text=t("update.open_download_folder"),
-                command=open_folder,
-                fg_color=_colors["card_bg"],
-                hover_color=_colors["card_hover"],
-                text_color=_colors["text"],
-                height=35
-            ).pack(fill="x", pady=(0, 5))
-            
-            ctk.CTkButton(
-                button_container,
-                text="Close",
-                command=_close_all,
-                fg_color=_colors["card_bg"],
-                hover_color=_colors["card_hover"],
-                text_color=_colors["text"],
-                height=35
-            ).pack(fill="x")
-            
-        except Exception as e:
-            print(f"[DEBUG] Download failed: {e}")
-            download_btn.configure(text="Download Update", state="normal")
-            
-            # Show error and fallback to browser
-            error_msg = f"Download failed: {str(e)}\n\nOpening GitHub page instead..."
-            ctk.CTkLabel(
-                main_frame,
-                text=error_msg,
-                font=ctk.CTkFont(size=10),
-                text_color="red"
-            ).pack(pady=5)
-            
             update_window.after(2000, lambda: [
                 webbrowser.open(get_github_repo()),
-                update_window.destroy()
+                update_window.destroy(),
             ])
 
+        threading.Thread(target=_dl_thread, daemon=True).start()
+
     def maybe_later():
-        """Close update window"""
-        print(f"[DEBUG] maybe_later called")
-        print(f"[DEBUG] User chose maybe later")
+        log.debug("User chose Maybe Later")
         update_window.destroy()
 
     download_btn = ctk.CTkButton(
         button_frame,
-        text=t("update.download_update"),
+        text=t("update.download_update", default="Download Update"),
         command=download_update,
         fg_color=_colors["accent"],
         hover_color=_colors["accent_hover"],
         text_color=_colors["accent_text"],
         height=40,
         corner_radius=8,
-        font=ctk.CTkFont(size=13, weight="bold")
+        font=ctk.CTkFont(size=13, weight="bold"),
     )
     download_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
-    skip_btn = ctk.CTkButton(
+    maybe_later_btn = ctk.CTkButton(
         button_frame,
-        text=t("update.maybe_later"),
+        text=t("update.maybe_later", default="Maybe Later"),
         command=maybe_later,
         fg_color=_colors["card_bg"],
-        hover_color=_colors["card_hover"],
+        hover_color=_colors.get("card_hover", _colors["card_bg"]),
         text_color=_colors["text"],
         height=40,
         corner_radius=8,
-        font=ctk.CTkFont(size=13)
+        font=ctk.CTkFont(size=13),
     )
-    skip_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
+    maybe_later_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
+
+    skip_version_btn.pack(pady=(8, 0))
+
+
+def _show_downloaded_window(filepath, downloads_folder, new_version, update_window, fire_on_done):
+    """Show the 'Download Complete' window with Extract / Open Folder / Close."""
+
+    success_window = ctk.CTkToplevel(_app_instance)
+    set_window_icon(success_window)
+    success_window.title("Download Complete")
+    success_window.geometry("450x310")
+    success_window.resizable(False, False)
+    success_window.transient(_app_instance)
+    success_window.grab_set()
+
+    def _close_all():
+        try:
+            success_window.destroy()
+        except Exception:
+            pass
+        try:
+            update_window.destroy()
+        except Exception:
+            pass
+
+    success_window.protocol("WM_DELETE_WINDOW", _close_all)
+
+    success_window.update_idletasks()
+    w = success_window.winfo_width()
+    h = success_window.winfo_height()
+    sx = (success_window.winfo_screenwidth()  // 2) - (w // 2)
+    sy = (success_window.winfo_screenheight() // 2) - (h // 2)
+    success_window.geometry(f"{w}x{h}+{sx}+{sy}")
+
+    frame = ctk.CTkFrame(success_window, fg_color=_colors["frame_bg"])
+    frame.pack(fill="both", expand=True, padx=15, pady=15)
+
+    ctk.CTkLabel(
+        frame, text="✓",
+        font=ctk.CTkFont(size=40, weight="bold"),
+        text_color=_colors["accent"],
+    ).pack(pady=(10, 5))
+
+    ctk.CTkLabel(
+        frame, text="Download Complete!",
+        font=ctk.CTkFont(size=16, weight="bold"),
+        text_color=_colors["text"],
+    ).pack(pady=(0, 10))
+
+    ctk.CTkLabel(
+        frame,
+        text=f"Update file saved to:\n{filepath}",
+        font=ctk.CTkFont(size=11),
+        text_color=_colors["text_secondary"],
+        justify="center",
+    ).pack(pady=10)
+
+    status_lbl = ctk.CTkLabel(
+        frame, text="",
+        font=ctk.CTkFont(size=11),
+        text_color=_colors["text"],
+        wraplength=400,
+        justify="center",
+    )
+    status_lbl.pack(pady=(0, 5))
+
+    btn_container = ctk.CTkFrame(frame, fg_color="transparent")
+    btn_container.pack(pady=(5, 10), fill="x", padx=10)
+
+    def extract_and_update():
+        extract_btn.configure(text="Installing…", state="disabled")
+        open_folder_btn.configure(state="disabled")
+        close_btn.configure(state="disabled")
+        status_lbl.configure(text="Please wait…", text_color=_colors["text"])
+        success_window.update()
+
+        def _on_status(msg: str):
+            _app_instance.after(0, lambda m=msg: status_lbl.configure(text=m))
+
+        def _ex_thread():
+            try:
+                files_updated = _extract_and_install(
+                    filepath, new_version, on_status=_on_status
+                )
+                _app_instance.after(0, lambda: _on_extract_success(files_updated))
+            except Exception as e:
+                log.debug("Extraction failed: %s", e)
+                import traceback; traceback.print_exc()
+                _app_instance.after(0, lambda err=str(e): _on_extract_failed(err))
+
+        def _on_extract_success(files_updated: int):
+            success_window.destroy()
+            _show_complete_window(files_updated, new_version, update_window, fire_on_done)
+
+        def _on_extract_failed(err: str):
+            extract_btn.configure(text=t("update.update_button", default="Extract & Install"), state="normal")
+            open_folder_btn.configure(state="normal")
+            close_btn.configure(state="normal")
+            status_lbl.configure(
+                text=f"Install failed: {err}\nYou can extract manually from the downloads folder.",
+                text_color="red",
+            )
+
+        threading.Thread(target=_ex_thread, daemon=True).start()
+
+    def open_folder():
+        if sys.platform == "win32":
+            os.startfile(downloads_folder)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", downloads_folder])
+        else:
+            subprocess.Popen(["xdg-open", downloads_folder])
+        _close_all()
+
+    extract_btn = ctk.CTkButton(
+        btn_container,
+        text=t("update.update_button", default="Extract & Install"),
+        command=extract_and_update,
+        fg_color=_colors["accent"],
+        hover_color=_colors["accent_hover"],
+        text_color=_colors["accent_text"],
+        height=35,
+        font=ctk.CTkFont(size=12, weight="bold"),
+    )
+    extract_btn.pack(fill="x", pady=(0, 5))
+
+    open_folder_btn = ctk.CTkButton(
+        btn_container,
+        text=t("update.open_download_folder", default="Open Downloads Folder"),
+        command=open_folder,
+        fg_color=_colors["card_bg"],
+        hover_color=_colors.get("card_hover", _colors["card_bg"]),
+        text_color=_colors["text"],
+        height=35,
+    )
+    open_folder_btn.pack(fill="x", pady=(0, 5))
+
+    close_btn = ctk.CTkButton(
+        btn_container,
+        text=t("update.close", default="Close"),
+        command=_close_all,
+        fg_color=_colors["card_bg"],
+        hover_color=_colors.get("card_hover", _colors["card_bg"]),
+        text_color=_colors["text"],
+        height=35,
+    )
+    close_btn.pack(fill="x")
+
+
+def _show_complete_window(files_updated: int, new_version: str, update_window, fire_on_done):
+    """Show the post-install 'Update Complete' window with Restart Now / Later."""
+
+    completion_window = ctk.CTkToplevel(_app_instance)
+    set_window_icon(completion_window)
+    completion_window.title("Update Complete")
+    completion_window.geometry("450x280")
+    completion_window.resizable(False, False)
+    completion_window.transient(_app_instance)
+    completion_window.grab_set()
+
+    completion_window.update_idletasks()
+    w = completion_window.winfo_width()
+    h = completion_window.winfo_height()
+    cx = (completion_window.winfo_screenwidth()  // 2) - (w // 2)
+    cy = (completion_window.winfo_screenheight() // 2) - (h // 2)
+    completion_window.geometry(f"{w}x{h}+{cx}+{cy}")
+
+    comp_frame = ctk.CTkFrame(completion_window, fg_color=_colors["frame_bg"])
+    comp_frame.pack(fill="both", expand=True, padx=15, pady=15)
+
+    ctk.CTkLabel(
+        comp_frame,
+        text="✓ Update Complete!",
+        font=ctk.CTkFont(size=18, weight="bold"),
+        text_color=_colors["accent"],
+    ).pack(pady=(10, 5))
+
+    ctk.CTkLabel(
+        comp_frame,
+        text=(
+            f"Updated {files_updated} files to version {new_version}\n\n"
+            "Your settings and custom vehicles have been preserved.\n\n"
+            "Please restart BeamSkin Studio to use the new version."
+        ),
+        font=ctk.CTkFont(size=11),
+        text_color=_colors["text"],
+        justify="center",
+    ).pack(pady=10)
+
+    def restart_app():
+        log.debug("Restarting application…")
+        fire_on_done()
+        app_dir        = get_app_dir()
+        batch_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.bat")
+        py_launcher    = os.path.join(app_dir, "launchers-scripts", "quick_launcher.py")
+        main_script    = os.path.join(app_dir, "main.py")
+
+        completion_window.destroy()
+        try:
+            update_window.destroy()
+        except Exception:
+            pass
+        _app_instance.destroy()
+
+        if getattr(sys, "frozen", False):
+            subprocess.Popen([sys.executable])
+        elif sys.platform == "win32" and os.path.exists(batch_launcher):
+            subprocess.Popen([batch_launcher], cwd=app_dir, shell=True)
+        elif os.path.exists(py_launcher):
+            subprocess.Popen(
+                ["pythonw" if sys.platform == "win32" else sys.executable, py_launcher],
+                cwd=app_dir,
+            )
+        else:
+            subprocess.Popen([sys.executable, main_script], cwd=app_dir)
+
+        sys.exit(0)
+
+    ctk.CTkButton(
+        comp_frame,
+        text=t("update.restart_now", default="Restart Now"),
+        command=restart_app,
+        fg_color=_colors["accent"],
+        hover_color=_colors["accent_hover"],
+        text_color=_colors["accent_text"],
+        height=35,
+    ).pack(pady=(5, 5))
+
+    ctk.CTkButton(
+        comp_frame,
+        text=t("update.restart_later", default="Restart Later"),
+        command=completion_window.destroy,
+        fg_color=_colors["card_bg"],
+        hover_color=_colors.get("card_hover", _colors["card_bg"]),
+        text_color=_colors["text"],
+        height=35,
+    ).pack(pady=(0, 10))
+
+
+# ── public API ────────────────────────────────────────────────────────────── #
 
 def check_for_updates(on_done=None):
     """
-    Check for updates from OS-specific GitHub repository.
-
-    on_done: optional callable — invoked (on the main thread) once the update
-             check is fully complete *and* any update dialog has been closed.
-             Use this to chain the next startup dialog after this one.
+    Check GitHub for a newer version on a background thread.
+    Silently skips the prompt if the remote version was previously skipped by
+    the user.  on_done is called on the main thread after the dialog is
+    dismissed, or immediately if no update is available / version is skipped.
     """
-    print(f"[DEBUG] check_for_updates called")
-    print(f"\n[DEBUG] ========== UPDATE CHECK STARTED ==========")
-    print(f"[DEBUG] Platform detected: {sys.platform}")
-    print(f"[DEBUG] Checking repository: {get_github_repo()}")
-    print(f"[DEBUG] Current version: {CURRENT_VERSION}")
+    _check_for_updates_impl(on_done=on_done, ignore_skip=False)
 
-    url = get_github_raw_url()
-    print(f"[DEBUG] Fetching version from: {url}")
 
+def check_for_updates_manual(on_done=None):
+    """
+    Same as check_for_updates() but always shows the dialog even for
+    previously skipped versions.  Use this for the 'Check for Updates' button.
+    Shows a toast if already up to date.
+    """
+    _check_for_updates_impl(on_done=on_done, ignore_skip=True)
+
+
+def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
+    """Internal implementation shared by check_for_updates() and check_for_updates_manual()."""
+    log.debug("========== UPDATE CHECK STARTED ==========")
+    log.debug("Platform: %s  Repo: %s", sys.platform, get_github_repo())
+    log.debug("Current:  %s", CURRENT_VERSION)
+    log.debug("ignore_skip=%s  skipped=%r", ignore_skip, get_skipped_version())
+
+    def _worker():
+        url = get_github_raw_url()
+        log.debug("Fetching: %s", url)
+        try:
+            resp = requests.get(url, timeout=3)
+            if resp.status_code == 200:
+                latest = _format_version_string(resp.text)
+                log.debug("Remote: %s", latest)
+                if is_newer_version(latest, CURRENT_VERSION):
+                    log.debug("UPDATE AVAILABLE: %s → %s", CURRENT_VERSION, latest)
+                    log.debug("========== UPDATE CHECK COMPLETE ==========")
+
+                    skipped = get_skipped_version()
+                    if not ignore_skip and skipped and skipped == latest:
+                        log.debug("Version %r is skipped, suppressing dialog", latest)
+                        if on_done and _app_instance:
+                            _app_instance.after(0, on_done)
+                        elif on_done:
+                            on_done()
+                        return
+
+                    if _app_instance:
+                        _app_instance.after(0, lambda: prompt_update(latest, on_done=on_done))
+                    else:
+                        response = messagebox.askyesno(
+                            "Update Available",
+                            f"Version {latest} is available!\nDownload now?",
+                        )
+                        if response:
+                            webbrowser.open(get_github_repo())
+                        if on_done:
+                            on_done()
+                    return
+        except Exception as e:
+            log.debug("Update check failed: %s", e)
+
+        log.debug("========== UPDATE CHECK COMPLETE ==========")
+
+        # No update (or check failed) — no dialog was shown
+        if ignore_skip:
+            _show_up_to_date_toast()
+        if on_done and _app_instance:
+            _app_instance.after(0, on_done)
+        elif on_done:
+            on_done()
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _show_up_to_date_toast() -> None:
+    """Inform the user they are already on the latest version (manual check)."""
+    if _app_instance is None:
+        return
     try:
-        response = requests.get(url, timeout=3)
-
-        if response.status_code == 200:
-            content = response.text.strip()
-
-            if "Version:" in content:
-                content = content.replace("Version:", "").strip()
-
-            parts = content.split('.')
-            if len(parts) >= 3:
-                major, minor, patch = parts[0], parts[1], parts[2]
-                if len(parts) >= 4:
-                    try:
-                        build = int(parts[3])
-                        status = "Beta" if build == 0 else f"Build {build}"
-                    except ValueError:
-                        status = parts[3].capitalize()
-                else:
-                    status = "Stable"
-                latest_version = f"{major}.{minor}.{patch}.{status}"
-            else:
-                latest_version = content
-
-            print(f"[DEBUG] Latest version from GitHub: {latest_version}")
-
-            if is_newer_version(latest_version, CURRENT_VERSION):
-                print(f"[DEBUG] UPDATE AVAILABLE! {CURRENT_VERSION} -> {latest_version}")
-
-                if _app_instance:
-                    _app_instance.after(0, lambda: prompt_update(latest_version, on_done=on_done))
-                else:
-                    # Fallback to messagebox if no app instance
-                    response = messagebox.askyesno(
-                        "Update Available",
-                        f"Version {latest_version} is available!\nDownload now?"
-                    )
-                    if response:
-                        webbrowser.open(get_github_repo())
-                    if on_done:
-                        on_done()
-                # on_done is called inside prompt_update when the window closes
-                print(f"[DEBUG] ========== UPDATE CHECK COMPLETE ==========\n")
-                return
-            else:
-                print(f"[DEBUG] Already on latest version (or newer)")
+        # Use the app's notification system if available
+        if hasattr(_app_instance, "show_notification"):
+            _app_instance.after(
+                0,
+                lambda: _app_instance.show_notification(
+                    t("update.up_to_date",
+                      version=CURRENT_VERSION,
+                      default=f"You're up to date!  (v{CURRENT_VERSION})"),
+                    type="success",
+                    duration=3500,
+                ),
+            )
+            return
     except Exception as e:
-        print(f"[DEBUG] Update check failed: {e}")
+        log.debug("_show_up_to_date_toast: %s", e)
 
-    print(f"[DEBUG] ========== UPDATE CHECK COMPLETE ==========\n")
-
-    # No update dialog was shown — call on_done immediately
-    if on_done and _app_instance:
-        _app_instance.after(0, on_done)
-    elif on_done:
-        on_done()
+    # Fallback: simple messagebox
+    _app_instance.after(
+        0,
+        lambda: messagebox.showinfo(
+            "No Updates",
+            f"You're already on the latest version!\n\n(v{CURRENT_VERSION})",
+        ),
+    )

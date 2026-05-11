@@ -1,7 +1,6 @@
 """
 BeamSkin Studio - installer
 """
-# Import only standard library modules first (these are always available)
 import subprocess
 import sys
 import os
@@ -10,7 +9,7 @@ import time
 import urllib.request
 import tempfile
 
-# Check and install required packages BEFORE importing them
+
 def ensure_packages():
     """Check if required packages are installed, install if not"""
     print("[LAUNCHER] Checking required packages...")
@@ -56,10 +55,8 @@ def ensure_packages():
     
     print("[LAUNCHER] Starting GUI launcher...")
 
-# Run package check BEFORE importing GUI libraries
 ensure_packages()
 
-# NOW it's safe to import GUI libraries
 import customtkinter as ctk
 from PIL import Image
 
@@ -84,41 +81,34 @@ class LauncherWindow:
         print(f"[DEBUG] __init__ called")
         self.app = ctk.CTk()
         self.app.title("BeamSkin Studio - Launcher")
-        self.app.geometry("700x600")  # Slightly taller for logo
+        self.app.geometry("700x600") 
         self.app.resizable(False, False)
         self.app.configure(fg_color=COLORS["bg"])
         
         self.app.attributes('-topmost', True)
-        
-        # Load logo
+
         self.logo_image = self._load_logo()
-        
-        # Center window
+
         self.center_window()
         
         self.create_ui()
-        
-        # Lift window to front
+
         self.app.lift()
         self.app.focus_force()
     
     def _load_logo(self):
         """Load the BeamSkin Studio logo"""
-        # Get parent directory (go up from launchers-scripts to root)
         script_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(script_dir)
-        
-        # Try to load white logo (for dark background)
         logo_path = os.path.join(parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png")
         
         try:
             if os.path.exists(logo_path):
                 pil_image = Image.open(logo_path)
-                # Logo size - adjust as needed
                 logo_image = ctk.CTkImage(
                     light_image=pil_image,
                     dark_image=pil_image,
-                    size=(200, 200)  # Adjust size here
+                    size=(200, 200) 
                 )
                 print(f"[DEBUG] Loaded logo from: {logo_path}")
                 return logo_image
@@ -142,24 +132,19 @@ class LauncherWindow:
     
         print(f"[DEBUG] create_ui called")
         """Create the launcher UI"""
-        # Main container
         main_frame = ctk.CTkFrame(self.app, fg_color=COLORS["bg"])
         main_frame.pack(fill="both", expand=True, padx=25, pady=25)
         
-        # Header
         header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         header_frame.pack(pady=(0, 20))
         
-        # Logo/Icon
         if self.logo_image:
-            # Use logo image
             ctk.CTkLabel(
                 header_frame,
                 text="",
                 image=self.logo_image
             ).pack(pady=(0, 15))
         else:
-            # Fallback to emoji if logo not found
             ctk.CTkLabel(
                 header_frame,
                 text="🎨",
@@ -172,8 +157,7 @@ class LauncherWindow:
             font=ctk.CTkFont(size=13),
             text_color=COLORS["text_secondary"]
         ).pack()
-        
-        # Status card
+
         self.status_card = ctk.CTkFrame(
             main_frame,
             fg_color=COLORS["card"],
@@ -182,20 +166,17 @@ class LauncherWindow:
             border_color=COLORS["accent"]
         )
         self.status_card.pack(fill="both", expand=True, pady=(0, 20))
-        
-        # Status content
+
         status_content = ctk.CTkFrame(self.status_card, fg_color="transparent")
         status_content.pack(fill="both", expand=True, padx=30, pady=30)
-        
-        # Status icon
+
         self.status_icon = ctk.CTkLabel(
             status_content,
             text="🔍",
             font=ctk.CTkFont(size=64)
         )
         self.status_icon.pack(pady=(20, 15))
-        
-        # Status text
+
         self.status_label = ctk.CTkLabel(
             status_content,
             text="Initializing...",
@@ -204,7 +185,6 @@ class LauncherWindow:
         )
         self.status_label.pack(pady=(0, 10))
         
-        # Detail text
         self.detail_label = ctk.CTkLabel(
             status_content,
             text="",
@@ -213,7 +193,6 @@ class LauncherWindow:
         )
         self.detail_label.pack(pady=(0, 15))
         
-        # Progress bar
         self.progress_bar = ctk.CTkProgressBar(
             status_content,
             width=500,
@@ -225,7 +204,6 @@ class LauncherWindow:
         self.progress_bar.pack(pady=(0, 20))
         self.progress_bar.set(0)
         
-        # Action button (hidden initially)
         self.action_button = ctk.CTkButton(
             status_content,
             text="",
@@ -239,7 +217,6 @@ class LauncherWindow:
             font=ctk.CTkFont(size=15, weight="bold")
         )
         
-        # Footer
         footer_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         footer_frame.pack()
         
@@ -270,7 +247,6 @@ class LauncherWindow:
         self.detail_label.configure(text=detail)
         self.progress_bar.set(0)
         
-        # Show action button
         if button_command is None:
             button_command = self.app.quit
             
@@ -300,7 +276,6 @@ class LauncherWindow:
         self.detail_label.configure(text=detail)
         self.progress_bar.set(0)
         
-        # Create button frame
         button_frame = ctk.CTkFrame(self.status_card, fg_color="transparent")
         button_frame.pack(pady=10)
         
@@ -373,7 +348,6 @@ class SetupManager:
         """Download Python installer for Windows"""
         import webbrowser
         
-        # Python 3.11.9 (stable, widely compatible)
         python_url = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
         
         self.launcher.update_status(
@@ -384,18 +358,16 @@ class SetupManager:
         )
         
         try:
-            # Download to Downloads folder
             import os
             downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
             installer_path = os.path.join(downloads_folder, "python-3.11.9-amd64.exe")
-            
-            # Download with progress tracking
+
             def download_progress(block_num, block_size, total_size):
                 print(f"[DEBUG] download_progress called")
                 downloaded = block_num * block_size
                 if total_size > 0:
                     progress = min(downloaded / total_size, 1.0)
-                    self.launcher.progress_bar.set(0.2 + (progress * 0.6))  # 20-80%
+                    self.launcher.progress_bar.set(0.2 + (progress * 0.6))
                     self.launcher.app.update()
             
             urllib.request.urlretrieve(python_url, installer_path, download_progress)
@@ -408,8 +380,7 @@ class SetupManager:
             )
             
             time.sleep(0.5)
-            
-            # Run the installer automatically with silent flags
+
             self.launcher.update_status(
                 "🔧",
                 "Installing Python...",
@@ -418,10 +389,7 @@ class SetupManager:
             )
             
             try:
-                # Run Python installer with automatic flags
-                # /passive = shows progress but no user interaction
-                # PrependPath=1 = adds Python to PATH automatically
-                # Include_pip=1 = installs pip
+
                 result = subprocess.run(
                     [installer_path, "/passive", "PrependPath=1", "Include_pip=1"],
                     check=False
@@ -433,7 +401,6 @@ class SetupManager:
                         "Please restart this launcher to continue"
                     )
                     
-                    # Show restart button
                     self.launcher.action_button.configure(
                         text="Restart Launcher",
                         command=lambda: [self.launcher.app.quit(), os.execl(sys.executable, sys.executable, *sys.argv)],
@@ -442,7 +409,6 @@ class SetupManager:
                     )
                     self.launcher.action_button.pack(pady=10)
                 else:
-                    # Installation failed or cancelled
                     self.launcher.show_error(
                         "Installation Issue",
                         "Python installation may have been cancelled or failed.\n"
@@ -461,7 +427,6 @@ class SetupManager:
                 )
             
         except Exception as e:
-            # Fallback to browser if download fails
             self.launcher.show_error(
                 "Download Failed",
                 f"Error: {str(e)}\n\nOpening download page in browser instead...",
@@ -476,7 +441,7 @@ class SetupManager:
         packages = ["pip", "customtkinter", "Pillow", "requests"]
         
         for i, package in enumerate(packages):
-            progress = 0.3 + (i + 1) / len(packages) * 0.6  # 30-90%
+            progress = 0.3 + (i + 1) / len(packages) * 0.6 
             
             if package == "pip":
                 self.launcher.update_status(
@@ -506,12 +471,12 @@ class SetupManager:
                 )
             
             if result.returncode != 0:
-                # Don't fail on pip upgrade errors, just continue
+                
                 if package == "pip":
                     continue
                 raise Exception(f"Failed to install {package}")
             
-            time.sleep(0.2)  # Brief pause for visual feedback
+            time.sleep(0.2) 
     
     def launch_app(self):
     
@@ -526,12 +491,10 @@ class SetupManager:
         
         time.sleep(0.5)
         
-        # Get the parent directory (go up from launchers-scripts to root)
         script_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(script_dir)
         bat_file_path = os.path.join(parent_dir, "BeamSkin Studio.bat")
         
-        # Check if bat file exists
         if not os.path.exists(bat_file_path):
             self.launcher.show_error(
                 "File Not Found",
@@ -541,27 +504,24 @@ class SetupManager:
             )
             return
         
-        # Launch bat file without console window (don't wait for it)
         if sys.platform == 'win32':
-            # Use CREATE_NO_WINDOW flag on Windows and Popen to not wait
             process = subprocess.Popen(
                 [bat_file_path],
-                cwd=parent_dir,  # Set working directory to parent
+                cwd=parent_dir,  
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 shell=True
             )
         else:
-            # On other platforms, try to run it directly
+
             process = subprocess.Popen(
                 [bat_file_path],
                 cwd=parent_dir,
                 shell=True
             )
         
-        # Wait for main app window to appear before closing launcher
-        time.sleep(2)  # Give app time to initialize and show window
         
-        # Now hide and close launcher
+        time.sleep(2)  
+        
         self.launcher.app.withdraw()
         self.launcher.app.quit()
 
@@ -579,7 +539,6 @@ def main():
         print(f"[DEBUG] startup_sequence called")
         """Run the startup checks and launch"""
         try:
-            # Check Python
             launcher.update_status(
                 "🔍",
                 "Checking Python installation...",
@@ -591,7 +550,6 @@ def main():
             python_installed, version = setup.check_python()
             
             if not python_installed:
-                # Download and install Python for user
                 def download_and_install():
                     print(f"[DEBUG] download_and_install called")
                     setup.download_python_installer()
@@ -628,7 +586,6 @@ def main():
         print(f"[DEBUG] continue_startup called")
         """Continue with package installation and app launch"""
         try:
-            # Install/update packages
             launcher.update_status(
                 "📦",
                 "Checking dependencies...",
@@ -646,8 +603,7 @@ def main():
                 0.95
             )
             time.sleep(0.3)
-            
-            # Launch app via bat file
+
             setup.launch_app()
             
         except Exception as e:
@@ -656,10 +612,8 @@ def main():
                 str(e)
             )
     
-    # Start sequence in background thread
     threading.Thread(target=startup_sequence, daemon=True).start()
     
-    # Run GUI
     launcher.run()
 
 

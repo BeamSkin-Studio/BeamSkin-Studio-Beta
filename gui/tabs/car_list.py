@@ -64,7 +64,13 @@ class CarListTab(ctk.CTkFrame):
         self.carlist_scroll = ctk.CTkScrollableFrame(self, fg_color=state.colors["frame_bg"])
         self.carlist_scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.carlist_search_var.trace_add("write", self._update_carlist)
+        def safe_update_carlist(*args):
+            try:
+                self._update_carlist()
+            except Exception:
+                pass  # Silently ignore errors during widget destruction
+        
+        self.carlist_search_var.trace_add("write", safe_update_carlist)
 
     def _populate_car_list(self):
         """Populate the car list with all vehicles"""

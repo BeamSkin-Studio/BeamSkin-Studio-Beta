@@ -71,6 +71,12 @@ class HowToTab(ctk.CTkFrame):
         for widget in self.winfo_children():
             widget.destroy()
         
+        # Clear stale widget references
+        self.chapter_buttons.clear()
+        self.content_textbox = None
+        self.search_entry = None
+        self.view_all_btn = None
+        
         # Recreate UI with new translations
         self._setup_ui()
         self.load_all_chapters()
@@ -191,6 +197,10 @@ class HowToTab(ctk.CTkFrame):
 
     def _search_content(self):
         """Search through documentation content"""
+        # Safety check: widgets may be destroyed during UI refresh
+        if not self.search_entry or not self.content_textbox or not self.view_all_btn:
+            return
+        
         search_term = self.search_entry.get().lower().strip()
 
         if not search_term:
@@ -222,16 +232,21 @@ class HowToTab(ctk.CTkFrame):
 
         self.content_textbox.configure(state="disabled")
 
-        self.view_all_btn.configure(
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["tab_unselected_hover"],
-            text_color=state.colors["text"]
-        )
+        if self.view_all_btn and self.view_all_btn.winfo_exists():
+            self.view_all_btn.configure(
+                fg_color=state.colors["card_bg"],
+                hover_color=state.colors["tab_unselected_hover"],
+                text_color=state.colors["text"]
+            )
 
         self._reset_button_colors()
 
     def load_chapter(self, chapter_key: str):
         """Load a specific chapter"""
+        # Safety check: widgets may be destroyed during UI refresh
+        if not self.content_textbox or not self.view_all_btn or not self.chapter_buttons:
+            return
+        
         chapters = self._get_chapters()
         if chapter_key not in chapters:
             return
@@ -249,13 +264,16 @@ class HowToTab(ctk.CTkFrame):
 
         self.content_textbox.configure(state="disabled")
 
-        self.view_all_btn.configure(
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["tab_unselected_hover"],
-            text_color=state.colors["text"]
-        )
+        if self.view_all_btn and self.view_all_btn.winfo_exists():
+            self.view_all_btn.configure(
+                fg_color=state.colors["card_bg"],
+                hover_color=state.colors["tab_unselected_hover"],
+                text_color=state.colors["text"]
+            )
 
         for btn, key in self.chapter_buttons:
+            if not btn.winfo_exists():
+                continue
             if key == chapter_key:
                 btn.configure(
                     fg_color=state.colors["accent"],
@@ -273,6 +291,10 @@ class HowToTab(ctk.CTkFrame):
 
     def load_all_chapters(self):
         """Load all chapters in sequence"""
+        # Safety check: widgets may be destroyed during UI refresh
+        if not self.content_textbox or not self.view_all_btn or not self.chapter_buttons:
+            return
+        
         self.current_chapter = "all"
 
         self.content_textbox.configure(state="normal")
@@ -298,11 +320,12 @@ class HowToTab(ctk.CTkFrame):
 
         self.content_textbox.configure(state="disabled")
 
-        self.view_all_btn.configure(
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["tab_selected_hover"],
-            text_color=state.colors["accent_text"]
-        )
+        if self.view_all_btn and self.view_all_btn.winfo_exists():
+            self.view_all_btn.configure(
+                fg_color=state.colors["accent"],
+                hover_color=state.colors["tab_selected_hover"],
+                text_color=state.colors["accent_text"]
+            )
 
         self._reset_button_colors()
 
@@ -310,9 +333,14 @@ class HowToTab(ctk.CTkFrame):
 
     def _reset_button_colors(self):
         """Reset all chapter buttons to default colors"""
+        # Safety check: widgets may be destroyed during UI refresh
+        if not self.chapter_buttons:
+            return
+        
         for btn, _ in self.chapter_buttons:
-            btn.configure(
-                fg_color=state.colors["card_bg"],
-                hover_color=state.colors["tab_unselected_hover"],
-                text_color=state.colors["text"]
-            )
+            if btn.winfo_exists():
+                btn.configure(
+                    fg_color=state.colors["card_bg"],
+                    hover_color=state.colors["tab_unselected_hover"],
+                    text_color=state.colors["text"]
+                )

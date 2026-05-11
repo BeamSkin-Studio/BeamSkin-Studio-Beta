@@ -1,6 +1,5 @@
 """
 Single Instance Lock - Prevents multiple instances of BeamSkin Studio from running
-Cross-platform implementation for Windows, Linux, and macOS
 """
 import os
 import sys

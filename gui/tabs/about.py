@@ -164,7 +164,7 @@ class AboutTab(ctk.CTkFrame):
                 logo_image = ctk.CTkImage(
                     light_image=pil_image,
                     dark_image=pil_image,
-                    size=(200, 200)
+                    size=(200, 100)
                 )
                 print(f"[DEBUG] Loaded About tab logo from: {logo_path}")
                 return logo_image

@@ -4,16 +4,6 @@ import platform
 
 def load_config_types(config_file=None):
     print(f"[DEBUG] load_config_types called")
-    """
-    Load config types from carconfigs.txt file in vehicles folder.
-    Returns a list of config types.
-
-    Args:
-        config_file: Optional custom path to the config types file
-
-    Returns:
-        List of config type strings
-    """
     config_types = ["Factory", "Custom", "Police"]
 
     if config_file is None:
@@ -41,13 +31,6 @@ def load_config_types(config_file=None):
 
 def get_beamng_vehicles_path():
     print(f"[DEBUG] get_beamng_vehicles_path called")
-    """
-    Get the path to BeamNG.drive vehicles folder.
-    Cross-platform implementation.
-
-    Returns:
-        Path to BeamNG vehicles folder based on OS
-    """
     system = platform.system()
 
     if system == "Windows":
@@ -149,12 +132,6 @@ def get_beamng_default_install_paths():
     return existing_paths if existing_paths else [os.path.expanduser("~")]
 
 def get_beamng_mods_default_paths():
-    """
-    Get list of common BeamNG.drive mods folder paths based on OS.
-
-    Returns:
-        List of potential mods folder paths
-    """
     system = platform.system()
     home = os.path.expanduser("~")
     paths = []

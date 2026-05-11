@@ -11,6 +11,8 @@ Pillow>=10.0.0
 # HTTP Requests (for update checker)
 requests>=2.31.0
 
+deep-translator>=1.11.4
+
 # Windows-specific (optional, for better Windows integration)
 pywin32>=306; sys_platform == 'win32'
 

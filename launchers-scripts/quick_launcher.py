@@ -68,7 +68,7 @@ class QuickLauncher:
                 logo_image = ctk.CTkImage(
                     light_image=pil_image,
                     dark_image=pil_image,
-                    size=(200, 200)
+                    size=(350, 175)
                 )
                 print(f"[DEBUG] Loaded logo from: {logo_path}")
                 return logo_image
@@ -122,9 +122,9 @@ class QuickLauncher:
         for i in range(101):
             self.progress_bar.set(i / 100)
             self.app.update()
-            time.sleep(0.011)
+            time.sleep(0.038)
 
-        time.sleep(1.2)
+        time.sleep(0.5)
 
         self.app.destroy()
 

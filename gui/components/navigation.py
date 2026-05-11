@@ -160,7 +160,14 @@ class Sidebar(ctk.CTkFrame):
 
         self.custom_option_sidebar = custom_option_sidebar
 
-        self.output_mode_var.trace_add("write", lambda *args: self._update_output_mode())
+        # Wrap trace callback to handle widget destruction gracefully
+        def safe_update_output_mode(*args):
+            try:
+                self._update_output_mode()
+            except Exception:
+                pass  # Silently ignore errors during widget destruction
+        
+        self.output_mode_var.trace_add("write", safe_update_output_mode)
 
         self.custom_output_frame = ctk.CTkFrame(self, fg_color="transparent")
 
@@ -226,7 +233,14 @@ class Sidebar(ctk.CTkFrame):
         self.sidebar_search_entry.bind("<FocusIn>", self._on_search_focus_in)
         self.sidebar_search_entry.bind("<FocusOut>", self._on_search_focus_out)
 
-        self.sidebar_search_var.trace_add("write", lambda *args: self._filter_vehicles())
+        # Wrap trace callback to handle widget destruction gracefully
+        def safe_filter(*args):
+            try:
+                self._filter_vehicles()
+            except Exception:
+                pass  # Silently ignore errors during widget destruction
+        
+        self.sidebar_search_var.trace_add("write", safe_filter)
 
         self.sidebar_scroll = ctk.CTkScrollableFrame(
             self,
@@ -286,25 +300,31 @@ class Sidebar(ctk.CTkFrame):
 
     def _filter_vehicles(self):
         """Filter vehicle buttons based on search"""
-        search_query = self.sidebar_search_var.get()
+        try:
+            search_query = self.sidebar_search_var.get()
 
-        if search_query == self.sidebar_search_placeholder:
-            search_query = ""
+            if search_query == self.sidebar_search_placeholder:
+                search_query = ""
 
-        search_query = search_query.lower()
+            search_query = search_query.lower()
 
-        for container, carid, display_name, add_btn_frame in state.sidebar_vehicle_buttons:
+            for container, carid, display_name, add_btn_frame in state.sidebar_vehicle_buttons:
+                # Safety check: widget may have been destroyed during UI refresh
+                if not container.winfo_exists():
+                    continue
 
-            matches = (
-                not search_query or
-                search_query in display_name.lower() or
-                search_query in carid.lower()
-            )
+                matches = (
+                    not search_query or
+                    search_query in display_name.lower() or
+                    search_query in carid.lower()
+                )
 
-            if matches:
-                container.pack(fill="x", pady=2, padx=0)
-            else:
-                container.pack_forget()
+                if matches:
+                    container.pack(fill="x", pady=2, padx=0)
+                else:
+                    container.pack_forget()
+        except Exception as e:
+            print(f"[DEBUG] Error filtering vehicles: {e}")
 
     def _get_real_value(self, value: str, placeholder: str) -> str:
         """Get real value, ignoring placeholder"""
@@ -489,7 +509,7 @@ class Topbar(ctk.CTkFrame):
 
         logo_container = ctk.CTkFrame(self, fg_color="transparent")
 
-        logo_container.place(x=25, y=-35)
+        logo_container.pack(side="left", padx=25)
 
         if self.logo_image:
             logo_label = ctk.CTkLabel(

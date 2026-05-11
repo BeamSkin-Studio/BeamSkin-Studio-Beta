@@ -11,30 +11,95 @@ set "LOG_FILE=%TEMP%\BeamSkinStudio_launch.log"
 if exist "%LOG_FILE%" del /f /q "%LOG_FILE%"
 
 :: -----------------------------------------------------------
-:: Step 1: Check Python is available
+:: Step 1: Locate Python — try multiple methods
 :: -----------------------------------------------------------
+set "PYTHON_CMD="
+
+:: 1a. Try 'python' directly (classic PATH entry)
 python --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PYTHON_CMD=python"
+    goto :python_found
+)
+
+:: 1b. Try 'py' (Windows Python Launcher — common with 3.12 installs)
+py --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PYTHON_CMD=py"
+    goto :python_found
+)
+
+:: 1c. Try 'py -3' (explicit Python 3 via launcher)
+py -3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PYTHON_CMD=py -3"
+    goto :python_found
+)
+
+:: 1d. Try 'python3' (sometimes set up this way)
+python3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PYTHON_CMD=python3"
+    goto :python_found
+)
+
+:: 1e. Probe common install paths for Python 3.12, 3.11, 3.10
+for %%V in (312 311 310 39 38) do (
+    for %%P in (
+        "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
+        "%ProgramFiles%\Python%%V\python.exe"
+        "%ProgramFiles(x86)%\Python%%V\python.exe"
+    ) do (
+        if exist %%P (
+            set "PYTHON_CMD=%%P"
+            goto :python_found
+        )
+    )
+)
+
+:: 1f. Check the Windows Store stub location
+for %%P in (
+    "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe"
+    "%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe"
+) do (
+    if exist %%P (
+        :: Windows Store stubs silently do nothing — test they actually work
+        %%P --version >nul 2>&1
+        if !errorlevel! equ 0 (
+            set "PYTHON_CMD=%%P"
+            goto :python_found
+        )
+    )
+)
+
+:: Nothing worked
+call :show_error "Python Not Found" "Python 3 could not be found on this system.^^Please install Python 3.8+ from https://python.org^^and make sure to check 'Add Python to PATH' during setup,^^then run install.bat before launching."
+exit /b 1
+
+:python_found
+:: Confirm the found Python is version 3.x (not some Python 2 remnant)
+%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info.major==3 else 1)" >nul 2>&1
 if %errorlevel% neq 0 (
-    call :show_error "Python Not Found" "Python is not installed or not in PATH.^^Please run install.bat first."
+    call :show_error "Python Version Error" "A Python installation was found but it is not Python 3.^^Please install Python 3.8+ from https://python.org"
     exit /b 1
 )
 
 :: -----------------------------------------------------------
 :: Step 2: Check critical dependencies
 :: -----------------------------------------------------------
-python -c "import customtkinter" >nul 2>&1
+%PYTHON_CMD% -c "import customtkinter" >nul 2>&1
 if %errorlevel% neq 0 (
     call :show_error "Missing Dependency" "customtkinter is not installed.^^Please run install.bat to install dependencies."
     exit /b 1
 )
 
-python -c "import PIL" >nul 2>&1
+%PYTHON_CMD% -c "import PIL" >nul 2>&1
 if %errorlevel% neq 0 (
     call :show_error "Missing Dependency" "Pillow (PIL) is not installed.^^Please run install.bat to install dependencies."
     exit /b 1
 )
 
-python -c "import requests" >nul 2>&1
+%PYTHON_CMD% -c "import requests" >nul 2>&1
 if %errorlevel% neq 0 (
     call :show_error "Missing Dependency" "requests is not installed.^^Please run install.bat to install dependencies."
     exit /b 1
@@ -60,7 +125,7 @@ exit /b 1
 :: Step 4: Launch — capture output, detect crash
 :: -----------------------------------------------------------
 :launch
-python "%LAUNCH_FILE%" > "%LOG_FILE%" 2>&1
+%PYTHON_CMD% "%LAUNCH_FILE%" > "%LOG_FILE%" 2>&1
 set EXIT_CODE=%errorlevel%
 
 if %EXIT_CODE% neq 0 (

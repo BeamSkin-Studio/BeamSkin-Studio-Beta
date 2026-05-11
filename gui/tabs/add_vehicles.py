@@ -541,7 +541,14 @@ class AddVehiclesTab(ctk.CTkFrame):
         self.dev_search_entry.bind("<FocusIn>", self._on_dev_search_focus_in)
         self.dev_search_entry.bind("<FocusOut>", self._on_dev_search_focus_out)
 
-        self.dev_search_var.trace("w", lambda *args: self.refresh_developer_list())
+        # Wrap trace callback to handle widget destruction gracefully
+        def safe_refresh(*args):
+            try:
+                self.refresh_developer_list()
+            except Exception:
+                pass  # Silently ignore errors during widget destruction
+        
+        self.dev_search_var.trace("w", safe_refresh)
 
         self.dev_list_scroll = ctk.CTkScrollableFrame(
             self,
@@ -718,6 +725,10 @@ class AddVehiclesTab(ctk.CTkFrame):
 
         print(f"[DEBUG] refresh_developer_list called")
         """Refresh the list of custom vehicles"""
+        
+        # Safety check: widget may be destroyed during UI refresh
+        if not hasattr(self, 'dev_list_scroll') or not self.dev_list_scroll.winfo_exists():
+            return
 
         for widget in self.dev_list_scroll.winfo_children():
             widget.destroy()

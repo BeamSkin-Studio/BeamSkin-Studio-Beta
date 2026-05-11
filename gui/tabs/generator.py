@@ -771,7 +771,13 @@ class GeneratorTab(ctk.CTkFrame):
 
     def _bind_search(self):
         """Bind search functionality"""
-        self.project_search_var.trace_add("write", lambda *args: self.refresh_project_display())
+        def safe_refresh(*args):
+            try:
+                self.refresh_project_display()
+            except Exception:
+                pass  # Silently ignore errors during widget destruction
+        
+        self.project_search_var.trace_add("write", safe_refresh)
 
     def add_car_to_project(self, carid: str, display_name: str):
 
@@ -1099,7 +1105,7 @@ class GeneratorTab(ctk.CTkFrame):
         self.refresh_project_display()
 
         try:
-            if hasattr(self, 'project_overview_frame') and self.project_overview_frame:
+            if hasattr(self, 'project_overview_frame') and self.project_overview_frame and self.project_overview_frame.winfo_exists():
                 for widget in self.project_overview_frame.winfo_children():
                     widget.update()
                 self.project_overview_frame.update()
@@ -1652,7 +1658,7 @@ class GeneratorTab(ctk.CTkFrame):
 
             self.add_material_properties_var.set(False)
 
-            if self.material_properties_frame:
+            if self.material_properties_frame and self.material_properties_frame.winfo_exists():
                 self.material_properties_frame.pack_forget()
 
                 for widget in self.material_properties_frame.winfo_children():
@@ -2250,6 +2256,10 @@ class GeneratorTab(ctk.CTkFrame):
         Populate the material properties UI with entry fields
         materials: Dict from _load_material_structure
         """
+        
+        # Safety check: widget may be destroyed during UI refresh
+        if not hasattr(self, 'material_properties_frame') or not self.material_properties_frame or not self.material_properties_frame.winfo_exists():
+            return
 
         for widget in self.material_properties_frame.winfo_children():
             widget.destroy()
@@ -2615,6 +2625,11 @@ class GeneratorTab(ctk.CTkFrame):
         """Refresh the project overview display with 2-column grid layout"""
         print(f"[DEBUG] ========== REFRESH PROJECT DISPLAY ==========")
         print(f"[DEBUG] Cars in project: {len(self.project_data['cars'])}")
+        
+        # Safety check: widget may be destroyed during UI refresh
+        if not hasattr(self, 'project_overview_frame') or not self.project_overview_frame or not self.project_overview_frame.winfo_exists():
+            print(f"[DEBUG] ========== REFRESH SKIPPED (WIDGET DESTROYED) ==========")
+            return
 
         for widget in self.project_overview_frame.winfo_children():
             widget.destroy()

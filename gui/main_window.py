@@ -18,6 +18,18 @@ from gui.tabs.howto import HowToTab
 from gui.tabs.add_vehicles import AddVehiclesTab, load_added_vehicles_at_startup
 from gui.tabs.about import AboutTab
 
+# ── Try to load the real Online tab; fall back to the placeholder if missing ──
+try:
+    from gui.tabs.online_tab import OnlineTab as _OnlineTabClass
+    _ONLINE_TAB_AVAILABLE = True
+    print("[DEBUG] gui.tabs.online_tab loaded — Online tab is AVAILABLE")
+except ImportError:
+    _OnlineTabClass = None
+    _ONLINE_TAB_AVAILABLE = False
+    print("[DEBUG] gui.tabs.online_tab NOT found — Online tab will show unavailable placeholder")
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 class OnlineUnavailableTab(ctk.CTkFrame):
 
     def __init__(self, parent, **kwargs):
@@ -196,7 +208,7 @@ class BeamSkinStudioApp(ctk.CTk):
     def _load_logos(self):
         icon_dir = os.path.join("gui", "Icons")
 
-        logo_size = (100, 100)
+        logo_size = (100, 50)
 
         try:
             logo_white_path = os.path.join(icon_dir, "BeamSkin_Studio_White.png")
@@ -299,10 +311,18 @@ class BeamSkinStudioApp(ctk.CTk):
 
         self.tabs["about"] = AboutTab(self.main_container)
 
-        self.tabs["online_tab"] = OnlineUnavailableTab(
-            self.main_container,
-            notification_callback=self.show_notification
-        )
+        if _ONLINE_TAB_AVAILABLE:
+            self.tabs["online_tab"] = _OnlineTabClass(
+                self.main_container,
+                notification_callback=self.show_notification
+            )
+            print("[DEBUG] Online tab: using real OnlineTab")
+        else:
+            self.tabs["online_tab"] = OnlineUnavailableTab(
+                self.main_container,
+                notification_callback=self.show_notification
+            )
+            print("[DEBUG] Online tab: using OnlineUnavailableTab (file missing)")
 
     def switch_view(self, view_name: str):
 
