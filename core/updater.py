@@ -35,14 +35,55 @@ def get_github_repo() -> str:
         return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta"
     return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta"
 
-def get_github_raw_url() -> str:
-    if sys.platform == "win32":
-        return "https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/version.txt"
-    return "https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/main/version.txt"
+def get_releases_api_url() -> str:
+    repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
+    return f"https://api.github.com/repos/BeamSkin-Studio/{repo}/releases/latest"
+
+# Populated by fetch_latest_release(); used by get_zip_url().
+_latest_release_zip_url: str = ""
 
 def get_zip_url() -> str:
+    """Return the zip download URL from the latest GitHub release.
+
+    Falls back to the source-archive URL if fetch_latest_release() has not
+    been called yet (e.g. in headless / fallback flows).
+    """
+    if _latest_release_zip_url:
+        return _latest_release_zip_url
     repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
-    return f"https://github.com/BeamSkin-Studio/{repo}/archive/refs/heads/main.zip"
+    return f"https://github.com/BeamSkin-Studio/{repo}/releases/latest/download/BeamSkin-Studio.zip"
+
+def fetch_latest_release() -> "tuple[str, str]":
+    """Call the GitHub Releases API and return (version_string, zip_url).
+
+    Also caches the zip URL in ``_latest_release_zip_url`` so that
+    ``get_zip_url()`` can return it without making a second API call.
+
+    Raises ``requests.HTTPError`` or ``KeyError`` on failure.
+    """
+    global _latest_release_zip_url
+    resp = requests.get(
+        get_releases_api_url(),
+        timeout=10,
+        headers={"Accept": "application/vnd.github+json"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    tag = re.sub(r"^[Vv]\.?", "", data["tag_name"])  # "V.0.7.11.Beta" → "0.7.11.Beta"
+    version = _format_version_string(tag)
+
+    # Prefer an explicit .zip release asset; fall back to the auto-generated
+    # zipball (source archive) which GitHub always provides.
+    zip_url = data.get("zipball_url", "")
+    for asset in data.get("assets", []):
+        if asset.get("name", "").endswith(".zip"):
+            zip_url = asset["browser_download_url"]
+            break
+
+    _latest_release_zip_url = zip_url
+    log.debug("fetch_latest_release: version=%s  zip_url=%s", version, zip_url)
+    return version, zip_url
 
 def get_base_path() -> str:
     if getattr(sys, "frozen", False):
@@ -842,38 +883,35 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
     log.debug("ignore_skip=%s  skipped=%r", ignore_skip, get_skipped_version())
 
     def _worker():
-        url = get_github_raw_url()
-        log.debug("Fetching: %s", url)
+        log.debug("Fetching latest release from: %s", get_releases_api_url())
         try:
-            resp = requests.get(url, timeout=3)
-            if resp.status_code == 200:
-                latest = _format_version_string(resp.text)
-                log.debug("Remote: %s", latest)
-                if is_newer_version(latest, CURRENT_VERSION):
-                    log.debug("UPDATE AVAILABLE: %s → %s", CURRENT_VERSION, latest)
-                    log.debug("========== UPDATE CHECK COMPLETE ==========")
+            latest, _zip_url = fetch_latest_release()
+            log.debug("Remote: %s  zip: %s", latest, _zip_url)
+            if is_newer_version(latest, CURRENT_VERSION):
+                log.debug("UPDATE AVAILABLE: %s → %s", CURRENT_VERSION, latest)
+                log.debug("========== UPDATE CHECK COMPLETE ==========")
 
-                    skipped = get_skipped_version()
-                    if not ignore_skip and skipped and skipped == latest:
-                        log.debug("Version %r is skipped, suppressing dialog", latest)
-                        if on_done and _app_instance:
-                            _app_instance.after(0, on_done)
-                        elif on_done:
-                            on_done()
-                        return
-
-                    if _app_instance:
-                        _app_instance.after(0, lambda: prompt_update(latest, on_done=on_done))
-                    else:
-                        response = messagebox.askyesno(
-                            "Update Available",
-                            f"Version {latest} is available!\nDownload now?",
-                        )
-                        if response:
-                            webbrowser.open(get_github_repo())
-                        if on_done:
-                            on_done()
+                skipped = get_skipped_version()
+                if not ignore_skip and skipped and skipped == latest:
+                    log.debug("Version %r is skipped, suppressing dialog", latest)
+                    if on_done and _app_instance:
+                        _app_instance.after(0, on_done)
+                    elif on_done:
+                        on_done()
                     return
+
+                if _app_instance:
+                    _app_instance.after(0, lambda: prompt_update(latest, on_done=on_done))
+                else:
+                    response = messagebox.askyesno(
+                        "Update Available",
+                        f"Version {latest} is available!\nDownload now?",
+                    )
+                    if response:
+                        webbrowser.open(get_github_repo())
+                    if on_done:
+                        on_done()
+                return
         except Exception as e:
             log.debug("Update check failed: %s", e)
 
