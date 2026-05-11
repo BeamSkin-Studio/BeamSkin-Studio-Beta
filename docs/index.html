@@ -270,7 +270,7 @@
         ══════════════════════════════════════════════════════════════════ */
         .section-block {
             width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 50px;
             box-sizing: border-box;
         }
 
@@ -503,10 +503,56 @@
         .install-panel { display: none; text-align: left; }
         .install-panel.active { display: block; }
 
+        /* ── OS toggle (inside the install panel) ── */
+        .os-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .os-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 16px;
+            border-radius: 7px;
+            border: 1px solid #1e2430;
+            background: var(--surface);
+            color: var(--text-mute);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: 0.05em;
+        }
+
+        .os-btn i { font-size: 0.85rem; }
+
+        .os-btn:hover { color: var(--text); border-color: #333; }
+
+        .os-btn.active-win {
+            background: rgba(255, 102, 0, 0.1);
+            color: var(--accent);
+            border-color: rgba(255, 102, 0, 0.35);
+        }
+
+        .os-btn.active-lin {
+            background: rgba(243, 156, 18, 0.1);
+            color: #f39c12;
+            border-color: rgba(243, 156, 18, 0.35);
+        }
+
         /* ── Installation steps ── */
         .steps-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .steps-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
         }
 
@@ -530,6 +576,10 @@
             transition: opacity 0.2s;
         }
 
+        .step-card.linux-card::before {
+            background: #f39c12;
+        }
+
         .step-card:hover { border-color: #2e3a4a; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .step-card:hover::before { opacity: 1; }
 
@@ -542,6 +592,10 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .step-num.linux-num {
+            color: rgba(243, 156, 18, 0.13);
+        }
+
         .step-icon {
             width: 30px; height: 30px;
             border-radius: 7px;
@@ -551,6 +605,12 @@
             font-size: 0.78rem;
             color: var(--accent);
             margin-bottom: 9px;
+        }
+
+        .step-icon.linux-icon {
+            background: rgba(243, 156, 18, 0.1);
+            border-color: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
         }
 
         .step-label {
@@ -577,12 +637,52 @@
             font-family: 'Courier New', monospace;
         }
 
+        .step-desc code.linux-code {
+            background: rgba(243, 156, 18, 0.08);
+            border-color: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+        }
+
         .step-tip {
             margin-top: 6px;
             font-size: 0.66rem;
             color: rgba(148, 163, 184, 0.6);
             font-style: italic;
             line-height: 1.5;
+        }
+
+        /* ── OS panel sections ── */
+        .os-steps-section { display: none; }
+        .os-steps-section.active { display: block; }
+
+        /* ── Linux info banner ── */
+        .linux-note {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: rgba(243, 156, 18, 0.05);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+            border-left: 3px solid #f39c12;
+            border-radius: 8px;
+            font-size: 0.71rem;
+            color: var(--text-mute);
+            line-height: 1.7;
+        }
+
+        .linux-note strong { color: #f39c12; }
+
+        /* ── Optional step (desktop shortcut) ── */
+        .optional-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.60rem;
+            font-weight: 700;
+            color: #94a3b8;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 20px;
+            padding: 1px 7px;
+            margin-bottom: 6px;
         }
 
         /* ── Troubleshooting ── */
@@ -641,7 +741,7 @@
             transition: max-height 0.3s ease;
         }
 
-        .trouble-item.open .trouble-a { max-height: 300px; }
+        .trouble-item.open .trouble-a { max-height: 400px; }
 
         .trouble-a-inner {
             padding: 0 14px 12px 50px;
@@ -663,6 +763,172 @@
 
         .footer { margin-top: 20px; color: var(--text-mute); font-size: 0.8rem; padding-bottom: 15px; }
         .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
+
+        /* ══════════════════════════════════════════════════════════════════
+           ALL RELEASES SECTION
+        ══════════════════════════════════════════════════════════════════ */
+        .rel-os-panel { display: none; }
+        .rel-os-panel.active { display: block; }
+
+        .release-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .release-loading {
+            color: var(--text-mute);
+            font-size: 0.74rem;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .release-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 11px 16px;
+            background: var(--surface);
+            border: 1px solid #1e2430;
+            border-radius: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .release-row::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .release-row.linux-row::before { background: #f39c12; }
+
+        .release-row:hover {
+            border-color: #2e3a4a;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+        }
+
+        .release-row:hover::before { opacity: 1; }
+
+        .release-row.is-latest {
+            border-color: rgba(255, 102, 0, 0.25);
+        }
+
+        .release-row.is-latest.linux-row {
+            border-color: rgba(243, 156, 18, 0.25);
+        }
+
+        .release-tag {
+            font-size: 0.82rem;
+            font-weight: 900;
+            color: var(--text);
+            min-width: 110px;
+            flex-shrink: 0;
+        }
+
+        .release-latest-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.60rem;
+            font-weight: 800;
+            color: var(--accent);
+            background: rgba(255, 102, 0, 0.1);
+            border: 1px solid rgba(255, 102, 0, 0.25);
+            border-radius: 20px;
+            padding: 2px 8px;
+            margin-left: 6px;
+            letter-spacing: 0.05em;
+            vertical-align: middle;
+        }
+
+        .release-latest-badge.linux-badge {
+            color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+            border-color: rgba(243, 156, 18, 0.25);
+        }
+
+        .release-date {
+            font-size: 0.69rem;
+            color: var(--text-mute);
+            flex-shrink: 0;
+            min-width: 90px;
+        }
+
+        .release-dl-count {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.69rem;
+            color: var(--text-mute);
+            flex: 1;
+        }
+
+        .release-dl-count i { color: var(--accent); font-size: 0.65rem; }
+        .release-dl-count.linux-count i { color: #f39c12; }
+
+        .release-dl-count .dl-num {
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .release-dl-btn {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            border-radius: 7px;
+            border: none;
+            background: rgba(255, 102, 0, 0.12);
+            color: var(--accent);
+            font-size: 0.70rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: 0.04em;
+            box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.25);
+        }
+
+        .release-dl-btn.linux-btn {
+            background: rgba(243, 156, 18, 0.1);
+            color: #f39c12;
+            box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.25);
+        }
+
+        .release-dl-btn:hover {
+            background: rgba(255, 102, 0, 0.22);
+            box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.45);
+        }
+
+        .release-dl-btn.linux-btn:hover {
+            background: rgba(243, 156, 18, 0.2);
+            box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.45);
+        }
+
+        .release-dl-btn i { font-size: 0.68rem; }
+
+        .release-no-asset {
+            font-size: 0.68rem;
+            color: rgba(148, 163, 184, 0.4);
+            font-style: italic;
+            padding: 6px 14px;
+        }
+
+        @media (max-width: 900px) {
+            .release-row { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+            .release-tag { min-width: unset; font-size: 0.78rem; }
+            .release-date { min-width: unset; }
+            .release-dl-count { flex: none; width: 100%; }
+            .release-dl-btn { width: 100%; justify-content: center; }
+        }
 
         /* ══════════════════════════════════════════════════════════════════
            MOBILE STYLES
@@ -698,6 +964,7 @@
             .features-grid { grid-template-columns: 1fr 1fr; }
             .upcoming-grid { grid-template-columns: 1fr; }
             .steps-grid    { grid-template-columns: 1fr 1fr; }
+            .steps-grid-4  { grid-template-columns: 1fr 1fr; }
 
             .install-tabs { flex-wrap: nowrap; overflow-x: auto; }
             .install-tab  { flex: 0 0 auto; font-size: 0.68rem; padding: 7px 10px; }
@@ -705,6 +972,8 @@
             .footer        { font-size: 0.75rem; margin-top: 16px; padding-bottom: 24px; }
             .wip-box       { font-size: 0.78rem; }
             .changelog-box { font-size: 0.78rem; }
+
+            .os-toggle { flex-wrap: wrap; }
         }
 
         @media (max-width: 380px) {
@@ -712,6 +981,7 @@
             .logo { width: 130px; }
             .dl-btn { font-size: 0.9rem; }
             .steps-grid    { grid-template-columns: 1fr; }
+            .steps-grid-4  { grid-template-columns: 1fr; }
             .features-grid { grid-template-columns: 1fr; }
         }
     </style>
@@ -913,7 +1183,35 @@
                     <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
                     <div class="upcoming-icon"><i class="fas fa-truck-moving"></i></div>
                     <div class="upcoming-label">Body Variant Support</div>
-                    <div class="upcoming-desc">Skinning support for cargo, box truck, and ambulance body variants
+                    <div class="upcoming-desc">Skinning support for cargo, box truck, and ambulance body variants.</div>
+                </div>
+
+                <div class="upcoming-card">
+                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
+                    <div class="upcoming-icon"><i class="fas fa-desktop"></i></div>
+                    <div class="upcoming-label">Migrated to PySide6</div>
+                    <div class="upcoming-desc">The UI framework is being moved from CustomTkinter to PySide6 — enabling a more modern, flexible interface and better long-term maintainability.</div>
+                </div>
+
+                <div class="upcoming-card">
+                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
+                    <div class="upcoming-icon"><i class="fas fa-folder-open"></i></div>
+                    <div class="upcoming-label">Unpacked Mod Toggle</div>
+                    <div class="upcoming-desc">A toggle to export the mod as a plain folder instead of a ZIP file — useful for testing or editing the mod directly without extracting it first.</div>
+                </div>
+
+                <div class="upcoming-card">
+                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
+                    <div class="upcoming-icon"><i class="fas fa-puzzle-piece"></i></div>
+                    <div class="upcoming-label">Auto Mod Import</div>
+                    <div class="upcoming-desc">Point BeamSkin Studio at a mod and it will automatically scan and extract everything needed — vehicle JSON, JBeam files, and the vehicle's default preview image used in the car list and hover preview — then add the modded vehicle ready to skin. No more manually hunting through mod folders for the right files.</div>
+                </div>
+
+                <div class="upcoming-card">
+                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
+                    <div class="upcoming-icon"><i class="fas fa-floppy-disk"></i></div>
+                    <div class="upcoming-label">Improved Save / Load</div>
+                    <div class="upcoming-desc">Saving a project now remembers its location automatically. Loading opens a built-in menu listing all your saved projects in one place — no more navigating through File Explorer to track down a save file. Pick a save from the list and you're straight back in.</div>
                 </div>
 
             </div>
@@ -937,10 +1235,13 @@
 
         <div class="section-body" id="installBody">
 
-            <!-- Tab strip: only Installation + Troubleshooting -->
+            <!-- Tab strip -->
             <div class="install-tabs">
                 <button class="install-tab active" onclick="switchTab('install', this)">
                     <i class="fas fa-download"></i> Installation
+                </button>
+                <button class="install-tab" onclick="switchTab('manual', this)">
+                    <i class="fas fa-terminal"></i> Manual Install
                 </button>
                 <button class="install-tab" onclick="switchTab('trouble', this)">
                     <i class="fas fa-wrench"></i> Troubleshooting
@@ -949,48 +1250,234 @@
 
             <div class="install-panels">
 
-                <!-- ── Installation ── -->
+                <!-- ══════════════════════════════════════════════════════
+                     Installation panel — Windows + Linux with OS toggle
+                ══════════════════════════════════════════════════════ -->
                 <div class="install-panel active" id="panel-install">
-                    <div class="steps-grid">
+
+                    <!-- OS toggle -->
+                    <div class="os-toggle">
+                        <button class="os-btn active-win" id="osWinBtn" onclick="switchOS('windows')">
+                            <i class="fab fa-windows"></i> WINDOWS
+                        </button>
+                        <button class="os-btn" id="osLinBtn" onclick="switchOS('linux')">
+                            <i class="fab fa-linux"></i> LINUX
+                        </button>
+                    </div>
+
+                    <!-- ── Windows steps ── -->
+                    <div class="os-steps-section active" id="os-windows">
+                        <div class="steps-grid">
+
+                            <div class="step-card">
+                                <div class="step-num">01</div>
+                                <div class="step-icon"><i class="fas fa-download"></i></div>
+                                <div class="step-label">Download</div>
+                                <div class="step-desc">Click the <strong>Windows Download</strong> button above to grab the latest release ZIP from GitHub.</div>
+                            </div>
+
+                            <div class="step-card">
+                                <div class="step-num">02</div>
+                                <div class="step-icon"><i class="fas fa-file-zipper"></i></div>
+                                <div class="step-label">Extract ZIP</div>
+                                <div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder you want BeamSkin Studio to live in.</div>
+                                <div class="step-tip">💡 Avoid paths with spaces or special characters (e.g. <code>C:\Tools\BeamSkin</code> works great).</div>
+                            </div>
+
+                            <div class="step-card">
+                                <div class="step-num">03</div>
+                                <div class="step-icon"><i class="fas fa-terminal"></i></div>
+                                <div class="step-label">Run Install.bat</div>
+                                <div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It should automatically install all required dependencies.</div>
+                                <div class="step-tip">⚠️ If Windows SmartScreen appears, click <strong>More info → Run anyway</strong>. This is a false positive common with Python apps.</div>
+                            </div>
+
+                            <div class="step-card">
+                                <div class="step-num">04</div>
+                                <div class="step-icon"><i class="fas fa-circle-check"></i></div>
+                                <div class="step-label">First Launch</div>
+                                <div class="step-desc">Once installation finishes, BeamSkin Studio will launch automatically for the first time.</div>
+                            </div>
+
+                            <div class="step-card">
+                                <div class="step-num">05</div>
+                                <div class="step-icon"><i class="fas fa-rocket"></i></div>
+                                <div class="step-label">Future Launches</div>
+                                <div class="step-desc">Use <code>BeamSkin Studio.bat</code> to start the app from now on — it skips the installer for a faster startup.</div>
+                                <div class="step-tip">💡 You can create a shortcut to this .bat file on your desktop for quick access.</div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- ── Linux steps ── -->
+                    <div class="os-steps-section" id="os-linux">
+
+                        <div class="linux-note">
+                            <strong><i class="fab fa-linux"></i> Linux — heads up:</strong>
+                            The Linux version is <strong>untested</strong> and may have issues. If you run into a problem, please report it on the
+                            <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:#f39c12;font-weight:700;">Linux GitHub Issues</a> page.
+                            The installer script supports <strong>Ubuntu / Debian, Fedora / RHEL, Arch / Manjaro, and openSUSE</strong>.
+                        </div>
+
+                        <div class="steps-grid-4">
+
+                            <div class="step-card linux-card">
+                                <div class="step-num linux-num">01</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-download"></i></div>
+                                <div class="step-label">Download</div>
+                                <div class="step-desc">Click the <strong>Linux Download</strong> button above to grab the latest release ZIP from GitHub.</div>
+                            </div>
+
+                            <div class="step-card linux-card">
+                                <div class="step-num linux-num">02</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-file-zipper"></i></div>
+                                <div class="step-label">Extract ZIP</div>
+                                <div class="step-desc">Right-click and extract with your file manager, or run in a terminal:<br><br>
+                                    <code class="linux-code">unzip BeamSkin-Studio-Linux-*.zip</code>
+                                </div>
+                                <div class="step-tip">💡 Avoid paths with spaces. A location like <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">~/Tools/BeamSkin</code> works well.</div>
+                            </div>
+
+                            <div class="step-card linux-card">
+                                <div class="step-num linux-num">03</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-terminal"></i></div>
+                                <div class="step-label">Run the Installer</div>
+                                <div class="step-desc">Open a terminal inside the extracted folder and run:<br><br>
+                                    <code class="linux-code">chmod +x install_linux.sh</code><br>
+                                    <code class="linux-code">./install_linux.sh</code><br><br>
+                                    The script automatically installs Python 3, pip, tkinter, and all required Python packages for your distro.
+                                </div>
+                                <div class="step-tip">⚠️ You may be prompted for your <strong>sudo password</strong> to install system packages — this is expected.</div>
+                            </div>
+
+                            <div class="step-card linux-card">
+                                <div class="step-num linux-num">04</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-circle-check"></i></div>
+                                <div class="step-label">First Launch</div>
+                                <div class="step-desc">Once the installer finishes it will ask if you want to launch BeamSkin Studio immediately. Type <strong>y</strong> and press Enter, or launch it yourself anytime with:<br><br>
+                                    <code class="linux-code">./beamskin_studio.sh</code>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Optional: desktop shortcut row -->
+                        <div class="upcoming-header" style="margin-top: 16px;">
+                            <i class="fas fa-desktop"></i> OPTIONAL — DESKTOP SHORTCUT
+                        </div>
+
+                        <div class="steps-grid-4" style="grid-template-columns: repeat(3, 1fr);">
+
+                            <div class="step-card linux-card">
+                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-file-code"></i></div>
+                                <div class="step-label">Edit the .desktop File</div>
+                                <div class="step-desc">Open <code class="linux-code">beamskin-studio.desktop</code> in a text editor. Replace the two <code class="linux-code">/path/to/BeamSkin-Studio</code> placeholders with the <strong>actual path</strong> to your extracted folder.</div>
+                                <div class="step-tip">💡 Run <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">pwd</code> inside the folder to see the full path.</div>
+                            </div>
+
+                            <div class="step-card linux-card">
+                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-copy"></i></div>
+                                <div class="step-label">Install the Shortcut</div>
+                                <div class="step-desc">Copy the file to your local applications folder so it appears in your app launcher:<br><br>
+                                    <code class="linux-code">cp beamskin-studio.desktop ~/.local/share/applications/</code>
+                                </div>
+                            </div>
+
+                            <div class="step-card linux-card">
+                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
+                                <div class="step-icon linux-icon"><i class="fas fa-rocket"></i></div>
+                                <div class="step-label">Future Launches</div>
+                                <div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your application launcher, or always use the terminal launcher:<br><br>
+                                    <code class="linux-code">./beamskin_studio.sh</code>
+                                </div>
+                                <div class="step-tip">💡 You can also create a symbolic link on your desktop pointing to <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">beamskin_studio.sh</code>.</div>
+                            </div>
+
+                        </div>
+                    </div><!-- /os-linux -->
+
+                </div><!-- /panel-install -->
+
+                <!-- ── Manual Install ── -->
+                <div class="install-panel" id="panel-manual">
+                    <div class="steps-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 14px;">
 
                         <div class="step-card">
                             <div class="step-num">01</div>
-                            <div class="step-icon"><i class="fas fa-download"></i></div>
-                            <div class="step-label">Download</div>
-                            <div class="step-desc">Click the <strong>Windows Download</strong> button above to grab the latest release ZIP from GitHub.</div>
+                            <div class="step-icon"><i class="fab fa-python"></i></div>
+                            <div class="step-label">Install Python</div>
+                            <div class="step-desc">Download and install <strong>Python 3.9 or newer</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:700;">python.org</a>.</div>
+                            <div class="step-tip">⚠️ On the installer screen, check <strong>"Add Python to PATH"</strong> before clicking Install Now — this is required.</div>
                         </div>
 
                         <div class="step-card">
                             <div class="step-num">02</div>
-                            <div class="step-icon"><i class="fas fa-file-zipper"></i></div>
-                            <div class="step-label">Extract ZIP</div>
-                            <div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder you want BeamSkin Studio to live in.</div>
-                            <div class="step-tip">💡 Avoid paths with spaces or special characters (e.g. <code>C:\Tools\BeamSkin</code> works great).</div>
+                            <div class="step-icon"><i class="fas fa-terminal"></i></div>
+                            <div class="step-label">Open a Terminal</div>
+                            <div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong>. On Linux, open your terminal emulator. Navigate to the BeamSkin Studio folder with <code>cd</code>.</div>
+                            <div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar while inside the folder to open a prompt there.</div>
                         </div>
 
                         <div class="step-card">
                             <div class="step-num">03</div>
-                            <div class="step-icon"><i class="fas fa-terminal"></i></div>
-                            <div class="step-label">Run Install.bat</div>
-                            <div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It should automatically install all required dependencies.</div>
-                            <div class="step-tip">⚠️ If Windows SmartScreen appears, click <strong>More info → Run anyway</strong>. This is a false positive common with Python apps.</div>
+                            <div class="step-icon"><i class="fas fa-box"></i></div>
+                            <div class="step-label">Install Dependencies</div>
+                            <div class="step-desc">Run the following command to install all required packages at once:<br><br><code>pip install -r requirements.txt</code></div>
+                            <div class="step-tip">💡 If <code>pip</code> isn't recognised, try <code>python -m pip install -r requirements.txt</code> instead.</div>
                         </div>
 
-                        <div class="step-card">
-                            <div class="step-num">04</div>
-                            <div class="step-icon"><i class="fas fa-circle-check"></i></div>
-                            <div class="step-label">First Launch</div>
-                            <div class="step-desc">Once installation finishes, BeamSkin Studio will launch automatically for the first time.</div>
+                    </div>
+
+                    <!-- Package breakdown -->
+                    <div class="upcoming-header" style="margin-top:4px;">
+                        <i class="fas fa-cube"></i> WHAT GETS INSTALLED
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:8px;">
+
+                        <div class="feature-card">
+                            <div class="feature-icon"><i class="fas fa-window-maximize"></i></div>
+                            <div class="feature-text">
+                                <div class="feature-label">PySide6 <span style="font-weight:400;color:var(--text-mute);">≥ 6.5.0</span></div>
+                                <div class="feature-desc">The Qt-based GUI framework powering the entire interface. Replaces CustomTkinter as of v0.8.0.</div>
+                            </div>
                         </div>
 
-                        <div class="step-card">
-                            <div class="step-num">05</div>
-                            <div class="step-icon"><i class="fas fa-rocket"></i></div>
-                            <div class="step-label">Future Launches</div>
-                            <div class="step-desc">Use <code>BeamSkin Studio.bat</code> to start the app from now on — it skips the installer for a faster startup.</div>
-                            <div class="step-tip">💡 You can create a shortcut to this .bat file on your desktop for quick access.</div>
+                        <div class="feature-card">
+                            <div class="feature-icon"><i class="fas fa-image"></i></div>
+                            <div class="feature-text">
+                                <div class="feature-label">Pillow <span style="font-weight:400;color:var(--text-mute);">≥ 10.0.0</span></div>
+                                <div class="feature-desc">Image processing library used for skin texture manipulation and colorable skin generation.</div>
+                            </div>
                         </div>
 
+                        <div class="feature-card">
+                            <div class="feature-icon"><i class="fas fa-globe"></i></div>
+                            <div class="feature-text">
+                                <div class="feature-label">requests <span style="font-weight:400;color:var(--text-mute);">≥ 2.31.0</span></div>
+                                <div class="feature-desc">HTTP library used for the update checker and online tab features.</div>
+                            </div>
+                        </div>
+
+                        <div class="feature-card">
+                            <div class="feature-icon"><i class="fab fa-windows"></i></div>
+                            <div class="feature-text">
+                                <div class="feature-label">pywin32 <span style="font-weight:400;color:var(--text-mute);">≥ 306</span></div>
+                                <div class="feature-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped automatically on Linux.</div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Linux note -->
+                    <div style="margin-top:12px; padding:11px 14px; background:rgba(243,156,18,0.05); border:1px solid rgba(243,156,18,0.2); border-left:3px solid #f39c12; border-radius:8px; font-size:0.72rem; color:var(--text-mute); line-height:1.7;">
+                        <span style="color:#f39c12; font-weight:800;"><i class="fab fa-linux"></i> Linux note —</span>
+                        PySide6 bundles its own Qt libraries so no system Qt packages are needed. You may still need <code>libGL</code> for rendering:
+                        <code>sudo apt install libgl1</code> (Debian/Ubuntu) &nbsp;·&nbsp;
+                        <code>sudo dnf install mesa-libGL</code> (Fedora) &nbsp;·&nbsp;
+                        <code>sudo pacman -S mesa</code> (Arch)
                     </div>
                 </div>
 
@@ -1022,8 +1509,41 @@
                             <div class="trouble-a">
                                 <div class="trouble-a-inner">
                                     A missing module means the installation didn't complete correctly.<br><br>
-                                    • Re-run <code>Install.bat</code> and let it finish without interruption.<br>
-                                    • Make sure you're launching via <code>BeamSkin Studio.bat</code>, not <code>main.py</code> directly.
+                                    • <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish without interruption. Make sure you're launching via <code>BeamSkin Studio.bat</code>, not <code>main.py</code> directly.<br>
+                                    • <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for any errors. You can also install the missing package manually with <code>pip install --user &lt;package-name&gt;</code>.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="trouble-item" onclick="toggleTrouble(this)">
+                            <div class="trouble-q">
+                                <div class="trouble-q-icon warn"><i class="fab fa-linux"></i></div>
+                                Linux: tkinter not found / GUI fails to open
+                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
+                            </div>
+                            <div class="trouble-a">
+                                <div class="trouble-a-inner">
+                                    tkinter is not always bundled with Python on Linux and must be installed separately via your package manager:<br><br>
+                                    • <strong>Ubuntu / Debian / Mint:</strong> <code>sudo apt install python3-tk</code><br>
+                                    • <strong>Fedora / RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>
+                                    • <strong>Arch / Manjaro:</strong> <code>sudo pacman -S tk</code><br>
+                                    • <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code><br><br>
+                                    The installer script handles this automatically, but if you skipped it, install tkinter manually using the command above.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="trouble-item" onclick="toggleTrouble(this)">
+                            <div class="trouble-q">
+                                <div class="trouble-q-icon warn"><i class="fab fa-linux"></i></div>
+                                Linux: permission denied when running scripts
+                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
+                            </div>
+                            <div class="trouble-a">
+                                <div class="trouble-a-inner">
+                                    The shell scripts need execute permission before they can be run. Fix this with:<br><br>
+                                    <code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>
+                                    Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.
                                 </div>
                             </div>
                         </div>
@@ -1039,7 +1559,7 @@
                                     If repeated fixes don't help, do a clean reinstall:<br><br>
                                     1. <strong>Delete</strong> the downloaded ZIP <em>and</em> the extracted folder entirely.<br>
                                     2. Re-download a fresh copy from the button above.<br>
-                                    3. Extract to a new location and run <code>Install.bat</code> again.
+                                    3. Extract to a new location and run the installer again (<code>Install.bat</code> on Windows, <code>./install_linux.sh</code> on Linux).
                                 </div>
                             </div>
                         </div>
@@ -1067,6 +1587,47 @@
             </div><!-- /install-panels -->
         </div><!-- /section-body -->
     </div><!-- /section-block -->
+
+    <!-- ════════════════════════════════════════════════════════════════════
+         ALL RELEASES SECTION
+    ════════════════════════════════════════════════════════════════════ -->
+    <div class="section-block">
+
+        <div class="section-header" onclick="toggleSection('releasesBody', 'releasesChevron')">
+            <div class="section-header-line left"></div>
+            <div class="section-title">
+                <i class="fas fa-tag icon"></i>
+                ALL RELEASES
+                <i class="fas fa-chevron-up section-chevron open" id="releasesChevron"></i>
+            </div>
+            <div class="section-header-line"></div>
+        </div>
+
+        <div class="section-body" id="releasesBody">
+
+            <div class="os-toggle" style="margin-bottom: 16px;">
+                <button class="os-btn active-win" id="relWinBtn" onclick="switchReleaseOS('windows')">
+                    <i class="fab fa-windows"></i> WINDOWS
+                </button>
+                <button class="os-btn" id="relLinBtn" onclick="switchReleaseOS('linux')">
+                    <i class="fab fa-linux"></i> LINUX
+                </button>
+            </div>
+
+            <div class="rel-os-panel active" id="rel-windows">
+                <div class="release-list" id="releaseList-windows">
+                    <div class="release-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases...</div>
+                </div>
+            </div>
+
+            <div class="rel-os-panel" id="rel-linux">
+                <div class="release-list" id="releaseList-linux">
+                    <div class="release-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <div class="footer">
         Project made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a>
@@ -1209,7 +1770,7 @@
         document.getElementById(chevronId).classList.toggle('open');
     }
 
-    /* ── Install guide: tab switch ── */
+    /* ── Install guide: main tab switch ── */
     function switchTab(name, btn) {
         document.querySelectorAll('.install-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.install-panel').forEach(p => p.classList.remove('active'));
@@ -1217,13 +1778,103 @@
         document.getElementById('panel-' + name).classList.add('active');
     }
 
+    /* ── Install guide: OS toggle ── */
+    function switchOS(os) {
+        document.querySelectorAll('.os-steps-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('os-' + os).classList.add('active');
+
+        const winBtn = document.getElementById('osWinBtn');
+        const linBtn = document.getElementById('osLinBtn');
+
+        winBtn.classList.remove('active-win', 'active-lin');
+        linBtn.classList.remove('active-win', 'active-lin');
+
+        if (os === 'windows') {
+            winBtn.classList.add('active-win');
+        } else {
+            linBtn.classList.add('active-lin');
+        }
+    }
+
     /* ── Troubleshooting: accordion ── */
     function toggleTrouble(item) {
         item.classList.toggle('open');
     }
 
+    /* ── All Releases ── */
+    function switchReleaseOS(os) {
+        document.querySelectorAll('.rel-os-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('rel-' + os).classList.add('active');
+
+        const wb = document.getElementById('relWinBtn');
+        const lb = document.getElementById('relLinBtn');
+        wb.classList.remove('active-win', 'active-lin');
+        lb.classList.remove('active-win', 'active-lin');
+        if (os === 'windows') wb.classList.add('active-win');
+        else lb.classList.add('active-lin');
+    }
+
+    function formatDate(iso) {
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function buildReleaseList(releases, containerId, isLinux) {
+        const container = document.getElementById(containerId);
+        if (!releases.length) {
+            container.innerHTML = '<div class="release-loading">No releases found.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        releases.forEach((release, index) => {
+            const isLatest = index === 0;
+            const dlCount  = release.assets.reduce((sum, a) => sum + a.download_count, 0);
+            const assetUrl = release.assets.length ? release.assets[0].browser_download_url : null;
+            const rowClass = isLinux ? 'release-row linux-row' : 'release-row';
+
+            const row = document.createElement('div');
+            row.className = rowClass + (isLatest ? ' is-latest' : '');
+
+            const badgeHtml = isLatest
+                ? `<span class="release-latest-badge ${isLinux ? 'linux-badge' : ''}"><i class="fas fa-circle-check"></i> LATEST</span>`
+                : '';
+
+            const dlBtnHtml = assetUrl
+                ? `<a href="${assetUrl}" class="release-dl-btn ${isLinux ? 'linux-btn' : ''}"><i class="fas fa-download"></i> DOWNLOAD</a>`
+                : `<span class="release-no-asset">No asset</span>`;
+
+            row.innerHTML = `
+                <div class="release-tag">${release.tag_name}${badgeHtml}</div>
+                <div class="release-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:0.4;font-size:0.65rem;"></i>${formatDate(release.published_at)}</div>
+                <div class="release-dl-count ${isLinux ? 'linux-count' : ''}">
+                    <i class="fas fa-download"></i>
+                    <span class="dl-num">${dlCount.toLocaleString()}</span> downloads
+                </div>
+                ${dlBtnHtml}
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    async function fetchAllReleases() {
+        try {
+            const [winRel, linRel] = await Promise.all([
+                fetch(`https://api.github.com/repos/${winRepo}/releases`).then(r => r.json()),
+                fetch(`https://api.github.com/repos/${linuxRepo}/releases`).then(r => r.json())
+            ]);
+            buildReleaseList(winRel,  'releaseList-windows', false);
+            buildReleaseList(linRel,  'releaseList-linux',   true);
+        } catch (err) {
+            console.error('Releases fetch error:', err);
+            document.getElementById('releaseList-windows').innerHTML = '<div class="release-loading">Could not load releases.</div>';
+            document.getElementById('releaseList-linux').innerHTML   = '<div class="release-loading">Could not load releases.</div>';
+        }
+    }
+
     init();
     fetchChangelog();
+    fetchAllReleases();
 </script>
 
 </body>
