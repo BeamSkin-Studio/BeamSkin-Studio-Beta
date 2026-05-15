@@ -1215,9 +1215,9 @@ body::after {
 .release-row.is-latest.lin-row { border-color: var(--amber-md); }
 
 .rel-tag {
-  font-family: var(--font-head);
-  font-weight: 900;
-  font-size: .93rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: .82rem;
   color: var(--text);
   min-width: 120px;
   flex-shrink: 0;
@@ -2009,13 +2009,21 @@ async function fetchChangelog(){
     while((m=re.exec(blk))!==null) entries.push({type:m[1],text:m[2]||''});
     const body=document.getElementById('clBody');
     body.innerHTML='';
+
+    // Safely escape HTML then convert literal \n to <br>
+    const safe = t => t
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/\\n/g,'<br>');
+
     for(const en of entries){
       if(en.type==='separator'){const hr=document.createElement('hr');hr.className='cl-sep';body.appendChild(hr);continue;}
       const div=document.createElement('div');
-      if(en.type==='title'){div.className='cl-title-el';div.textContent=en.text;}
-      else if(en.type==='subtitle'){div.className='cl-sub';div.textContent=en.text;}
-      else if(en.type==='item'){div.className='cl-item-el';div.textContent=en.text;}
-      else if(en.type==='note'){div.className='cl-note-el';div.textContent='💡 '+en.text;}
+      if(en.type==='title'){div.className='cl-title-el';div.innerHTML=safe(en.text);}
+      else if(en.type==='subtitle'){div.className='cl-sub';div.innerHTML=safe(en.text);}
+      else if(en.type==='item'){div.className='cl-item-el';div.innerHTML=safe(en.text);}
+      else if(en.type==='note'){div.className='cl-note-el';div.innerHTML='💡 '+safe(en.text);}
       body.appendChild(div);
     }
   } catch(e){
