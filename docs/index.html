@@ -1,1808 +1,1985 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeamSkin Studio</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --bg: #05070a;
-            --surface: #0f1218;
-            --accent: #FF6600;
-            --accent-glow: rgba(255, 102, 0, 0.6);
-            --linux: #f39c12;
-            --linux-glow: rgba(243, 156, 18, 0.4);
-            --text: #ffffff;
-            --text-mute: #94a3b8;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1800px;
-            padding: 0 30px;
-            box-sizing: border-box;
-            text-align: center;
-        }
-
-        .logo {
-            width: 200px;
-            margin: 10px 0;
-            filter: drop-shadow(0 0 15px var(--accent-glow));
-        }
-
-        /* ── Three-column top layout ─────────────────────────────────────── */
-        .top-layout {
-            display: grid;
-            grid-template-columns: 7fr 14fr 7fr;
-            gap: 14px;
-            width: 100%;
-            margin-bottom: 15px;
-            align-items: start;
-        }
-
-        /* ── WIP warning (left) ──────────────────────────────────────────── */
-        .wip-box {
-            padding: 12px 13px;
-            border-radius: 8px;
-            border: 1px solid #f39c12;
-            border-left: 4px solid #f39c12;
-            background: rgba(243, 156, 18, 0.07);
-            text-align: left;
-            font-size: 0.76rem;
-            color: var(--text-mute);
-            line-height: 1.65;
-            box-sizing: border-box;
-        }
-
-        .wip-box .wip-header {
-            font-weight: 700;
-            color: #f39c12;
-            margin-bottom: 7px;
-            font-size: 0.82rem;
-        }
-
-        .wip-box strong { color: var(--text); }
-
-        .wip-box .wip-links {
-            margin-top: 8px;
-            font-style: italic;
-            font-size: 0.72rem;
-        }
-
-        .wip-box a {
-            color: #f39c12;
-            font-weight: 600;
-            text-decoration: none;
-            font-size: 0.74rem;
-        }
-
-        /* ── Middle column ──────────────────────────────────────────────── */
-        .middle-col {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-width: 0;
-        }
-
-        .display-wrapper {
-            width: 100%;
-            border-radius: 12px;
-            border: 2px solid var(--accent);
-            box-shadow: 0 0 30px var(--accent-glow);
-            overflow: hidden;
-            background: #000;
-            aspect-ratio: 16 / 9;
-            position: relative;
-        }
-
-        .display-content {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0; left: 0;
-            display: none;
-            object-fit: contain;
-        }
-
-        .active-content { display: block; }
-        .aspect-ratio { width: 100%; height: 100%; background: #000; }
-        .aspect-ratio iframe { width: 100%; height: 100%; border: 0; display: block; }
-
-        .gallery-section-label {
-            font-size: 0.68rem;
-            font-weight: 900;
-            color: var(--text-mute);
-            letter-spacing: 0.1em;
-            text-align: left;
-            padding: 2px 2px 0;
-            margin-top: 4px;
-        }
-
-        .gallery-section-label i { color: var(--accent); margin-right: 4px; }
-
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            width: 100%;
-        }
-
-        .gallery-videos { grid-template-columns: repeat(3, 1fr); }
-
-        .gallery-videos .nav-card img,
-        .gallery-images .nav-card img {
-            height: auto;
-            aspect-ratio: 16 / 9;
-            object-fit: cover;
-            border-radius: 7px;
-            width: 100%;
-        }
-
-        .nav-card {
-            background: var(--surface);
-            border-radius: 8px;
-            border: 1px solid #222;
-            overflow: hidden;
-            cursor: pointer;
-            transition: 0.2s;
-            position: relative;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .nav-card img {
-            width: 100%; height: 70px;
-            object-fit: cover; opacity: 0.5;
-            transition: 0.3s; pointer-events: none;
-            border-radius: 7px;
-        }
-
-        .nav-card:hover { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
-        .nav-card:active { transform: scale(0.95); }
-        .nav-card:hover img { opacity: 1; }
-
-        .nav-card span {
-            position: absolute; bottom: 4px; width: 100%;
-            font-size: 8px; font-weight: 900; color: var(--accent);
-            text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        /* ── Changelog (right) ───────────────────────────────────────────── */
-        .changelog-box {
-            padding: 12px 13px;
-            border-radius: 8px;
-            border: 1px solid #222;
-            border-left: 4px solid var(--accent);
-            background: var(--surface);
-            text-align: left;
-            font-size: 0.76rem;
-            line-height: 1.65;
-            box-sizing: border-box;
-            overflow-y: auto;
-            max-height: 420px;
-        }
-
-        .changelog-box .cl-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 8px; flex-wrap: wrap; gap: 4px;
-        }
-
-        .changelog-box .cl-version { font-weight: 900; color: var(--accent); font-size: 1.04rem; }
-        .changelog-box .cl-date    { color: var(--text-mute); font-size: 0.72rem; }
-
-        .changelog-box .cl-title {
-            font-weight: 800; color: var(--text); font-size: 0.80rem;
-            margin-top: 8px; margin-bottom: 2px;
-        }
-        .changelog-box .cl-subtitle {
-            font-weight: 700; color: var(--accent); font-size: 0.74rem;
-            margin-top: 5px;
-        }
-        .changelog-box .cl-item {
-            color: var(--text-mute); padding-left: 10px; font-size: 0.73rem;
-        }
-        .changelog-box .cl-item::before { content: "• "; color: var(--accent); }
-        .changelog-box .cl-note {
-            font-style: italic; color: var(--text-mute); font-size: 0.71rem;
-            margin-top: 4px;
-        }
-        .changelog-box .cl-separator {
-            border: none; border-top: 1px solid #222; margin: 7px 0;
-        }
-
-        .changelog-box::-webkit-scrollbar { width: 4px; }
-        .changelog-box::-webkit-scrollbar-track { background: transparent; }
-        .changelog-box::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-
-        /* ── Download row ────────────────────────────────────────────────── */
-        .download-row {
-            display: flex;
-            justify-content: space-evenly;
-            gap: 0;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .dl-btn {
-            flex: 0 0 38%;
-            min-width: 0;
-            padding: 12px;
-            border-radius: 10px;
-            text-decoration: none;
-            color: #000 !important;
-            font-weight: 900;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transition: 0.3s;
-            cursor: pointer;
-            border: none;
-            box-sizing: border-box;
-        }
-
-        .dl-btn span, .dl-btn .ver-tag { color: #000 !important; }
-
-        .btn-win   { background: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
-        .btn-linux { background: var(--linux);  box-shadow: 0 0 20px var(--linux-glow); }
-        .dl-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
-
-        .ver-tag   { font-size: 13px; text-transform: uppercase; margin-top: 2px; opacity: 0.9; }
-        .count-tag { font-size: 11px; font-weight: 400; margin-top: 2px; opacity: 0.8; }
-        .count-tag i { font-size: 9px; }
-        .dl-btn i  { margin-bottom: 2px; font-size: 0.75rem; }
-
-        /* ══════════════════════════════════════════════════════════════════
-           SHARED: collapsible section chrome
-        ══════════════════════════════════════════════════════════════════ */
-        .section-block {
-            width: 100%;
-            margin-bottom: 50px;
-            box-sizing: border-box;
-        }
-
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 14px;
-            cursor: pointer;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        .section-header-line {
-            flex: 1;
-            height: 1px;
-            background: linear-gradient(to right, #222, transparent);
-        }
-
-        .section-header-line.left {
-            background: linear-gradient(to left, #222, transparent);
-        }
-
-        .section-title {
-            font-size: 0.72rem;
-            font-weight: 900;
-            letter-spacing: 0.14em;
-            color: var(--text-mute);
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            white-space: nowrap;
-        }
-
-        .section-title i.icon { color: var(--accent); }
-
-        .section-chevron {
-            color: var(--text-mute);
-            font-size: 0.65rem;
-            transition: transform 0.3s ease;
-        }
-
-        .section-chevron.open { transform: rotate(180deg); }
-
-        .section-body {
-            overflow: hidden;
-            transition: max-height 0.4s ease, opacity 0.3s ease;
-            max-height: 3000px;
-            opacity: 1;
-        }
-
-        .section-body.collapsed { max-height: 0; opacity: 0; }
-
-        /* ══════════════════════════════════════════════════════════════════
-           FEATURES SECTION
-        ══════════════════════════════════════════════════════════════════ */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        .feature-card {
-            background: var(--surface);
-            border: 1px solid #1e2430;
-            border-radius: 10px;
-            padding: 13px 14px;
-            display: flex;
-            align-items: flex-start;
-            gap: 11px;
-            transition: border-color 0.2s;
-        }
-
-        .feature-card:hover { border-color: rgba(255, 102, 0, 0.25); }
-
-        .feature-icon {
-            width: 32px; height: 32px;
-            flex-shrink: 0;
-            border-radius: 8px;
-            background: rgba(255, 102, 0, 0.1);
-            border: 1px solid rgba(255, 102, 0, 0.2);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.82rem;
-            color: var(--accent);
-            margin-top: 1px;
-        }
-
-        .feature-text { flex: 1; min-width: 0; }
-
-        .feature-label {
-            font-size: 0.74rem;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 3px;
-        }
-
-        .feature-desc {
-            font-size: 0.69rem;
-            color: var(--text-mute);
-            line-height: 1.6;
-        }
-
-        /* ══════════════════════════════════════════════════════════════════
-           INSTALLATION GUIDE SECTION
-        ══════════════════════════════════════════════════════════════════ */
-
-        /* Tab strip */
-        .install-tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 12px;
-            background: var(--surface);
-            border-radius: 8px;
-            padding: 4px;
-            border: 1px solid #1e2430;
-        }
-
-        .install-tab {
-            flex: 1;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: none;
-            background: transparent;
-            color: var(--text-mute);
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            cursor: pointer;
-            transition: 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        .install-tab i { font-size: 0.78rem; }
-        .install-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-        .install-tab.active {
-            background: rgba(255, 102, 0, 0.12);
-            color: var(--accent);
-            box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.3);
-        }
-
-        /* Tab panels */
-        .install-panels { position: relative; }
-        .install-panel { display: none; text-align: left; }
-        .install-panel.active { display: block; }
-
-        /* ── OS toggle (inside the install panel) ── */
-        .os-toggle {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .os-btn {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 7px 16px;
-            border-radius: 7px;
-            border: 1px solid #1e2430;
-            background: var(--surface);
-            color: var(--text-mute);
-            font-size: 0.72rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.2s;
-            font-family: 'Segoe UI', sans-serif;
-            letter-spacing: 0.05em;
-        }
-
-        .os-btn i { font-size: 0.85rem; }
-
-        .os-btn:hover { color: var(--text); border-color: #333; }
-
-        .os-btn.active-win {
-            background: rgba(255, 102, 0, 0.1);
-            color: var(--accent);
-            border-color: rgba(255, 102, 0, 0.35);
-        }
-
-        .os-btn.active-lin {
-            background: rgba(243, 156, 18, 0.1);
-            color: #f39c12;
-            border-color: rgba(243, 156, 18, 0.35);
-        }
-
-        /* ── Installation steps ── */
-        .steps-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-        }
-
-        .steps-grid-4 {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        .step-card {
-            background: var(--surface);
-            border: 1px solid #1e2430;
-            border-radius: 10px;
-            padding: 14px 13px 13px;
-            position: relative;
-            overflow: hidden;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .step-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .step-card.linux-card::before {
-            background: #f39c12;
-        }
-
-        .step-card:hover { border-color: #2e3a4a; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        .step-card:hover::before { opacity: 1; }
-
-        .step-num {
-            font-size: 1.8rem;
-            font-weight: 900;
-            color: rgba(255, 102, 0, 0.13);
-            line-height: 1;
-            margin-bottom: 8px;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .step-num.linux-num {
-            color: rgba(243, 156, 18, 0.13);
-        }
-
-        .step-icon {
-            width: 30px; height: 30px;
-            border-radius: 7px;
-            background: rgba(255, 102, 0, 0.1);
-            border: 1px solid rgba(255, 102, 0, 0.2);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.78rem;
-            color: var(--accent);
-            margin-bottom: 9px;
-        }
-
-        .step-icon.linux-icon {
-            background: rgba(243, 156, 18, 0.1);
-            border-color: rgba(243, 156, 18, 0.2);
-            color: #f39c12;
-        }
-
-        .step-label {
-            font-size: 0.72rem;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 4px;
-            letter-spacing: 0.04em;
-        }
-
-        .step-desc {
-            font-size: 0.69rem;
-            color: var(--text-mute);
-            line-height: 1.6;
-        }
-
-        .step-desc code {
-            background: rgba(255, 102, 0, 0.1);
-            border: 1px solid rgba(255, 102, 0, 0.2);
-            color: var(--accent);
-            padding: 1px 5px;
-            border-radius: 4px;
-            font-size: 0.68rem;
-            font-family: 'Courier New', monospace;
-        }
-
-        .step-desc code.linux-code {
-            background: rgba(243, 156, 18, 0.08);
-            border-color: rgba(243, 156, 18, 0.2);
-            color: #f39c12;
-        }
-
-        .step-tip {
-            margin-top: 6px;
-            font-size: 0.66rem;
-            color: rgba(148, 163, 184, 0.6);
-            font-style: italic;
-            line-height: 1.5;
-        }
-
-        /* ── OS panel sections ── */
-        .os-steps-section { display: none; }
-        .os-steps-section.active { display: block; }
-
-        /* ── Linux info banner ── */
-        .linux-note {
-            margin-bottom: 12px;
-            padding: 10px 14px;
-            background: rgba(243, 156, 18, 0.05);
-            border: 1px solid rgba(243, 156, 18, 0.2);
-            border-left: 3px solid #f39c12;
-            border-radius: 8px;
-            font-size: 0.71rem;
-            color: var(--text-mute);
-            line-height: 1.7;
-        }
-
-        .linux-note strong { color: #f39c12; }
-
-        /* ── Optional step (desktop shortcut) ── */
-        .optional-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.60rem;
-            font-weight: 700;
-            color: #94a3b8;
-            background: rgba(148, 163, 184, 0.08);
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 20px;
-            padding: 1px 7px;
-            margin-bottom: 6px;
-        }
-
-        /* ── Troubleshooting ── */
-        .trouble-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .trouble-item {
-            background: var(--surface);
-            border: 1px solid #1e2430;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .trouble-q {
-            padding: 11px 14px;
-            font-size: 0.74rem;
-            font-weight: 700;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            transition: background 0.15s;
-            user-select: none;
-        }
-
-        .trouble-q:hover { background: rgba(255,255,255,0.02); }
-
-        .trouble-q-icon {
-            width: 26px; height: 26px;
-            flex-shrink: 0;
-            border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.72rem;
-        }
-
-        .trouble-q-icon.warn { background: rgba(243,156,18,0.12); color: #f39c12; border: 1px solid rgba(243,156,18,0.25); }
-        .trouble-q-icon.err  { background: rgba(220,50,50,0.10);  color: #e05555; border: 1px solid rgba(220,50,50,0.2); }
-        .trouble-q-icon.bug  { background: rgba(100,180,255,0.08); color: #6ab4ff; border: 1px solid rgba(100,180,255,0.18); }
-
-        .trouble-q-chevron {
-            margin-left: auto;
-            color: var(--text-mute);
-            font-size: 0.65rem;
-            transition: transform 0.25s;
-        }
-
-        .trouble-item.open .trouble-q-chevron { transform: rotate(180deg); }
-
-        .trouble-a {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .trouble-item.open .trouble-a { max-height: 400px; }
-
-        .trouble-a-inner {
-            padding: 0 14px 12px 50px;
-            font-size: 0.70rem;
-            color: var(--text-mute);
-            line-height: 1.7;
-        }
-
-        .trouble-a-inner strong { color: var(--text); }
-        .trouble-a-inner code {
-            background: rgba(255, 102, 0, 0.08);
-            border: 1px solid rgba(255, 102, 0, 0.18);
-            color: var(--accent);
-            padding: 1px 5px;
-            border-radius: 4px;
-            font-size: 0.67rem;
-            font-family: 'Courier New', monospace;
-        }
-
-        .footer { margin-top: 20px; color: var(--text-mute); font-size: 0.8rem; padding-bottom: 15px; }
-        .footer a { color: var(--accent); text-decoration: none; font-weight: bold; }
-
-        /* ══════════════════════════════════════════════════════════════════
-           ALL RELEASES SECTION
-        ══════════════════════════════════════════════════════════════════ */
-        .rel-os-panel { display: none; }
-        .rel-os-panel.active { display: block; }
-
-        .release-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .release-loading {
-            color: var(--text-mute);
-            font-size: 0.74rem;
-            padding: 20px 0;
-            text-align: center;
-        }
-
-        .release-row {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 11px 16px;
-            background: var(--surface);
-            border: 1px solid #1e2430;
-            border-radius: 10px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .release-row::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 3px;
-            background: var(--accent);
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .release-row.linux-row::before { background: #f39c12; }
-
-        .release-row:hover {
-            border-color: #2e3a4a;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
-        }
-
-        .release-row:hover::before { opacity: 1; }
-
-        .release-row.is-latest {
-            border-color: rgba(255, 102, 0, 0.25);
-        }
-
-        .release-row.is-latest.linux-row {
-            border-color: rgba(243, 156, 18, 0.25);
-        }
-
-        .release-tag {
-            font-size: 0.82rem;
-            font-weight: 900;
-            color: var(--text);
-            min-width: 110px;
-            flex-shrink: 0;
-        }
-
-        .release-latest-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.60rem;
-            font-weight: 800;
-            color: var(--accent);
-            background: rgba(255, 102, 0, 0.1);
-            border: 1px solid rgba(255, 102, 0, 0.25);
-            border-radius: 20px;
-            padding: 2px 8px;
-            margin-left: 6px;
-            letter-spacing: 0.05em;
-            vertical-align: middle;
-        }
-
-        .release-latest-badge.linux-badge {
-            color: #f39c12;
-            background: rgba(243, 156, 18, 0.1);
-            border-color: rgba(243, 156, 18, 0.25);
-        }
-
-        .release-date {
-            font-size: 0.69rem;
-            color: var(--text-mute);
-            flex-shrink: 0;
-            min-width: 90px;
-        }
-
-        .release-dl-count {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.69rem;
-            color: var(--text-mute);
-            flex: 1;
-        }
-
-        .release-dl-count i { color: var(--accent); font-size: 0.65rem; }
-        .release-dl-count.linux-count i { color: #f39c12; }
-
-        .release-dl-count .dl-num {
-            font-weight: 700;
-            color: var(--text);
-        }
-
-        .release-dl-btn {
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 6px 14px;
-            border-radius: 7px;
-            border: none;
-            background: rgba(255, 102, 0, 0.12);
-            color: var(--accent);
-            font-size: 0.70rem;
-            font-weight: 800;
-            cursor: pointer;
-            transition: 0.2s;
-            text-decoration: none;
-            font-family: 'Segoe UI', sans-serif;
-            letter-spacing: 0.04em;
-            box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.25);
-        }
-
-        .release-dl-btn.linux-btn {
-            background: rgba(243, 156, 18, 0.1);
-            color: #f39c12;
-            box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.25);
-        }
-
-        .release-dl-btn:hover {
-            background: rgba(255, 102, 0, 0.22);
-            box-shadow: inset 0 0 0 1px rgba(255, 102, 0, 0.45);
-        }
-
-        .release-dl-btn.linux-btn:hover {
-            background: rgba(243, 156, 18, 0.2);
-            box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.45);
-        }
-
-        .release-dl-btn i { font-size: 0.68rem; }
-
-        .release-no-asset {
-            font-size: 0.68rem;
-            color: rgba(148, 163, 184, 0.4);
-            font-style: italic;
-            padding: 6px 14px;
-        }
-
-        /* upcoming-header reused for section dividers */
-        .upcoming-header {
-            font-size: 0.68rem;
-            font-weight: 900;
-            letter-spacing: 0.13em;
-            color: var(--text-mute);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 18px 0 10px;
-        }
-
-        .upcoming-header::before,
-        .upcoming-header::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #1e2430;
-        }
-
-        .upcoming-header i { color: #f39c12; }
-
-        @media (max-width: 900px) {
-            .release-row { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
-            .release-tag { min-width: unset; font-size: 0.78rem; }
-            .release-date { min-width: unset; }
-            .release-dl-count { flex: none; width: 100%; }
-            .release-dl-btn { width: 100%; justify-content: center; }
-        }
-
-        /* ══════════════════════════════════════════════════════════════════
-           MOBILE STYLES
-        ══════════════════════════════════════════════════════════════════ */
-        @media (max-width: 900px) {
-
-            .container { padding: 0 14px; }
-            .logo { width: 150px; margin: 8px 0 4px; }
-
-            .top-layout {
-                grid-template-columns: 1fr;
-                gap: 12px;
-                margin-bottom: 12px;
-            }
-
-            .middle-col    { order: 1; }
-            .wip-box       { order: 2; }
-            .changelog-box { order: 3; max-height: none; }
-
-            .display-wrapper { border-radius: 8px; }
-
-            .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 7px; }
-            .gallery-videos { grid-template-columns: repeat(2, 1fr); }
-
-            .nav-card img { height: 60px; }
-            .nav-card span { font-size: 9px; bottom: 5px; }
-
-            .download-row { flex-direction: column; gap: 10px; align-items: stretch; }
-            .dl-btn { flex: none; width: 100%; padding: 14px 12px; font-size: 1rem; border-radius: 10px; }
-            .ver-tag { font-size: 14px; }
-            .count-tag { font-size: 12px; }
-
-            .features-grid { grid-template-columns: 1fr 1fr; }
-            .steps-grid    { grid-template-columns: 1fr 1fr; }
-            .steps-grid-4  { grid-template-columns: 1fr 1fr; }
-
-            .install-tabs { flex-wrap: nowrap; overflow-x: auto; }
-            .install-tab  { flex: 0 0 auto; font-size: 0.68rem; padding: 7px 10px; }
-
-            .footer        { font-size: 0.75rem; margin-top: 16px; padding-bottom: 24px; }
-            .wip-box       { font-size: 0.78rem; }
-            .changelog-box { font-size: 0.78rem; }
-
-            .os-toggle { flex-wrap: wrap; }
-        }
-
-        @media (max-width: 380px) {
-            .container { padding: 0 10px; }
-            .logo { width: 130px; }
-            .dl-btn { font-size: 0.9rem; }
-            .steps-grid    { grid-template-columns: 1fr; }
-            .steps-grid-4  { grid-template-columns: 1fr; }
-            .features-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeamSkin Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,700&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #07090f;
+  --bg-1:      #0c1019;
+  --bg-2:      #111624;
+  --bg-3:      #161d2e;
+  --accent:    #ff6600;
+  --accent-lo: rgba(255,102,0,.08);
+  --accent-md: rgba(255,102,0,.18);
+  --accent-hi: rgba(255,102,0,.55);
+  --amber:     #f59e0b;
+  --amber-lo:  rgba(245,158,11,.08);
+  --amber-md:  rgba(245,158,11,.2);
+  --text:      #eef2ff;
+  --text-2:    #8899bb;
+  --text-3:    #4a5878;
+  --border:    rgba(255,255,255,.06);
+  --border-2:  rgba(255,255,255,.1);
+  --font-head: 'Barlow Condensed', sans-serif;
+  --font-body: 'Barlow', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(255,102,0,.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══════ NAVBAR ═══════ */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(7,9,15,.88);
+  border-bottom: 1px solid var(--border);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 0;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.nav-logo { height: 28px; filter: drop-shadow(0 0 8px rgba(255,102,0,.5)); }
+
+.nav-wordmark {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 1.18rem;
+  letter-spacing: .1em;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.nav-wordmark span { color: var(--accent); }
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 32px;
+  flex: 1;
+}
+
+.nav-tab {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .78rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color .2s, background .2s;
+  position: relative;
+}
+
+.nav-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 50%; right: 50%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  transition: left .25s, right .25s;
+}
+
+.nav-tab:hover { color: var(--text); background: var(--bg-2); }
+.nav-tab.active { color: var(--accent); }
+.nav-tab.active::after { left: 12px; right: 12px; }
+
+.nav-socials {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.soc-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-decoration: none;
+  font-family: var(--font-head);
+  text-transform: uppercase;
+  transition: border-color .2s, color .2s, background .2s, box-shadow .2s;
+}
+
+.soc-btn i { font-size: .8rem; }
+.soc-btn:hover { color: var(--text); border-color: var(--border-2); background: var(--bg-3); }
+.soc-btn.discord:hover { color: #7289da; border-color: rgba(114,137,218,.35); box-shadow: 0 0 12px rgba(114,137,218,.12); }
+.soc-btn.patreon:hover { color: #f96854; border-color: rgba(249,104,84,.35); box-shadow: 0 0 12px rgba(249,104,84,.12); }
+.soc-btn.linktree:hover { color: #39e09b; border-color: rgba(57,224,155,.35); box-shadow: 0 0 12px rgba(57,224,155,.12); }
+
+/* ═══════ WIP BANNER ═══════ */
+.wip-banner {
+  background: rgba(245,158,11,.05);
+  border-bottom: 1px solid rgba(245,158,11,.15);
+  padding: 9px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: .79rem;
+  color: var(--text-2);
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.wip-icon { color: var(--amber); flex-shrink: 0; margin-top: 2px; }
+
+.wip-content { flex: 1; min-width: 200px; }
+.wip-content strong { color: var(--amber); }
+
+.wip-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.wip-pill {
+  font-size: .67rem;
+  font-weight: 700;
+  font-family: var(--font-head);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 30px;
+  border: 1px solid rgba(245,158,11,.22);
+  background: rgba(245,158,11,.05);
+  color: var(--amber);
+}
+
+.wip-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  font-size: .74rem;
+}
+
+.wip-links a {
+  color: var(--amber);
+  text-decoration: none;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: opacity .2s;
+}
+
+.wip-links a:hover { opacity: .7; }
+
+.wip-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: .8rem;
+  padding: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: color .2s;
+}
+.wip-dismiss:hover { color: var(--text-2); }
+
+/* ═══════ LAYOUT ═══════ */
+.page-wrap {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ═══════ TAB PANELS ═══════ */
+.tab-panel { display: none; padding: 36px 0 60px; }
+.tab-panel.active { display: block; }
+
+/* ═══════ HOME HERO ═══════ */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: 44px;
+  align-items: start;
+  padding-bottom: 44px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-md);
+  background: var(--accent-lo);
+  padding: 4px 12px;
+  border-radius: 30px;
+  margin-bottom: 18px;
+}
+
+.hero-badge .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 2s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,102,0,.5); }
+  50% { opacity: .7; box-shadow: 0 0 0 5px rgba(255,102,0,0); }
+}
+
+.hero-title {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 4.6rem;
+  line-height: .93;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.hero-title .ac { color: var(--accent); }
+.hero-title .dim { color: var(--text-2); font-weight: 600; font-size: 3rem; }
+
+.hero-sub {
+  font-size: .98rem;
+  color: var(--text-2);
+  line-height: 1.7;
+  margin-bottom: 30px;
+  max-width: 420px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.dl-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 13px 22px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-head);
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  transition: transform .2s, filter .2s;
+  min-width: 175px;
+}
+
+.dl-btn:hover { transform: translateY(-2px); filter: brightness(1.12); }
+.dl-btn:active { transform: none; }
+
+.dl-btn-win {
+  background: var(--accent);
+  color: #000;
+  box-shadow: 0 0 28px rgba(255,102,0,.32), 0 4px 18px rgba(255,102,0,.22);
+}
+
+.dl-btn-linux {
+  background: var(--amber);
+  color: #000;
+  box-shadow: 0 0 28px rgba(245,158,11,.28), 0 4px 18px rgba(245,158,11,.18);
+}
+
+.btn-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .86rem;
+  color: #000;
+}
+
+.btn-ver {
+  font-size: .7rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  opacity: .8;
+  letter-spacing: .02em;
+  text-transform: none;
+  margin-top: 2px;
+  color: #000;
+}
+
+.btn-count {
+  font-size: .65rem;
+  font-weight: 400;
+  font-family: var(--font-body);
+  opacity: .7;
+  text-transform: none;
+  color: #000;
+}
+
+/* Stats */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 10px;
+}
+
+.stat-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 15px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  transition: border-color .2s;
+}
+
+.stat-card:hover { border-color: var(--accent-md); }
+
+.stat-icon {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent);
+  font-size: .82rem;
+  flex-shrink: 0;
+}
+
+.stat-icon.amb { background: var(--amber-lo); border-color: var(--amber-md); color: var(--amber); }
+
+.stat-label {
+  font-size: .64rem;
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 1px;
+}
+
+.stat-value {
+  font-size: 1.18rem;
+  font-weight: 700;
+  font-family: var(--font-head);
+  color: var(--text);
+}
+
+/* Viewer */
+.viewer-frame {
+  border-radius: 12px;
+  border: 1px solid var(--border-2);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16/9;
+  position: relative;
+  box-shadow: 0 0 40px rgba(255,102,0,.1), 0 20px 60px rgba(0,0,0,.5);
+  margin-bottom: 10px;
+}
+
+#vVideo { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
+#vImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
+
+.gallery-label {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .66rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gallery-label i { color: var(--accent); }
+
+.g-row { display: grid; gap: 7px; margin-bottom: 10px; }
+.g-row-3 { grid-template-columns: repeat(3,1fr); }
+.g-row-4 { grid-template-columns: repeat(4,1fr); }
+
+.g-card {
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+  aspect-ratio: 16/9;
+  background: var(--bg-1);
+}
+
+.g-card img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: .4;
+  transition: opacity .25s;
+  display: block;
+}
+
+.g-card .g-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.85), transparent);
+  padding: 8px 6px 5px;
+  font-family: var(--font-head);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+}
+
+.g-card:hover { border-color: var(--accent-hi); transform: scale(1.02); }
+.g-card:hover img, .g-card.active img { opacity: 1; }
+.g-card.active { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-hi); }
+
+.gh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .74rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color .2s;
+  margin-top: 6px;
+}
+.gh-link:hover { color: var(--accent); }
+
+/* ═══════ SECTION DIVIDER ═══════ */
+.sec-div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 40px 0 22px;
+}
+
+.sec-div-line { flex: 1; height: 1px; background: var(--border); }
+
+.sec-div-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .7rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sec-div-title i { color: var(--accent); }
+
+/* ═══════ QUICK FEATURES ═══════ */
+.qf-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+
+.qf-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  transition: border-color .2s, transform .2s;
+}
+
+.qf-card:hover { border-color: var(--accent-md); transform: translateY(-2px); }
+
+.qf-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent);
+  font-size: .78rem;
+  flex-shrink: 0;
+}
+
+.qf-title {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  color: var(--text);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.qf-desc { font-size: .74rem; color: var(--text-2); line-height: 1.6; }
+
+/* ═══════ COMMUNITY CARDS ═══════ */
+.community-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+
+.comm-card {
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  text-decoration: none;
+  transition: transform .2s, border-color .2s;
+  border: 1px solid transparent;
+}
+
+.comm-card:hover { transform: translateY(-3px); }
+
+.comm-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  flex-shrink: 0;
+}
+
+.comm-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .92rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.comm-desc { font-size: .78rem; color: var(--text-2); line-height: 1.6; }
+
+.comm-discord { background: rgba(114,137,218,.07); border-color: rgba(114,137,218,.2); }
+.comm-discord:hover { border-color: rgba(114,137,218,.45); }
+.comm-discord .comm-icon { background: rgba(114,137,218,.12); color: #7289da; }
+.comm-discord .comm-title { color: #7289da; }
+
+.comm-patreon { background: rgba(249,104,84,.05); border-color: rgba(249,104,84,.18); }
+.comm-patreon:hover { border-color: rgba(249,104,84,.42); }
+.comm-patreon .comm-icon { background: rgba(249,104,84,.1); color: #f96854; }
+.comm-patreon .comm-title { color: #f96854; }
+
+.comm-linktree { background: rgba(57,224,155,.04); border-color: rgba(57,224,155,.15); }
+.comm-linktree:hover { border-color: rgba(57,224,155,.38); }
+.comm-linktree .comm-icon { background: rgba(57,224,155,.08); color: #39e09b; }
+.comm-linktree .comm-title { color: #39e09b; }
+
+/* ═══════ FEATURES TAB ═══════ */
+.tab-heading {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 3.2rem;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.tab-heading span { color: var(--accent); }
+.tab-sub { color: var(--text-2); font-size: .9rem; margin-bottom: 28px; }
+
+.feat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+
+.feat-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s, transform .25s;
+}
+
+.feat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(to right, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.feat-card:hover { border-color: var(--accent-md); transform: translateY(-3px); }
+.feat-card:hover::before { opacity: 1; }
+
+.feat-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.feat-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent);
+  font-size: .88rem;
+  flex-shrink: 0;
+}
+
+.feat-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .9rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-top: 5px;
+}
+
+.feat-desc { font-size: .78rem; color: var(--text-2); line-height: 1.65; }
+
+/* Upcoming */
+.upc-hdr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 40px 0 18px;
+}
+
+.upc-hdr-line { flex: 1; height: 1px; background: rgba(245,158,11,.15); }
+
+.upc-hdr-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .7rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--amber);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.upc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+
+.upc-card {
+  background: var(--amber-lo);
+  border: 1px solid var(--amber-md);
+  border-radius: 12px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s, border-color .2s;
+}
+
+.upc-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(to right, var(--amber), transparent);
+}
+
+.upc-card:hover { transform: translateY(-2px); border-color: rgba(245,158,11,.38); }
+
+.upc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-head);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(245,158,11,.1);
+  border: 1px solid rgba(245,158,11,.22);
+  border-radius: 20px;
+  padding: 2px 9px;
+  margin-bottom: 11px;
+}
+
+.upc-icon {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: rgba(245,158,11,.08);
+  border: 1px solid rgba(245,158,11,.2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--amber);
+  font-size: .8rem;
+  margin-bottom: 10px;
+}
+
+.upc-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .88rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.upc-desc { font-size: .76rem; color: var(--text-2); line-height: 1.65; }
+
+/* ═══════ INSTALL TAB ═══════ */
+.sub-tabs {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 22px;
+  width: fit-content;
+}
+
+.sub-tab {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .74rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 8px 18px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: color .2s, background .2s;
+}
+
+.sub-tab i { font-size: .78rem; }
+.sub-tab:hover { color: var(--text); background: var(--bg-2); }
+.sub-tab.active { background: var(--accent-lo); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-md); }
+
+.sub-panel { display: none; }
+.sub-panel.active { display: block; }
+
+.os-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.os-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  color: var(--text-2);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .73rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.os-btn:hover { color: var(--text); border-color: var(--border-2); }
+.os-btn.win-on { background: var(--accent-lo); color: var(--accent); border-color: var(--accent-md); }
+.os-btn.lin-on { background: var(--amber-lo); color: var(--amber); border-color: var(--amber-md); }
+
+.os-sect { display: none; }
+.os-sect.active { display: block; }
+
+.lin-warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--amber-lo);
+  border: 1px solid var(--amber-md);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: .79rem;
+  color: var(--text-2);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+
+.lin-warn strong { color: var(--amber); }
+.lin-warn a { color: var(--amber); font-weight: 700; text-decoration: none; }
+
+.steps-grid { display: grid; gap: 10px; }
+.sg5 { grid-template-columns: repeat(5,1fr); }
+.sg4 { grid-template-columns: repeat(4,1fr); }
+.sg3 { grid-template-columns: repeat(3,1fr); }
+
+.step-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 15px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.step-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.step-card.lin::before { background: var(--amber); }
+.step-card:hover::before { opacity: 1; }
+.step-card:hover { border-color: rgba(255,102,0,.2); }
+.step-card.lin:hover { border-color: rgba(245,158,11,.2); }
+
+.step-num {
+  font-family: var(--font-head);
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: rgba(255,102,0,.1);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.step-num.l { color: rgba(245,158,11,.12); }
+
+.step-icon {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent);
+  font-size: .76rem;
+  margin-bottom: 9px;
+}
+
+.step-icon.l {
+  background: var(--amber-lo);
+  border-color: var(--amber-md);
+  color: var(--amber);
+}
+
+.step-label {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .8rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.step-desc { font-size: .74rem; color: var(--text-2); line-height: 1.65; }
+
+.step-desc code {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.step-desc code.l {
+  background: var(--amber-lo);
+  border-color: var(--amber-md);
+  color: var(--amber);
+}
+
+.step-tip {
+  margin-top: 7px;
+  font-size: .69rem;
+  color: var(--text-3);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.opt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-head);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  border-radius: 20px;
+  padding: 1px 8px;
+  margin-bottom: 8px;
+}
+
+.pkgs-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+
+.lin-info {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--amber-lo);
+  border: 1px solid var(--amber-md);
+  border-left: 3px solid var(--amber);
+  border-radius: 9px;
+  font-size: .77rem;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.lin-info strong { color: var(--amber); }
+.lin-info code {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  background: var(--amber-lo);
+  border: 1px solid var(--amber-md);
+  color: var(--amber);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* Troubleshooting */
+.trouble-list { display: flex; flex-direction: column; gap: 6px; }
+
+.trouble-item {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.trouble-item.open { border-color: var(--border-2); }
+
+.trouble-q {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: background .15s;
+  user-select: none;
+}
+
+.trouble-q:hover { background: rgba(255,255,255,.02); }
+
+.tq-icon {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .72rem;
+  flex-shrink: 0;
+}
+
+.tq-warn { background: rgba(245,158,11,.1); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
+.tq-err  { background: rgba(220,50,50,.08); color: #e05555; border: 1px solid rgba(220,50,50,.2); }
+.tq-info { background: rgba(100,180,255,.07); color: #6ab4ff; border: 1px solid rgba(100,180,255,.18); }
+
+.tq-chev {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: .65rem;
+  transition: transform .25s;
+}
+
+.trouble-item.open .tq-chev { transform: rotate(180deg); }
+
+.trouble-ans {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .3s ease;
+}
+
+.trouble-item.open .trouble-ans { max-height: 500px; }
+
+.ta-inner {
+  padding: 0 16px 14px 56px;
+  font-size: .78rem;
+  color: var(--text-2);
+  line-height: 1.75;
+}
+
+.ta-inner strong { color: var(--text); }
+.ta-inner code {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.ta-inner a { color: var(--accent); font-weight: 700; text-decoration: none; }
+
+/* ═══════ RELEASES TAB ═══════ */
+.release-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+
+.release-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.release-row.lin-row::before { background: var(--amber); }
+.release-row:hover::before { opacity: 1; }
+.release-row:hover { border-color: rgba(255,102,0,.2); }
+.release-row.is-latest { border-color: var(--accent-md); }
+.release-row.is-latest.lin-row { border-color: var(--amber-md); }
+
+.rel-tag {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: .93rem;
+  color: var(--text);
+  min-width: 120px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rel-latest-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .57rem;
+  font-weight: 800;
+  font-family: var(--font-head);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+.rel-latest-badge.lin { color: var(--amber); background: var(--amber-lo); border-color: var(--amber-md); }
+
+.rel-date { font-size: .74rem; color: var(--text-3); min-width: 100px; flex-shrink: 0; }
+
+.rel-dl {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .78rem;
+  color: var(--text-2);
+}
+
+.rel-dl i { color: var(--accent); font-size: .68rem; }
+.rel-dl.lin i { color: var(--amber); }
+.rel-dl .dl-n { font-weight: 700; color: var(--text); }
+
+.rel-dl-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-lo);
+  color: var(--accent);
+  font-family: var(--font-head);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .2s;
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px var(--accent-md);
+}
+
+.rel-dl-btn:hover { background: rgba(255,102,0,.2); }
+.rel-dl-btn.lin { background: var(--amber-lo); color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-md); }
+.rel-dl-btn.lin:hover { background: rgba(245,158,11,.2); }
+
+.rel-no-asset { font-size: .72rem; color: var(--text-3); font-style: italic; padding: 7px 16px; }
+.rel-loading { text-align: center; padding: 32px; color: var(--text-3); font-size: .85rem; }
+
+/* ═══════ CHANGELOG TAB ═══════ */
+.cl-wrap { max-width: 740px; }
+
+.cl-top {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.cl-ver {
+  font-family: var(--font-mono);
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-md);
+  padding: 3px 12px;
+  border-radius: 20px;
+}
+
+.cl-date-label {
+  font-family: var(--font-head);
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.cl-body {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+
+.cl-title-el {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 14px 0 4px;
+}
+
+.cl-title-el:first-child { margin-top: 0; }
+
+.cl-sub {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 9px 0 3px;
+}
+
+.cl-item-el {
+  font-size: .81rem;
+  color: var(--text-2);
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.65;
+  margin: 2px 0;
+}
+
+.cl-item-el::before { content: '·'; position: absolute; left: 4px; color: var(--accent); }
+
+.cl-note-el { font-size: .77rem; color: var(--text-3); font-style: italic; margin: 5px 0; }
+.cl-sep { border: none; border-top: 1px solid var(--border); margin: 13px 0; }
+.cl-loading { color: var(--text-3); font-size: .84rem; padding: 14px 0; }
+
+/* ═══════ FOOTER ═══════ */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  max-width: 1380px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-logo { height: 22px; opacity: .55; }
+
+.footer-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .86rem;
+  letter-spacing: .1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+.footer-socials { display: flex; align-items: center; gap: 7px; }
+
+.footer-soc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  text-decoration: none;
+  font-size: .7rem;
+  font-weight: 700;
+  font-family: var(--font-head);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  transition: all .2s;
+}
+
+.footer-soc:hover { color: var(--text); border-color: var(--border-2); }
+.footer-soc.discord:hover { color: #7289da; }
+.footer-soc.patreon:hover { color: #f96854; }
+.footer-soc.linktree:hover { color: #39e09b; }
+
+.footer-credit { font-size: .74rem; color: var(--text-3); }
+.footer-credit a { color: var(--accent); text-decoration: none; font-weight: 700; }
+
+/* tag */
+.tag-wip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-head);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: var(--amber-lo);
+  border: 1px solid var(--amber-md);
+  border-radius: 20px;
+  padding: 1px 8px;
+}
+
+/* ═══════ MOBILE ═══════ */
+.mobile-tab-bar { display: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.fa-spin { animation: spin 1s linear infinite; }
+
+@media (max-width: 1100px) {
+  .qf-grid { grid-template-columns: repeat(2,1fr); }
+  .feat-grid { grid-template-columns: repeat(2,1fr); }
+  .sg5 { grid-template-columns: repeat(3,1fr); }
+  .pkgs-grid { grid-template-columns: repeat(2,1fr); }
+  .upc-grid { grid-template-columns: repeat(2,1fr); }
+}
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; gap: 28px; }
+  .hero-title { font-size: 3.4rem; }
+  .stats-row { grid-template-columns: repeat(3,1fr); }
+  .nav-tabs { display: none; }
+  .mobile-tab-bar {
+    display: flex;
+    overflow-x: auto;
+    gap: 2px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    position: sticky;
+    top: 56px;
+    z-index: 800;
+  }
+
+  .mobile-tab {
+    flex-shrink: 0;
+    font-family: var(--font-head);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .2s, background .2s;
+  }
+
+  .mobile-tab.active { color: var(--accent); background: var(--accent-lo); }
+  .soc-btn span { display: none; }
+  .soc-btn { padding: 6px 9px; }
+}
+
+@media (max-width: 680px) {
+  .page-wrap { padding: 0 14px; }
+  .hero-title { font-size: 2.8rem; }
+  .hero-actions { flex-direction: column; }
+  .dl-btn { width: 100%; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .sg5, .sg4, .sg3 { grid-template-columns: repeat(2,1fr); }
+  .pkgs-grid { grid-template-columns: 1fr; }
+  .qf-grid { grid-template-columns: 1fr; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .upc-grid { grid-template-columns: 1fr; }
+  .community-grid { grid-template-columns: 1fr; }
+  .g-row-3 { grid-template-columns: repeat(2,1fr); }
+  .g-row-4 { grid-template-columns: repeat(2,1fr); }
+  .release-row { flex-wrap: wrap; gap: 8px; }
+  .rel-tag { min-width: unset; }
+}
+</style>
 </head>
 <body>
 
-<div class="container">
-    <img src="beamSkin_studio_logo.png" alt="BeamSkin Studio" class="logo">
-
-    <div class="top-layout">
-
-        <!-- LEFT: WIP Warning -->
-        <div class="wip-box">
-            <div class="wip-header">
-                <i class="fas fa-triangle-exclamation"></i> WORK IN PROGRESS
-            </div>
-            BeamSkin Studio is <strong>usable but still in active development.</strong><br>- crashes are rare, but bugs are possible.<br><br>
-            <strong>Known limitations:</strong><br>
-            • <strong>Game updates</strong> may rename textures, breaking some skins until patched.<br>
-            • <strong>Mod support</strong> is present but limited — not all mods work.<br>
-            • Some features are still <strong>missing or incomplete</strong>.<br>
-            • <strong>Linux version</strong> is completely untested — may not work.<br>
-            <div class="wip-links">
-                Report issues on GitHub:<br>
-                <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank">
-                    <i class="fab fa-github"></i> Windows Issues
-                </a>
-                &nbsp;·&nbsp;
-                <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">
-                    <i class="fab fa-github"></i> Linux Issues
-                </a>
-            </div>
-        </div>
-
-        <!-- MIDDLE: Viewer + Gallery + Downloads -->
-        <div class="middle-col">
-            <div id="displayBox" class="display-wrapper">
-                <div id="videoContainer" class="display-content active-content">
-                    <div class="aspect-ratio">
-                        <iframe src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
-                    </div>
-                </div>
-                <img id="imageDisplay" class="display-content" src="" alt="Screenshot">
-            </div>
-
-            <div class="gallery-section-label"><i class="fab fa-youtube"></i> VIDEOS</div>
-            <div class="gallery-grid gallery-videos">
-                <div class="nav-card" onclick="showVideo('b9bhjc8zTok')">
-                    <img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg">
-                    <span>VIDEO 2</span>
-                </div>
-                <div class="nav-card" onclick="showVideo('N1M8Tsnlodw')">
-                    <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg">
-                    <span>PREVIEW VIDEO</span>
-                </div>
-                <div class="nav-card" onclick="showVideo('Ik4mn3TPTeQ')">
-                    <img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg">
-                    <span>VIDEO 3</span>
-                </div>
-            </div>
-
-            <div class="gallery-section-label"><i class="fas fa-images"></i> SCREENSHOTS</div>
-            <div class="gallery-grid gallery-images">
-                <div class="nav-card" onclick="showImage('image1.png')"><img src="image1.png"><span>UI PREVIEW</span></div>
-                <div class="nav-card" onclick="showImage('image2.png')"><img src="image2.png"><span>USER GUIDE</span></div>
-                <div class="nav-card" onclick="showImage('image3.png')"><img src="image3.png"><span>CAR DATABASE</span></div>
-                <div class="nav-card" onclick="showImage('image4.png')"><img src="image4.png"><span>MOD TOOLS</span></div>
-                <div class="nav-card" onclick="showImage('image5.png')"><img src="image5.png"><span>APP SETTINGS</span></div>
-                <div class="nav-card" onclick="showImage('image6.png')"><img src="image6.png"><span>VERSION INFO</span></div>
-            </div>
-
-            <!-- Download Buttons -->
-            <div class="download-row">
-                <button id="winBtn" class="dl-btn btn-win">
-                    <span><i class="fab fa-windows"></i> WINDOWS DOWNLOAD</span>
-                    <span id="winVer" class="ver-tag">Checking...</span>
-                    <span id="win-count" class="count-tag"><i class="fas fa-download"></i> Loading...</span>
-                </button>
-                <button id="linBtn" class="dl-btn btn-linux">
-                    <span><i class="fab fa-linux"></i> LINUX DOWNLOAD</span>
-                    <span id="linVer" class="ver-tag">Checking...</span>
-                    <span id="lin-count" class="count-tag"><i class="fas fa-download"></i> Loading...</span>
-                </button>
-            </div>
-
-            <div style="font-size: 0.8rem; color: var(--text-mute); text-align: center;">
-                <i class="fas fa-download" style="color: var(--accent); font-size: 0.7rem;"></i>
-                All-time downloads: <span id="grand-total" style="color: var(--text); font-weight: 600;">Loading...</span>
-            </div>
-
-            <div style="font-size: 0.8rem; color: var(--text-mute); text-align: center;">
-                <i class="fab fa-github" style="color: var(--accent); font-size: 0.7rem;"></i>
-                <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 600;">View all repositories on GitHub</a>
-            </div>
-        </div>
-
-        <!-- RIGHT: Changelog -->
-        <div id="changelogBox" class="changelog-box">
-            <div class="cl-header">
-                <span class="cl-version">📋 Latest Changelog</span>
-                <span id="clDate" class="cl-date">Loading...</span>
-            </div>
-            <div id="clEntries">Loading changelog...</div>
-        </div>
-
-    </div>
-
-    <!-- ════════════════════════════════════════════════════════════════════
-         FEATURES SECTION
-    ════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block">
-
-        <div class="section-header" onclick="toggleSection('featuresBody', 'featuresChevron')">
-            <div class="section-header-line left"></div>
-            <div class="section-title">
-                <i class="fas fa-star icon"></i>
-                FEATURES
-                <i class="fas fa-chevron-up section-chevron open" id="featuresChevron"></i>
-            </div>
-            <div class="section-header-line"></div>
-        </div>
-
-        <div class="section-body" id="featuresBody">
-            <div class="features-grid">
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-rotate"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Automatic Update Checking</div>
-                        <div class="feature-desc">On every startup BeamSkin Studio checks GitHub for a newer version and notifies you if one is available.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-palette"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Colorable Skins</div>
-                        <div class="feature-desc">When enabled, the user selects a base color PNG and a color palette map — BeamSkin Studio takes care of the rest.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-file-pen"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Material File Editing</div>
-                        <div class="feature-desc">Lets the user adjust material values such as metallic, clearcoat, and other surface properties through a simple interface.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-sliders"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Saved Configurations</div>
-                        <div class="feature-desc">Users can bundle a saved in-game vehicle configuration — all the tuning and setup they've done to a car — into their mod, optionally with a preview image.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-language"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Multiple Languages</div>
-                        <div class="feature-desc">The interface supports multiple languages — switch at any time from the settings panel without restarting.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-floppy-disk"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Save / Load Projects</div>
-                        <div class="feature-desc">Saving a project now remembers its location automatically. Loading opens a built-in menu listing all your saved projects in one place — no more navigating through File Explorer to track down a save file.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-sun"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Reflective Map Support</div>
-                        <div class="feature-desc">Add a reflectivity map to your skin, making specific areas reflective — perfect for police car decals, chrome accents, and other shiny surfaces.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-truck-moving"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Body Variant Support</div>
-                        <div class="feature-desc">Create skins for vehicle body variants including bus, cargo, box truck, and ambulance configurations.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-desktop"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">PySide6 Interface</div>
-                        <div class="feature-desc">The UI runs on PySide6 — a modern Qt-based framework using your GPU for rendering, giving a smoother and more stable experience.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-folder-open"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Unpacked Mod Export</div>
-                        <div class="feature-desc">Export your mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly without extracting it first.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-puzzle-piece"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Auto Add Mods</div>
-                        <div class="feature-desc">BeamSkin Studio can now add your mods and find the correct files automatically — no more hunting through mod folders for the right files yourself.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-folder-tree"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Smart Config Browsing</div>
-                        <div class="feature-desc">When browsing for <code style="background:rgba(255,102,0,0.1);border:1px solid rgba(255,102,0,0.2);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:0.65rem;">.pc</code> and <code style="background:rgba(255,102,0,0.1);border:1px solid rgba(255,102,0,0.2);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:0.65rem;">.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <!-- ════════════════════════════════════════════════════════════════════
-         INSTALLATION GUIDE SECTION
-    ════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block">
-
-        <div class="section-header" onclick="toggleSection('installBody', 'installChevron')">
-            <div class="section-header-line left"></div>
-            <div class="section-title">
-                <i class="fas fa-book-open icon"></i>
-                INSTALLATION GUIDE
-                <i class="fas fa-chevron-up section-chevron open" id="installChevron"></i>
-            </div>
-            <div class="section-header-line"></div>
-        </div>
-
-        <div class="section-body" id="installBody">
-
-            <!-- Tab strip -->
-            <div class="install-tabs">
-                <button class="install-tab active" onclick="switchTab('install', this)">
-                    <i class="fas fa-download"></i> Installation
-                </button>
-                <button class="install-tab" onclick="switchTab('manual', this)">
-                    <i class="fas fa-terminal"></i> Manual Install
-                </button>
-                <button class="install-tab" onclick="switchTab('trouble', this)">
-                    <i class="fas fa-wrench"></i> Troubleshooting
-                </button>
-            </div>
-
-            <div class="install-panels">
-
-                <!-- ══════════════════════════════════════════════════════
-                     Installation panel — Windows + Linux with OS toggle
-                ══════════════════════════════════════════════════════ -->
-                <div class="install-panel active" id="panel-install">
-
-                    <!-- OS toggle -->
-                    <div class="os-toggle">
-                        <button class="os-btn active-win" id="osWinBtn" onclick="switchOS('windows')">
-                            <i class="fab fa-windows"></i> WINDOWS
-                        </button>
-                        <button class="os-btn" id="osLinBtn" onclick="switchOS('linux')">
-                            <i class="fab fa-linux"></i> LINUX
-                        </button>
-                    </div>
-
-                    <!-- ── Windows steps ── -->
-                    <div class="os-steps-section active" id="os-windows">
-                        <div class="steps-grid">
-
-                            <div class="step-card">
-                                <div class="step-num">01</div>
-                                <div class="step-icon"><i class="fas fa-download"></i></div>
-                                <div class="step-label">Download</div>
-                                <div class="step-desc">Click the <strong>Windows Download</strong> button above to grab the latest release ZIP from GitHub.</div>
-                            </div>
-
-                            <div class="step-card">
-                                <div class="step-num">02</div>
-                                <div class="step-icon"><i class="fas fa-file-zipper"></i></div>
-                                <div class="step-label">Extract ZIP</div>
-                                <div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder you want BeamSkin Studio to live in.</div>
-                                <div class="step-tip">💡 Avoid paths with spaces or special characters (e.g. <code>C:\Tools\BeamSkin</code> works great).</div>
-                            </div>
-
-                            <div class="step-card">
-                                <div class="step-num">03</div>
-                                <div class="step-icon"><i class="fas fa-terminal"></i></div>
-                                <div class="step-label">Run Install.bat</div>
-                                <div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It should automatically install all required dependencies.</div>
-                                <div class="step-tip">⚠️ If Windows SmartScreen appears, click <strong>More info → Run anyway</strong>. This is a false positive common with Python apps.</div>
-                            </div>
-
-                            <div class="step-card">
-                                <div class="step-num">04</div>
-                                <div class="step-icon"><i class="fas fa-circle-check"></i></div>
-                                <div class="step-label">First Launch</div>
-                                <div class="step-desc">Once installation finishes, BeamSkin Studio will launch automatically for the first time.</div>
-                            </div>
-
-                            <div class="step-card">
-                                <div class="step-num">05</div>
-                                <div class="step-icon"><i class="fas fa-rocket"></i></div>
-                                <div class="step-label">Future Launches</div>
-                                <div class="step-desc">Use <code>BeamSkin Studio.bat</code> to start the app from now on — it skips the installer for a faster startup.</div>
-                                <div class="step-tip">💡 You can create a shortcut to this .bat file on your desktop for quick access.</div>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <!-- ── Linux steps ── -->
-                    <div class="os-steps-section" id="os-linux">
-
-                        <div class="linux-note">
-                            <strong><i class="fab fa-linux"></i> Linux — heads up:</strong>
-                            The Linux version is <strong>untested</strong> and may have issues. If you run into a problem, please report it on the
-                            <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:#f39c12;font-weight:700;">Linux GitHub Issues</a> page.
-                            The installer script supports <strong>Ubuntu / Debian, Fedora / RHEL, Arch / Manjaro, and openSUSE</strong>.
-                        </div>
-
-                        <div class="steps-grid-4">
-
-                            <div class="step-card linux-card">
-                                <div class="step-num linux-num">01</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-download"></i></div>
-                                <div class="step-label">Download</div>
-                                <div class="step-desc">Click the <strong>Linux Download</strong> button above to grab the latest release ZIP from GitHub.</div>
-                            </div>
-
-                            <div class="step-card linux-card">
-                                <div class="step-num linux-num">02</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-file-zipper"></i></div>
-                                <div class="step-label">Extract ZIP</div>
-                                <div class="step-desc">Right-click and extract with your file manager, or run in a terminal:<br><br>
-                                    <code class="linux-code">unzip BeamSkin-Studio-Linux-*.zip</code>
-                                </div>
-                                <div class="step-tip">💡 Avoid paths with spaces. A location like <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">~/Tools/BeamSkin</code> works well.</div>
-                            </div>
-
-                            <div class="step-card linux-card">
-                                <div class="step-num linux-num">03</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-terminal"></i></div>
-                                <div class="step-label">Run the Installer</div>
-                                <div class="step-desc">Open a terminal inside the extracted folder and run:<br><br>
-                                    <code class="linux-code">chmod +x install_linux.sh</code><br>
-                                    <code class="linux-code">./install_linux.sh</code><br><br>
-                                    The script automatically installs Python 3, pip, tkinter, and all required Python packages for your distro.
-                                </div>
-                                <div class="step-tip">⚠️ You may be prompted for your <strong>sudo password</strong> to install system packages — this is expected.</div>
-                            </div>
-
-                            <div class="step-card linux-card">
-                                <div class="step-num linux-num">04</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-circle-check"></i></div>
-                                <div class="step-label">First Launch</div>
-                                <div class="step-desc">Once the installer finishes it will ask if you want to launch BeamSkin Studio immediately. Type <strong>y</strong> and press Enter, or launch it yourself anytime with:<br><br>
-                                    <code class="linux-code">./beamskin_studio.sh</code>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <!-- Optional: desktop shortcut row -->
-                        <div class="upcoming-header" style="margin-top: 16px;">
-                            <i class="fas fa-desktop"></i> OPTIONAL — DESKTOP SHORTCUT
-                        </div>
-
-                        <div class="steps-grid-4" style="grid-template-columns: repeat(3, 1fr);">
-
-                            <div class="step-card linux-card">
-                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-file-code"></i></div>
-                                <div class="step-label">Edit the .desktop File</div>
-                                <div class="step-desc">Open <code class="linux-code">beamskin-studio.desktop</code> in a text editor. Replace the two <code class="linux-code">/path/to/BeamSkin-Studio</code> placeholders with the <strong>actual path</strong> to your extracted folder.</div>
-                                <div class="step-tip">💡 Run <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">pwd</code> inside the folder to see the full path.</div>
-                            </div>
-
-                            <div class="step-card linux-card">
-                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-copy"></i></div>
-                                <div class="step-label">Install the Shortcut</div>
-                                <div class="step-desc">Copy the file to your local applications folder so it appears in your app launcher:<br><br>
-                                    <code class="linux-code">cp beamskin-studio.desktop ~/.local/share/applications/</code>
-                                </div>
-                            </div>
-
-                            <div class="step-card linux-card">
-                                <div class="optional-badge"><i class="fas fa-star-half-stroke"></i> Optional</div>
-                                <div class="step-icon linux-icon"><i class="fas fa-rocket"></i></div>
-                                <div class="step-label">Future Launches</div>
-                                <div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your application launcher, or always use the terminal launcher:<br><br>
-                                    <code class="linux-code">./beamskin_studio.sh</code>
-                                </div>
-                                <div class="step-tip">💡 You can also create a symbolic link on your desktop pointing to <code style="color:#f39c12;background:rgba(243,156,18,0.08);border-color:rgba(243,156,18,0.2);">beamskin_studio.sh</code>.</div>
-                            </div>
-
-                        </div>
-                    </div><!-- /os-linux -->
-
-                </div><!-- /panel-install -->
-
-                <!-- ── Manual Install ── -->
-                <div class="install-panel" id="panel-manual">
-                    <div class="steps-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 14px;">
-
-                        <div class="step-card">
-                            <div class="step-num">01</div>
-                            <div class="step-icon"><i class="fab fa-python"></i></div>
-                            <div class="step-label">Install Python</div>
-                            <div class="step-desc">Download and install <strong>Python 3.9 or newer</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:700;">python.org</a>.</div>
-                            <div class="step-tip">⚠️ On the installer screen, check <strong>"Add Python to PATH"</strong> before clicking Install Now — this is required.</div>
-                        </div>
-
-                        <div class="step-card">
-                            <div class="step-num">02</div>
-                            <div class="step-icon"><i class="fas fa-terminal"></i></div>
-                            <div class="step-label">Open a Terminal</div>
-                            <div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong>. On Linux, open your terminal emulator. Navigate to the BeamSkin Studio folder with <code>cd</code>.</div>
-                            <div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar while inside the folder to open a prompt there.</div>
-                        </div>
-
-                        <div class="step-card">
-                            <div class="step-num">03</div>
-                            <div class="step-icon"><i class="fas fa-box"></i></div>
-                            <div class="step-label">Install Dependencies</div>
-                            <div class="step-desc">Run the following command to install all required packages at once:<br><br><code>pip install -r requirements.txt</code></div>
-                            <div class="step-tip">💡 If <code>pip</code> isn't recognised, try <code>python -m pip install -r requirements.txt</code> instead.</div>
-                        </div>
-
-                    </div>
-
-                    <!-- Package breakdown -->
-                    <div class="upcoming-header" style="margin-top:4px;">
-                        <i class="fas fa-cube"></i> WHAT GETS INSTALLED
-                    </div>
-                    <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:8px;">
-
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-window-maximize"></i></div>
-                            <div class="feature-text">
-                                <div class="feature-label">PySide6 <span style="font-weight:400;color:var(--text-mute);">≥ 6.5.0</span></div>
-                                <div class="feature-desc">The Qt-based GUI framework powering the entire interface. Replaces CustomTkinter as of v0.8.0.</div>
-                            </div>
-                        </div>
-
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-image"></i></div>
-                            <div class="feature-text">
-                                <div class="feature-label">Pillow <span style="font-weight:400;color:var(--text-mute);">≥ 10.0.0</span></div>
-                                <div class="feature-desc">Image processing library used for skin texture manipulation and colorable skin generation.</div>
-                            </div>
-                        </div>
-
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-globe"></i></div>
-                            <div class="feature-text">
-                                <div class="feature-label">requests <span style="font-weight:400;color:var(--text-mute);">≥ 2.31.0</span></div>
-                                <div class="feature-desc">HTTP library used for the update checker and online tab features.</div>
-                            </div>
-                        </div>
-
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fab fa-windows"></i></div>
-                            <div class="feature-text">
-                                <div class="feature-label">pywin32 <span style="font-weight:400;color:var(--text-mute);">≥ 306</span></div>
-                                <div class="feature-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped automatically on Linux.</div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <!-- Linux note -->
-                    <div style="margin-top:12px; padding:11px 14px; background:rgba(243,156,18,0.05); border:1px solid rgba(243,156,18,0.2); border-left:3px solid #f39c12; border-radius:8px; font-size:0.72rem; color:var(--text-mute); line-height:1.7;">
-                        <span style="color:#f39c12; font-weight:800;"><i class="fab fa-linux"></i> Linux note —</span>
-                        PySide6 bundles its own Qt libraries so no system Qt packages are needed. You may still need <code>libGL</code> for rendering:
-                        <code>sudo apt install libgl1</code> (Debian/Ubuntu) &nbsp;·&nbsp;
-                        <code>sudo dnf install mesa-libGL</code> (Fedora) &nbsp;·&nbsp;
-                        <code>sudo pacman -S mesa</code> (Arch)
-                    </div>
-                </div>
-
-                <!-- ── Troubleshooting ── -->
-                <div class="install-panel" id="panel-trouble">
-                    <div class="trouble-list">
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon warn"><i class="fas fa-shield-halved"></i></div>
-                                Antivirus / Windows Defender warnings
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and other antivirus software may flag the app — this is a <strong>false positive</strong> common with Python applications and does not indicate malware.<br><br>
-                                    • On SmartScreen: click <strong>More info → Run anyway</strong>.<br>
-                                    • In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon err"><i class="fas fa-circle-xmark"></i></div>
-                                ModuleNotFoundError on launch
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    A missing module means the installation didn't complete correctly.<br><br>
-                                    • <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish without interruption. Make sure you're launching via <code>BeamSkin Studio.bat</code>, not <code>main.py</code> directly.<br>
-                                    • <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for any errors. You can also install the missing package manually with <code>pip install --user &lt;package-name&gt;</code>.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon warn"><i class="fab fa-linux"></i></div>
-                                Linux: tkinter not found / GUI fails to open
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    tkinter is not always bundled with Python on Linux and must be installed separately via your package manager:<br><br>
-                                    • <strong>Ubuntu / Debian / Mint:</strong> <code>sudo apt install python3-tk</code><br>
-                                    • <strong>Fedora / RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>
-                                    • <strong>Arch / Manjaro:</strong> <code>sudo pacman -S tk</code><br>
-                                    • <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code><br><br>
-                                    The installer script handles this automatically, but if you skipped it, install tkinter manually using the command above.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon warn"><i class="fab fa-linux"></i></div>
-                                Linux: permission denied when running scripts
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    The shell scripts need execute permission before they can be run. Fix this with:<br><br>
-                                    <code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>
-                                    Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon err"><i class="fas fa-rotate-left"></i></div>
-                                Everything keeps failing — fresh start
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    If repeated fixes don't help, do a clean reinstall:<br><br>
-                                    1. <strong>Delete</strong> the downloaded ZIP <em>and</em> the extracted folder entirely.<br>
-                                    2. Re-download a fresh copy from the button above.<br>
-                                    3. Extract to a new location and run the installer again (<code>Install.bat</code> on Windows, <code>./install_linux.sh</code> on Linux).
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="trouble-item" onclick="toggleTrouble(this)">
-                            <div class="trouble-q">
-                                <div class="trouble-q-icon bug"><i class="fab fa-github"></i></div>
-                                Other errors or bugs
-                                <i class="fas fa-chevron-down trouble-q-chevron"></i>
-                            </div>
-                            <div class="trouble-a">
-                                <div class="trouble-a-inner">
-                                    If you hit an issue that isn't covered here, please submit a report on GitHub so it can be investigated:<br><br>
-                                    • <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:700;"><i class="fab fa-github"></i> Windows Issues</a>
-                                    &nbsp;·&nbsp;
-                                    <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:#f39c12;text-decoration:none;font-weight:700;"><i class="fab fa-github"></i> Linux Issues</a><br><br>
-                                    Include any error messages or console output — it makes fixing things much faster.
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-            </div><!-- /install-panels -->
-        </div><!-- /section-body -->
-    </div><!-- /section-block -->
-
-    <!-- ════════════════════════════════════════════════════════════════════
-         ALL RELEASES SECTION
-    ════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block">
-
-        <div class="section-header" onclick="toggleSection('releasesBody', 'releasesChevron')">
-            <div class="section-header-line left"></div>
-            <div class="section-title">
-                <i class="fas fa-tag icon"></i>
-                ALL RELEASES
-                <i class="fas fa-chevron-up section-chevron open" id="releasesChevron"></i>
-            </div>
-            <div class="section-header-line"></div>
-        </div>
-
-        <div class="section-body" id="releasesBody">
-
-            <div class="os-toggle" style="margin-bottom: 16px;">
-                <button class="os-btn active-win" id="relWinBtn" onclick="switchReleaseOS('windows')">
-                    <i class="fab fa-windows"></i> WINDOWS
-                </button>
-                <button class="os-btn" id="relLinBtn" onclick="switchReleaseOS('linux')">
-                    <i class="fab fa-linux"></i> LINUX
-                </button>
-            </div>
-
-            <div class="rel-os-panel active" id="rel-windows">
-                <div class="release-list" id="releaseList-windows">
-                    <div class="release-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases...</div>
-                </div>
-            </div>
-
-            <div class="rel-os-panel" id="rel-linux">
-                <div class="release-list" id="releaseList-linux">
-                    <div class="release-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases...</div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <div class="footer">
-        Project made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a>
-    </div>
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="nav-brand" href="#">
+    <img src="beamSkin_studio_logo.png" alt="" class="nav-logo">
+    <span class="nav-wordmark">BeamSkin <span>Studio</span></span>
+  </a>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('home',this)">Home</button>
+    <button class="nav-tab" onclick="switchTab('features',this)">Features</button>
+    <button class="nav-tab" onclick="switchTab('install',this)">Install</button>
+    <button class="nav-tab" onclick="switchTab('releases',this)">Releases</button>
+    <button class="nav-tab" onclick="switchTab('changelog',this)">Changelog</button>
+  </div>
+
+  <div class="nav-socials">
+    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord">
+      <i class="fab fa-discord"></i><span>Discord</span>
+    </a>
+    <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon">
+      <i class="fab fa-patreon"></i><span>Patreon</span>
+    </a>
+    <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree">
+      <i class="fas fa-seedling"></i><span>Linktree</span>
+    </a>
+    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="soc-btn">
+      <i class="fab fa-github"></i><span>GitHub</span>
+    </a>
+  </div>
+</nav>
+
+<!-- Mobile tab bar -->
+<div class="mobile-tab-bar">
+  <button class="mobile-tab active" onclick="switchTab('home',this,true)">Home</button>
+  <button class="mobile-tab" onclick="switchTab('features',this,true)">Features</button>
+  <button class="mobile-tab" onclick="switchTab('install',this,true)">Install</button>
+  <button class="mobile-tab" onclick="switchTab('releases',this,true)">Releases</button>
+  <button class="mobile-tab" onclick="switchTab('changelog',this,true)">Changelog</button>
 </div>
 
+<!-- WIP Banner -->
+<div class="wip-banner" id="wipBanner">
+  <i class="fas fa-triangle-exclamation wip-icon"></i>
+  <div class="wip-content">
+    <strong>Work in Progress —</strong> BeamSkin Studio is usable but actively developed. Known limitations:
+    <div class="wip-pills">
+      <span class="wip-pill">Rare crashes possible</span>
+      <span class="wip-pill">Game updates may break textures</span>
+      <span class="wip-pill">No vehicle variant support yet</span>
+      <span class="wip-pill">Limited mod support</span>
+      <span class="wip-pill">Linux build untested</span>
+    </div>
+  </div>
+  <div class="wip-links">
+    <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a>
+    <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank"><i class="fab fa-github"></i> Linux Issues</a>
+  </div>
+  <button class="wip-dismiss" onclick="document.getElementById('wipBanner').style.display='none'"><i class="fas fa-xmark"></i></button>
+</div>
+
+<!-- MAIN -->
+<div class="page-wrap">
+
+  <!-- ── HOME ── -->
+  <div class="tab-panel active" id="panel-home">
+
+    <div class="hero">
+      <!-- Left -->
+      <div>
+        <div class="hero-badge"><span class="dot"></span> Skin modding tool for BeamNG.drive</div>
+
+        <h1 class="hero-title">
+          CRAFT<br>
+          <span class="ac">YOUR</span><br>
+          BEAMNG<br>
+          <span class="dim">SKINS</span>
+        </h1>
+
+        <p class="hero-sub">A desktop application that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</p>
+
+        <div class="hero-actions">
+          <button class="dl-btn dl-btn-win" id="winBtn">
+            <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
+            <span id="winVer" class="btn-ver">Checking…</span>
+            <span id="winCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+          </button>
+          <button class="dl-btn dl-btn-linux" id="linBtn">
+            <span class="btn-label"><i class="fab fa-linux"></i> Linux Download</span>
+            <span id="linVer" class="btn-ver">Checking…</span>
+            <span id="linCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+          </button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-download"></i></div>
+            <div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal">—</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fab fa-windows"></i></div>
+            <div><div class="stat-label">Windows</div><div class="stat-value" id="statWin">—</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon amb"><i class="fab fa-linux"></i></div>
+            <div><div class="stat-label">Linux</div><div class="stat-value" id="statLin">—</div></div>
+          </div>
+        </div>
+
+        <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="gh-link">
+          <i class="fab fa-github"></i> View all repositories on GitHub
+        </a>
+      </div>
+
+      <!-- Right: Media Viewer -->
+      <div>
+        <div class="viewer-frame">
+          <iframe id="vVideo" src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
+          <img id="vImg" src="" alt="Screenshot">
+        </div>
+
+        <div class="gallery-label"><i class="fab fa-youtube"></i> Videos</div>
+        <div class="g-row g-row-3" style="margin-bottom:10px;">
+          <div class="g-card active" onclick="showVideo('b9bhjc8zTok',this)">
+            <img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg" alt="">
+            <span class="g-label">Video 2</span>
+          </div>
+          <div class="g-card" onclick="showVideo('N1M8Tsnlodw',this)">
+            <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg" alt="">
+            <span class="g-label">Preview</span>
+          </div>
+          <div class="g-card" onclick="showVideo('Ik4mn3TPTeQ',this)">
+            <img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg" alt="">
+            <span class="g-label">Video 3</span>
+          </div>
+        </div>
+
+        <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
+        <div class="g-row g-row-4">
+          <div class="g-card" onclick="showImage('image1.png',this)"><img src="image1.png" alt=""><span class="g-label">UI Preview</span></div>
+          <div class="g-card" onclick="showImage('image2.png',this)"><img src="image2.png" alt=""><span class="g-label">User Guide</span></div>
+          <div class="g-card" onclick="showImage('image3.png',this)"><img src="image3.png" alt=""><span class="g-label">Car Database</span></div>
+          <div class="g-card" onclick="showImage('image4.png',this)"><img src="image4.png" alt=""><span class="g-label">Mod Tools</span></div>
+          <div class="g-card" onclick="showImage('image5.png',this)"><img src="image5.png" alt=""><span class="g-label">App Settings</span></div>
+          <div class="g-card" onclick="showImage('image6.png',this)"><img src="image6.png" alt=""><span class="g-label">Version Info</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Features -->
+    <div class="sec-div">
+      <div class="sec-div-line"></div>
+      <div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div>
+      <div class="sec-div-line"></div>
+    </div>
+
+    <div class="qf-grid">
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on every startup and notifies you instantly.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-palette"></i></div><div><div class="qf-title">Colorable Skins</div><div class="qf-desc">Select a base color PNG and palette map — BeamSkin handles the blending automatically.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-file-pen"></i></div><div><div class="qf-title">Material Editing</div><div class="qf-desc">Adjust metallic, clearcoat, and surface properties through a clean interface.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-language"></i></div><div><div class="qf-title">Multi-Language</div><div class="qf-desc">Switch UI language at any time from the settings — no restart required.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-puzzle-piece"></i></div><div><div class="qf-title">Mod Support</div><div class="qf-desc">Skin custom vehicles from supported mods — coverage expanding with each release.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-sliders"></i></div><div><div class="qf-title">Saved Configurations</div><div class="qf-desc">Bundle an in-game vehicle configuration into your mod, with optional preview image.</div></div></div>
+      <div class="qf-card"><div class="qf-icon"><i class="fas fa-floppy-disk"></i></div><div><div class="qf-title">Save / Load Projects</div><div class="qf-desc">Save your skin setup as a project file and reload it exactly where you left off.</div></div></div>
+      <div class="qf-card" style="cursor:pointer;" onclick="switchTab('features',document.querySelectorAll('.nav-tab')[1])">
+        <div class="qf-icon"><i class="fas fa-arrow-right"></i></div>
+        <div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming in v0.8.0 Beta.</div></div>
+      </div>
+    </div>
+
+    <!-- Community -->
+    <div class="sec-div">
+      <div class="sec-div-line"></div>
+      <div class="sec-div-title"><i class="fas fa-users"></i> Community</div>
+      <div class="sec-div-line"></div>
+    </div>
+
+    <div class="community-grid">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord">
+        <div class="comm-icon"><i class="fab fa-discord"></i></div>
+        <div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div>
+      </a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon">
+        <div class="comm-icon"><i class="fab fa-patreon"></i></div>
+        <div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of BeamSkin Studio and get early access to new builds.</div></div>
+      </a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree">
+        <div class="comm-icon"><i class="fas fa-seedling"></i></div>
+        <div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div>
+      </a>
+    </div>
+
+  </div><!-- /home -->
+
+  <!-- ── FEATURES ── -->
+  <div class="tab-panel" id="panel-features">
+    <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
+    <p class="tab-sub">Everything available in the current release of BeamSkin Studio.</p>
+
+    <div class="feat-grid">
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup BeamSkin Studio checks GitHub for a newer version and notifies you if one is available.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Mod Support</div></div><div class="feat-desc">Basic mod support is included, allowing custom vehicle skins from supported mods — coverage is still expanding.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-palette"></i></div><div class="feat-title">Colorable Skins</div></div><div class="feat-desc">When enabled, select a base color PNG and a color palette map — BeamSkin Studio takes care of the rest automatically.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-file-pen"></i></div><div class="feat-title">Material File Editing</div></div><div class="feat-desc">Adjust material values such as metallic, clearcoat, and other surface properties through a simple interface.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sliders"></i></div><div class="feat-title">Saved Configurations</div></div><div class="feat-desc">Bundle a saved in-game vehicle configuration into your mod, optionally with a preview image.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-language"></i></div><div class="feat-title">Multiple Languages</div></div><div class="feat-desc">The interface supports multiple languages — switch at any time from the settings panel without restarting.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-floppy-disk"></i></div><div class="feat-title">Save / Load Projects</div></div><div class="feat-desc">Save your current skin setup as a project file and reload it later to pick up exactly where you left off.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-desktop"></i></div><div class="feat-title">PySide6 Interface</div></div><div class="feat-desc">Built on Qt via PySide6, providing a modern, responsive interface with better cross-platform compatibility.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-linux"></i></div><div class="feat-title">Linux Support</div></div><div class="feat-desc">A Linux build is available alongside the Windows version. <span class="tag-wip"><i class="fas fa-flask"></i> Untested</span></div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sun"></i></div><div class="feat-title">Reflective Map Support</div></div><div class="feat-desc">Add a reflectivity map to your skin, making specific areas reflective — perfect for police car decals, chrome accents, and other shiny surfaces.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-truck-moving"></i></div><div class="feat-title">Body Variant Support</div></div><div class="feat-desc">Create skins for vehicle body variants including bus, cargo, box truck, and ambulance configurations.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-open"></i></div><div class="feat-title">Unpacked Mod Export</div></div><div class="feat-desc">Export your mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly without extracting it first.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Auto Add Mods</div></div><div class="feat-desc">BeamSkin Studio can automatically add your mods and find the correct files — no more manually hunting through mod folders for the right files.</div></div>
+      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-tree"></i></div><div class="feat-title">Smart Config Browsing</div></div><div class="feat-desc">When browsing for <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.pc</code> and <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div></div>
+    </div>
+
+    <div class="upc-hdr">
+      <div class="upc-hdr-line"></div>
+      <div class="upc-hdr-title"><i class="fas fa-hourglass-half"></i> Coming in V.0.8.0.Beta</div>
+      <div class="upc-hdr-line"></div>
+    </div>
+
+    <div class="upc-grid">
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-sun"></i></div><div class="upc-title">Reflective Map Support</div><div class="upc-desc">Add a reflectivity map to your skin — useful for police car decals or chrome accents.</div></div>
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-truck-moving"></i></div><div class="upc-title">Body Variant Support</div><div class="upc-desc">Skinning support for cargo, box truck, and ambulance body variants.</div></div>
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-folder-open"></i></div><div class="upc-title">Unpacked Mod Toggle</div><div class="upc-desc">Export the mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly.</div></div>
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-puzzle-piece"></i></div><div class="upc-title">Auto Mod Import</div><div class="upc-desc">Point BeamSkin at a mod and it automatically scans and extracts everything needed — vehicle JSON, JBeam files, and default preview — then adds the vehicle ready to skin.</div></div>
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-floppy-disk"></i></div><div class="upc-title">Improved Save / Load</div><div class="upc-desc">Saving remembers its location automatically. Loading opens a built-in menu listing all saved projects — no more navigating File Explorer to find a save file.</div></div>
+      <div class="upc-card"><div class="upc-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div><div class="upc-icon"><i class="fas fa-desktop"></i></div><div class="upc-title">PySide6 Migration</div><div class="upc-desc">The full UI migration from CustomTkinter to PySide6 is finalised in this version, enabling a more modern and flexible interface throughout.</div></div>
+    </div>
+  </div><!-- /features -->
+
+  <!-- ── INSTALL ── -->
+  <div class="tab-panel" id="panel-install">
+    <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
+    <p class="tab-sub">Get BeamSkin Studio running in minutes on Windows or Linux.</p>
+
+    <div class="sub-tabs">
+      <button class="sub-tab active" onclick="switchSub('inst',this)"><i class="fas fa-download"></i> Installation</button>
+      <button class="sub-tab" onclick="switchSub('manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
+      <button class="sub-tab" onclick="switchSub('trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
+    </div>
+
+    <!-- Installation -->
+    <div class="sub-panel active" id="sub-inst">
+      <div class="os-toggle">
+        <button class="os-btn win-on" id="instW" onclick="switchInstOS('windows')"><i class="fab fa-windows"></i> Windows</button>
+        <button class="os-btn" id="instL" onclick="switchInstOS('linux')"><i class="fab fa-linux"></i> Linux</button>
+      </div>
+
+      <div class="os-sect active" id="inst-windows">
+        <div class="steps-grid sg5">
+          <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Windows Download</strong> button on the Home tab to grab the latest release ZIP from GitHub.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder.</div><div class="step-tip">💡 Avoid paths with spaces — <code>C:\Tools\BeamSkin</code> works great.</div></div>
+          <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Run Install.bat</div><div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It installs all required dependencies automatically.</div><div class="step-tip">⚠️ If SmartScreen appears, click <strong>More info → Run anyway</strong>. False positive — common with Python apps.</div></div>
+          <div class="step-card"><div class="step-num">04</div><div class="step-icon"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">Once installation finishes, BeamSkin Studio launches automatically for the first time.</div></div>
+          <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Use <code>BeamSkin Studio.bat</code> from now on — it skips the installer for a faster startup.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
+        </div>
+      </div>
+
+      <div class="os-sect" id="inst-linux">
+        <div class="lin-warn">
+          <i class="fab fa-linux" style="color:var(--amber);font-size:.9rem;margin-top:2px;flex-shrink:0;"></i>
+          <div><strong>Linux — heads up:</strong> The Linux version is <strong>untested</strong> and may have issues. Report them on the <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">Linux GitHub Issues</a> page. Supports <strong>Ubuntu/Debian, Fedora/RHEL, Arch/Manjaro, and openSUSE</strong>.</div>
+        </div>
+        <div class="steps-grid sg4">
+          <div class="step-card lin"><div class="step-num l">01</div><div class="step-icon l"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Linux Download</strong> button on the Home tab.</div></div>
+          <div class="step-card lin"><div class="step-num l">02</div><div class="step-icon l"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Use your file manager or:<br><br><code class="l">unzip BeamSkin-Studio-Linux-*.zip</code></div></div>
+          <div class="step-card lin"><div class="step-num l">03</div><div class="step-icon l"><i class="fas fa-terminal"></i></div><div class="step-label">Run Installer</div><div class="step-desc">Open a terminal in the extracted folder:<br><br><code class="l">chmod +x install_linux.sh</code><br><code class="l">./install_linux.sh</code><br><br>Installs Python 3, pip, tkinter, and all required packages.</div><div class="step-tip">⚠️ May prompt for your <strong>sudo password</strong> — this is expected.</div></div>
+          <div class="step-card lin"><div class="step-num l">04</div><div class="step-icon l"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">The installer will ask to launch immediately. Type <strong>y</strong> and Enter, or run anytime with:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+        </div>
+
+        <div class="upc-hdr" style="margin-top:24px;">
+          <div class="upc-hdr-line"></div>
+          <div class="upc-hdr-title"><i class="fas fa-desktop"></i> Optional — Desktop Shortcut</div>
+          <div class="upc-hdr-line"></div>
+        </div>
+
+        <div class="steps-grid sg3">
+          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-file-code"></i></div><div class="step-label">Edit .desktop File</div><div class="step-desc">Open <code class="l">beamskin-studio.desktop</code> in a text editor. Replace both <code class="l">/path/to/BeamSkin-Studio</code> placeholders with your actual path.</div><div class="step-tip">💡 Run <code style="color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);font-family:var(--font-mono);font-size:.68rem;padding:1px 5px;border-radius:4px;">pwd</code> inside the folder to see it.</div></div>
+          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-copy"></i></div><div class="step-label">Install Shortcut</div><div class="step-desc">Copy it so it appears in your app launcher:<br><br><code class="l">cp beamskin-studio.desktop ~/.local/share/applications/</code></div></div>
+          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your launcher, or use:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+        </div>
+      </div>
+    </div><!-- /sub-inst -->
+
+    <!-- Manual -->
+    <div class="sub-panel" id="sub-manual">
+      <div class="steps-grid sg3" style="margin-bottom:24px;">
+        <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
+        <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong> (Linux: your terminal). Navigate to the BeamSkin Studio folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
+        <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
+      </div>
+
+      <div class="upc-hdr">
+        <div class="upc-hdr-line"></div>
+        <div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div>
+        <div class="upc-hdr-line"></div>
+      </div>
+
+      <div class="pkgs-grid">
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 6.5.0</span></div></div></div><div class="feat-desc">Qt-based GUI framework powering the entire interface.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div><div class="feat-title">Pillow <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 10.0.0</span></div></div></div><div class="feat-desc">Image processing library for skin texture manipulation and colorable skin generation.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 2.31.0</span></div></div></div><div class="feat-desc">HTTP library for the update checker and online features.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-windows"></i></div><div><div class="feat-title">pywin32 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 306</span></div></div></div><div class="feat-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped on Linux.</div></div>
+      </div>
+
+      <div class="lin-info">
+        <strong><i class="fab fa-linux"></i> Linux note —</strong>
+        PySide6 bundles its own Qt libraries so no system Qt is needed. You may need <code>libGL</code> for rendering:
+        &nbsp;<code>sudo apt install libgl1</code> (Debian/Ubuntu)
+        &nbsp;·&nbsp;<code>sudo dnf install mesa-libGL</code> (Fedora)
+        &nbsp;·&nbsp;<code>sudo pacman -S mesa</code> (Arch)
+      </div>
+    </div><!-- /sub-manual -->
+
+    <!-- Troubleshooting -->
+    <div class="sub-panel" id="sub-trouble">
+      <div class="trouble-list">
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and third-party antivirus may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.</div></div>
+        </div>
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly.<br><br>• <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish. Launch via <code>BeamSkin Studio.bat</code>, not <code>main.py</code>.<br>• <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for errors. Or install manually: <code>pip install --user &lt;package-name&gt;</code>.</div></div>
+        </div>
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: tkinter not found / GUI fails to open<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">tkinter must be installed separately on Linux:<br><br>• <strong>Ubuntu/Debian:</strong> <code>sudo apt install python3-tk</code><br>• <strong>Fedora/RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>• <strong>Arch/Manjaro:</strong> <code>sudo pacman -S tk</code><br>• <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code></div></div>
+        </div>
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: permission denied when running scripts<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">The shell scripts need execute permission before they can run:<br><br><code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.</div></div>
+        </div>
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div>
+        </div>
+
+        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div>
+        </div>
+
+      </div>
+    </div><!-- /sub-trouble -->
+
+  </div><!-- /install -->
+
+  <!-- ── RELEASES ── -->
+  <div class="tab-panel" id="panel-releases">
+    <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
+    <p class="tab-sub">Complete release history for Windows and Linux builds.</p>
+
+    <div class="os-toggle" style="margin-bottom:20px;">
+      <button class="os-btn win-on" id="relW" onclick="switchRelOS('windows')"><i class="fab fa-windows"></i> Windows</button>
+      <button class="os-btn" id="relL" onclick="switchRelOS('linux')"><i class="fab fa-linux"></i> Linux</button>
+    </div>
+
+    <div class="os-sect active" id="rel-windows">
+      <div id="rlw"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
+    </div>
+    <div class="os-sect" id="rel-linux">
+      <div id="rll"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
+    </div>
+  </div><!-- /releases -->
+
+  <!-- ── CHANGELOG ── -->
+  <div class="tab-panel" id="panel-changelog">
+    <div class="cl-wrap">
+      <div class="cl-top">
+        <h2 class="tab-heading">CHANGE<span>LOG</span></h2>
+        <span id="clVer" class="cl-ver">Loading…</span>
+        <span id="clDate" class="cl-date-label"></span>
+      </div>
+      <div class="cl-body" id="clBody">
+        <div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div>
+      </div>
+    </div>
+  </div><!-- /changelog -->
+
+</div><!-- /page-wrap -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-brand">
+    <img src="beamSkin_studio_logo.png" alt="" class="footer-logo">
+    <span class="footer-name">BeamSkin Studio</span>
+  </div>
+  <div class="footer-socials">
+    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+    <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+    <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
+  </div>
+  <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
+</footer>
+
 <script>
-    /* ── GitHub release data ── */
-    const winRepo   = "BeamSkin-Studio/BeamSkin-Studio-Beta";
-    const linuxRepo = "BeamSkin-Studio/BeamSkin-Studio-Linux-Beta";
+const WIN_REPO   = 'BeamSkin-Studio/BeamSkin-Studio-Beta';
+const LINUX_REPO = 'BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
+let winUrl   = `https://github.com/${WIN_REPO}/releases/latest`;
+let linuxUrl = `https://github.com/${LINUX_REPO}/releases/latest`;
 
-    let winUrl   = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/releases/latest";
-    let linuxUrl = "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/releases/latest";
+/* GitHub data */
+async function initData() {
+  try {
+    const [wR, lR] = await Promise.all([
+      fetch(`https://api.github.com/repos/${WIN_REPO}/releases`).then(r=>r.json()),
+      fetch(`https://api.github.com/repos/${LINUX_REPO}/releases`).then(r=>r.json())
+    ]);
 
-    async function getRepoData(repo, labelId) {
-        try {
-            const response = await fetch(`https://api.github.com/repos/${repo}/releases`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const releases = await response.json();
-            let totalDownloads = 0, latestDownloads = 0;
-            let latestAssetUrl = `https://github.com/${repo}/releases/latest`;
+    let wT=0,lT=0,wL=0,lL=0;
+    wR.forEach((r,i)=>r.assets.forEach(a=>{wT+=a.download_count;if(i===0)wL+=a.download_count;}));
+    lR.forEach((r,i)=>r.assets.forEach(a=>{lT+=a.download_count;if(i===0)lL+=a.download_count;}));
 
-            releases.forEach((release, index) => {
-                release.assets.forEach(asset => {
-                    totalDownloads += asset.download_count;
-                    if (index === 0) latestDownloads += asset.download_count;
-                });
-            });
-
-            if (releases.length > 0) {
-                const latest = releases[0];
-                document.getElementById(labelId).innerText = latest.tag_name;
-                if (latest.assets && latest.assets.length > 0) {
-                    latestAssetUrl = latest.assets[0].browser_download_url;
-                }
-            }
-            return { url: latestAssetUrl, latest: latestDownloads, total: totalDownloads };
-        } catch (err) {
-            console.error(`Error: ${err.message}`);
-            document.getElementById(labelId).innerText = "Latest Release";
-            return { url: `https://github.com/${repo}/releases/latest`, latest: 0, total: 0 };
-        }
+    if(wR.length){
+      document.getElementById('winVer').textContent=wR[0].tag_name;
+      if(wR[0].assets.length) winUrl=wR[0].assets[0].browser_download_url;
+    }
+    if(lR.length){
+      document.getElementById('linVer').textContent=lR[0].tag_name;
+      if(lR[0].assets.length) linuxUrl=lR[0].assets[0].browser_download_url;
     }
 
-    async function init() {
-        try {
-            const [winData, linuxData] = await Promise.all([
-                getRepoData(winRepo, 'winVer'),
-                getRepoData(linuxRepo, 'linVer')
-            ]);
-            winUrl   = winData.url;
-            linuxUrl = linuxData.url;
-            document.getElementById('win-count').innerHTML   = '<i class="fas fa-download"></i> ' + winData.latest.toLocaleString() + ' downloads (latest)';
-            document.getElementById('lin-count').innerHTML   = '<i class="fas fa-download"></i> ' + linuxData.latest.toLocaleString() + ' downloads (latest)';
-            document.getElementById('grand-total').innerText = (winData.total + linuxData.total).toLocaleString();
-        } catch (err) {
-            console.error('Init error:', err);
-            document.getElementById('win-count').innerHTML   = '<i class="fas fa-download"></i> Unavailable';
-            document.getElementById('lin-count').innerHTML   = '<i class="fas fa-download"></i> Unavailable';
-            document.getElementById('grand-total').innerText = 'Unavailable';
-        }
+    document.getElementById('winCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${wL.toLocaleString()} (latest)`;
+    document.getElementById('linCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${lL.toLocaleString()} (latest)`;
+    document.getElementById('statTotal').textContent=(wT+lT).toLocaleString();
+    document.getElementById('statWin').textContent=wT.toLocaleString();
+    document.getElementById('statLin').textContent=lT.toLocaleString();
+
+    buildRelList(wR,'rlw',false);
+    buildRelList(lR,'rll',true);
+  } catch(e) {
+    console.error(e);
+    ['winVer','linVer'].forEach(id=>document.getElementById(id).textContent='Unavailable');
+  }
+}
+
+function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+
+function buildRelList(rels,id,lin){
+  const c=document.getElementById(id);
+  if(!rels.length){c.innerHTML='<div class="rel-loading">No releases found.</div>';return;}
+  c.innerHTML='';
+  rels.forEach((r,i)=>{
+    const isL=i===0;
+    const dlC=r.assets.reduce((s,a)=>s+a.download_count,0);
+    const url=r.assets.length?r.assets[0].browser_download_url:null;
+    const row=document.createElement('div');
+    row.className='release-row'+(lin?' lin-row':'')+(isL?' is-latest':'');
+    const badge=isL?`<span class="rel-latest-badge ${lin?'lin':''}"><i class="fas fa-circle-check"></i> LATEST</span>`:'';
+    const btn=url
+      ?`<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>`
+      :`<span class="rel-no-asset">No asset</span>`;
+    row.innerHTML=`
+      <div class="rel-tag">${r.tag_name}${badge}</div>
+      <div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div>
+      <div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>
+      ${btn}
+    `;
+    c.appendChild(row);
+  });
+}
+
+/* Changelog */
+async function fetchChangelog(){
+  try{
+    const res=await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
+    if(!res.ok) throw new Error('fetch');
+    const text=await res.text();
+    const ls=text.indexOf('CHANGELOGS = [');
+    if(ls===-1) throw new Error('no list');
+    const cont=text.slice(ls);
+    let d=0,s=-1,e=-1;
+    for(let i=0;i<cont.length;i++){
+      if(cont[i]==='{'){if(d===0)s=i;d++;}
+      else if(cont[i]==='}'){d--;if(d===0){e=i;break;}}
     }
-
-    document.getElementById('winBtn').addEventListener('click', () => { window.location.href = winUrl; });
-    document.getElementById('linBtn').addEventListener('click', () => { window.location.href = linuxUrl; });
-
-    /* ── Media viewer ── */
-    const videoContainer = document.getElementById('videoContainer');
-    const imageDisplay   = document.getElementById('imageDisplay');
-
-    function showImage(src) {
-        videoContainer.style.display = 'none';
-        imageDisplay.src = src;
-        imageDisplay.style.display = 'block';
+    if(s===-1||e===-1) throw new Error('parse');
+    const blk=cont.slice(s,e+1);
+    const ver=(blk.match(/"version":\s*"([^"]+)"/))||[];
+    const dat=(blk.match(/"date":\s*"([^"]+)"/))||[];
+    document.getElementById('clVer').textContent=`v${ver[1]||'?'}`;
+    document.getElementById('clDate').textContent=dat[1]||'';
+    const entries=[];
+    const re=/(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
+    let m;
+    while((m=re.exec(blk))!==null) entries.push({type:m[1],text:m[2]||''});
+    const body=document.getElementById('clBody');
+    body.innerHTML='';
+    for(const en of entries){
+      if(en.type==='separator'){const hr=document.createElement('hr');hr.className='cl-sep';body.appendChild(hr);continue;}
+      const div=document.createElement('div');
+      if(en.type==='title'){div.className='cl-title-el';div.textContent=en.text;}
+      else if(en.type==='subtitle'){div.className='cl-sub';div.textContent=en.text;}
+      else if(en.type==='item'){div.className='cl-item-el';div.textContent=en.text;}
+      else if(en.type==='note'){div.className='cl-note-el';div.textContent='💡 '+en.text;}
+      body.appendChild(div);
     }
+  } catch(e){
+    console.error(e);
+    document.getElementById('clBody').innerHTML='<div class="cl-loading">Could not load changelog.</div>';
+    document.getElementById('clVer').textContent='';
+  }
+}
 
-    function showVideo(id) {
-        imageDisplay.style.display = 'none';
-        videoContainer.querySelector('iframe').src = `https://www.youtube.com/embed/${id}`;
-        videoContainer.style.display = 'block';
-    }
+/* Media */
+function clearG(){document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active'));}
+function showVideo(id,card){
+  document.getElementById('vVideo').src=`https://www.youtube.com/embed/${id}`;
+  document.getElementById('vVideo').style.display='block';
+  document.getElementById('vImg').style.display='none';
+  clearG(); if(card) card.classList.add('active');
+}
+function showImage(src,card){
+  document.getElementById('vImg').src=src;
+  document.getElementById('vVideo').style.display='none';
+  document.getElementById('vImg').style.display='block';
+  clearG(); if(card) card.classList.add('active');
+}
 
-    /* ── Changelog ── */
-    async function fetchChangelog() {
-        try {
-            const res = await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const text = await res.text();
+/* Navigation */
+const TABS=['home','features','install','releases','changelog'];
 
-            const listStart = text.indexOf('CHANGELOGS = [');
-            if (listStart === -1) throw new Error('No CHANGELOGS found');
+function switchTab(name,btn,isMobile){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const idx=TABS.indexOf(name);
 
-            const content = text.slice(listStart);
-            let depth = 0, start = -1, end = -1;
-            for (let i = 0; i < content.length; i++) {
-                if (content[i] === '{') { if (depth === 0) start = i; depth++; }
-                else if (content[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-            }
-            if (start === -1 || end === -1) throw new Error('Could not parse entry');
+  if(!isMobile){
+    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+    document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  } else {
+    document.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  }
+}
 
-            const block   = content.slice(start, end + 1);
-            const version = (block.match(/"version":\s*"([^"]+)"/) || [])[1] || '?';
-            const date    = (block.match(/"date":\s*"([^"]+)"/)    || [])[1] || '';
+function switchSub(name,btn){
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sub-'+name).classList.add('active');
+}
 
-            const entries = [];
-            const re = /(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
-            let m;
-            while ((m = re.exec(block)) !== null) {
-                entries.push({ type: m[1], text: m[2] || '' });
-            }
+function switchInstOS(os){
+  document.querySelectorAll('#sub-inst .os-sect').forEach(s=>s.classList.remove('active'));
+  document.getElementById('inst-'+os).classList.add('active');
+  document.getElementById('instW').className='os-btn'+(os==='windows'?' win-on':'');
+  document.getElementById('instL').className='os-btn'+(os==='linux'?' lin-on':'');
+}
 
-            document.getElementById('clDate').textContent = `v${version}  •  ${date}`;
+function switchRelOS(os){
+  document.querySelectorAll('#panel-releases .os-sect').forEach(s=>s.classList.remove('active'));
+  document.getElementById('rel-'+os).classList.add('active');
+  document.getElementById('relW').className='os-btn'+(os==='windows'?' win-on':'');
+  document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');
+}
 
-            const container = document.getElementById('clEntries');
-            container.innerHTML = '';
-            for (const entry of entries) {
-                if (entry.type === 'separator') {
-                    const hr = document.createElement('hr');
-                    hr.className = 'cl-separator';
-                    container.appendChild(hr);
-                    continue;
-                }
-                const el = document.createElement('div');
-                if      (entry.type === 'title')    { el.className = 'cl-title';    el.textContent = entry.text; }
-                else if (entry.type === 'subtitle') { el.className = 'cl-subtitle'; el.textContent = entry.text; }
-                else if (entry.type === 'item')     { el.className = 'cl-item';     el.textContent = entry.text; }
-                else if (entry.type === 'note')     { el.className = 'cl-note';     el.textContent = '💡 ' + entry.text; }
-                container.appendChild(el);
-            }
-        } catch (err) {
-            console.error('Changelog error:', err);
-            document.getElementById('clEntries').textContent = 'Could not load changelog.';
-            document.getElementById('clDate').textContent    = '';
-        }
-    }
+function toggleT(item){item.classList.toggle('open');}
 
-    /* ── Collapsible sections ── */
-    function toggleSection(bodyId, chevronId) {
-        document.getElementById(bodyId).classList.toggle('collapsed');
-        document.getElementById(chevronId).classList.toggle('open');
-    }
+document.getElementById('winBtn').onclick=()=>window.location.href=winUrl;
+document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
 
-    /* ── Install guide: main tab switch ── */
-    function switchTab(name, btn) {
-        document.querySelectorAll('.install-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.install-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('panel-' + name).classList.add('active');
-    }
-
-    /* ── Install guide: OS toggle ── */
-    function switchOS(os) {
-        document.querySelectorAll('.os-steps-section').forEach(s => s.classList.remove('active'));
-        document.getElementById('os-' + os).classList.add('active');
-
-        const winBtn = document.getElementById('osWinBtn');
-        const linBtn = document.getElementById('osLinBtn');
-
-        winBtn.classList.remove('active-win', 'active-lin');
-        linBtn.classList.remove('active-win', 'active-lin');
-
-        if (os === 'windows') {
-            winBtn.classList.add('active-win');
-        } else {
-            linBtn.classList.add('active-lin');
-        }
-    }
-
-    /* ── Troubleshooting: accordion ── */
-    function toggleTrouble(item) {
-        item.classList.toggle('open');
-    }
-
-    /* ── All Releases ── */
-    function switchReleaseOS(os) {
-        document.querySelectorAll('.rel-os-panel').forEach(p => p.classList.remove('active'));
-        document.getElementById('rel-' + os).classList.add('active');
-
-        const wb = document.getElementById('relWinBtn');
-        const lb = document.getElementById('relLinBtn');
-        wb.classList.remove('active-win', 'active-lin');
-        lb.classList.remove('active-win', 'active-lin');
-        if (os === 'windows') wb.classList.add('active-win');
-        else lb.classList.add('active-lin');
-    }
-
-    function formatDate(iso) {
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-
-    function buildReleaseList(releases, containerId, isLinux) {
-        const container = document.getElementById(containerId);
-        if (!releases.length) {
-            container.innerHTML = '<div class="release-loading">No releases found.</div>';
-            return;
-        }
-
-        container.innerHTML = '';
-        releases.forEach((release, index) => {
-            const isLatest = index === 0;
-            const dlCount  = release.assets.reduce((sum, a) => sum + a.download_count, 0);
-            const assetUrl = release.assets.length ? release.assets[0].browser_download_url : null;
-            const rowClass = isLinux ? 'release-row linux-row' : 'release-row';
-
-            const row = document.createElement('div');
-            row.className = rowClass + (isLatest ? ' is-latest' : '');
-
-            const badgeHtml = isLatest
-                ? `<span class="release-latest-badge ${isLinux ? 'linux-badge' : ''}"><i class="fas fa-circle-check"></i> LATEST</span>`
-                : '';
-
-            const dlBtnHtml = assetUrl
-                ? `<a href="${assetUrl}" class="release-dl-btn ${isLinux ? 'linux-btn' : ''}"><i class="fas fa-download"></i> DOWNLOAD</a>`
-                : `<span class="release-no-asset">No asset</span>`;
-
-            row.innerHTML = `
-                <div class="release-tag">${release.tag_name}${badgeHtml}</div>
-                <div class="release-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:0.4;font-size:0.65rem;"></i>${formatDate(release.published_at)}</div>
-                <div class="release-dl-count ${isLinux ? 'linux-count' : ''}">
-                    <i class="fas fa-download"></i>
-                    <span class="dl-num">${dlCount.toLocaleString()}</span> downloads
-                </div>
-                ${dlBtnHtml}
-            `;
-            container.appendChild(row);
-        });
-    }
-
-    async function fetchAllReleases() {
-        try {
-            const [winRel, linRel] = await Promise.all([
-                fetch(`https://api.github.com/repos/${winRepo}/releases`).then(r => r.json()),
-                fetch(`https://api.github.com/repos/${linuxRepo}/releases`).then(r => r.json())
-            ]);
-            buildReleaseList(winRel,  'releaseList-windows', false);
-            buildReleaseList(linRel,  'releaseList-linux',   true);
-        } catch (err) {
-            console.error('Releases fetch error:', err);
-            document.getElementById('releaseList-windows').innerHTML = '<div class="release-loading">Could not load releases.</div>';
-            document.getElementById('releaseList-linux').innerHTML   = '<div class="release-loading">Could not load releases.</div>';
-        }
-    }
-
-    init();
-    fetchChangelog();
-    fetchAllReleases();
+initData();
+fetchChangelog();
 </script>
-
 </body>
 </html>
