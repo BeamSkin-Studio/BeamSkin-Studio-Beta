@@ -57,6 +57,76 @@ body::after {
   z-index: 0;
 }
 
+/* ═══════ LIGHTBOX ═══════ */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,.93);
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: lbFadeIn .18s ease;
+}
+
+@keyframes lbFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lightbox.open { display: flex; }
+
+.lightbox-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 94vw;
+  max-height: 94vh;
+}
+
+.lightbox-inner img {
+  max-width: 94vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  cursor: default;
+  user-select: none;
+  display: block;
+  animation: lbImgIn .2s ease;
+}
+
+@keyframes lbImgIn {
+  from { transform: scale(.96); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #fff;
+  font-size: .85rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+  z-index: 10000;
+}
+
+.lightbox-close:hover {
+  background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.3);
+}
+
 /* ═══════ NAVBAR ═══════ */
 .navbar {
   position: sticky;
@@ -439,7 +509,43 @@ body::after {
 }
 
 #vVideo { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
-#vImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; }
+
+#vImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+  cursor: zoom-in;
+  transition: opacity .15s;
+}
+
+#vImg:hover { opacity: .88; }
+
+/* Zoom hint that appears over the image */
+.viewer-zoom-hint {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0,0,0,.65);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.7);
+  font-family: var(--font-head);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 5px;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.viewer-frame:hover .viewer-zoom-hint { display: flex; }
 
 .gallery-label {
   font-family: var(--font-head);
@@ -1522,9 +1628,12 @@ body::after {
 
       <!-- Right: Media Viewer -->
       <div>
-        <div class="viewer-frame">
+        <div class="viewer-frame" id="viewerFrame">
           <iframe id="vVideo" src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
-          <img id="vImg" src="" alt="Screenshot">
+          <img id="vImg" src="" alt="Screenshot" onclick="openLightbox()">
+          <div class="viewer-zoom-hint" id="zoomHint">
+            <i class="fas fa-magnifying-glass-plus"></i> Click to enlarge
+          </div>
         </div>
 
         <div class="gallery-label"><i class="fab fa-youtube"></i> Videos</div>
@@ -1797,13 +1906,23 @@ body::after {
   <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
 </footer>
 
+<!-- LIGHTBOX OVERLAY -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close fullscreen">
+    <i class="fas fa-xmark"></i>
+  </button>
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <img id="lightboxImg" src="" alt="Screenshot fullscreen">
+  </div>
+</div>
+
 <script>
 const WIN_REPO   = 'BeamSkin-Studio/BeamSkin-Studio-Beta';
 const LINUX_REPO = 'BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
 let winUrl   = `https://github.com/${WIN_REPO}/releases/latest`;
 let linuxUrl = `https://github.com/${LINUX_REPO}/releases/latest`;
 
-/* GitHub data */
+/* ── GitHub data ── */
 async function initData() {
   try {
     const [wR, lR] = await Promise.all([
@@ -1864,7 +1983,7 @@ function buildRelList(rels,id,lin){
   });
 }
 
-/* Changelog */
+/* ── Changelog ── */
 async function fetchChangelog(){
   try{
     const res=await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
@@ -1906,29 +2025,52 @@ async function fetchChangelog(){
   }
 }
 
-/* Media */
-function clearG(){document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active'));}
-function showVideo(id,card){
-  document.getElementById('vVideo').src=`https://www.youtube.com/embed/${id}`;
-  document.getElementById('vVideo').style.display='block';
-  document.getElementById('vImg').style.display='none';
-  clearG(); if(card) card.classList.add('active');
-}
-function showImage(src,card){
-  document.getElementById('vImg').src=src;
-  document.getElementById('vVideo').style.display='none';
-  document.getElementById('vImg').style.display='block';
-  clearG(); if(card) card.classList.add('active');
+/* ── Lightbox ── */
+function openLightbox() {
+  const img = document.getElementById('vImg');
+  if (!img.src || img.style.display === 'none') return;
+  document.getElementById('lightboxImg').src = img.src;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-/* Navigation */
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+/* ── Media viewer ── */
+function clearG(){ document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active')); }
+
+function showVideo(id, card) {
+  document.getElementById('vVideo').src = `https://www.youtube.com/embed/${id}`;
+  document.getElementById('vVideo').style.display = 'block';
+  document.getElementById('vImg').style.display = 'none';
+  document.getElementById('zoomHint').style.display = 'none';
+  clearG();
+  if (card) card.classList.add('active');
+}
+
+function showImage(src, card) {
+  document.getElementById('vImg').src = src;
+  document.getElementById('vVideo').style.display = 'none';
+  document.getElementById('vImg').style.display = 'block';
+  /* zoom hint is shown via CSS :hover on .viewer-frame */
+  clearG();
+  if (card) card.classList.add('active');
+}
+
+/* ── Navigation ── */
 const TABS=['home','features','install','releases','changelog'];
 
 function switchTab(name,btn,isMobile){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   const idx=TABS.indexOf(name);
-
   if(!isMobile){
     document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
     document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
@@ -1960,7 +2102,7 @@ function switchRelOS(os){
   document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');
 }
 
-function toggleT(item){item.classList.toggle('open');}
+function toggleT(item){ item.classList.toggle('open'); }
 
 document.getElementById('winBtn').onclick=()=>window.location.href=winUrl;
 document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
