@@ -1,164 +1,235 @@
-"""Debug utilities"""
-import customtkinter as ctk
+"""Debug utilities — PySide6 edition"""
 import sys
 import io
 from datetime import datetime
 
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont, QTextCursor, QTextCharFormat, QColor
+from PySide6.QtWidgets import (
+    QApplication, QDialog, QFrame,
+    QHBoxLayout, QLabel, QPushButton,
+    QTextEdit, QVBoxLayout,
+)
+
 debug_mode_enabled = False
-debug_window = None
-debug_textbox = None
+_debug_window: "QDialog | None" = None
+_debug_textbox: "QTextEdit | None" = None
 
-def setup_universal_scroll_handler(app):
-    """Sets up intelligent scroll handling"""
-    app.unbind_all("<MouseWheel>")
-    app.unbind_all("<Button-4>")
-    app.unbind_all("<Button-5>")
 
-    def universal_scroll(event):
-        x, y = app.winfo_pointerxy()
-        widget = app.winfo_containing(x, y)
-        if not widget:
-            return
-
-        scrollable_frame = None
-        current = widget
-        while current:
-            if isinstance(current, ctk.CTkScrollableFrame):
-                scrollable_frame = current
-                break
-            try:
-                current = current.master
-            except:
-                break
-
-        if scrollable_frame:
-            try:
-                if event.num == 4 or event.delta > 0:
-                    scrollable_frame._parent_canvas.yview_scroll(-25, "units")
-                elif event.num == 5 or event.delta < 0:
-                    scrollable_frame._parent_canvas.yview_scroll(25, "units")
-                return "break"
-            except:
-                pass
-
-    app.bind_all("<MouseWheel>", universal_scroll, add="+")
-    app.bind_all("<Button-4>", universal_scroll, add="+")
-    app.bind_all("<Button-5>", universal_scroll, add="+")
+# ── stdout redirect ─────────────────────────────────────────────────────────
 
 class DebugOutput(io.StringIO):
-    """Custom output stream for debug window"""
+    """
+    Custom stdout that echoes to the real terminal AND posts each write to the
+    debug console via QTimer.singleShot so it is always delivered on the main
+    thread, regardless of which thread calls print().
+    """
+
     def __init__(self):
         super().__init__()
+        # Keep a direct reference to the real terminal so we can always write
+        # even after sys.stdout has been replaced.
+        self._terminal = sys.__stdout__
 
-        self.terminal = sys.stdout
-        self.enabled = True
-
-    def write(self, message):
-
-        if self.terminal is not None:
+    def write(self, message: str) -> int:
+        # Always echo to the real terminal first.
+        if self._terminal is not None:
             try:
-                self.terminal.write(message)
+                self._terminal.write(message)
             except Exception:
                 pass
 
-        if self.enabled and debug_mode_enabled and debug_textbox is not None:
-            try:
-                if debug_textbox.winfo_exists():
-                    timestamp = datetime.now().strftime("%H:%M:%S")
-
-                    debug_textbox.insert("end", f"[{timestamp}] {message}")
-                    debug_textbox.see("end")
-            except Exception:
-                pass
+        # Forward to the GUI on the main thread.
+        if debug_mode_enabled and _debug_textbox is not None:
+            # Capture the value now; the lambda must not close over a mutable.
+            _msg = message
+            QTimer.singleShot(0, lambda m=_msg: _append_debug_text(m))
 
         return len(message)
 
     def flush(self):
-        if self.terminal is not None and hasattr(self.terminal, 'flush'):
-            self.terminal.flush()
+        if self._terminal and hasattr(self._terminal, "flush"):
+            self._terminal.flush()
 
-def create_debug_window(app, colors, on_close_callback=None):
-    """Create debug console window"""
-    global debug_window, debug_textbox, debug_mode_enabled
 
-    if debug_window is not None and debug_window.winfo_exists():
-        debug_window.lift()
+_COLOR_NORMAL = QColor("#FF8C00")   # orange — all regular debug output
+_COLOR_ERROR  = QColor("#FF3333")   # red   — lines that contain error/warning markers
+
+_ERROR_MARKERS = ("[ERROR]", "[WARN]", "[WARNING]", "ERROR", "CRITICAL", "Traceback")
+
+
+def _append_debug_text(message: str) -> None:
+    """Appends coloured text to the debug textbox. MUST be called from the main thread."""
+    global _debug_textbox
+    if _debug_textbox is None:
+        return
+    try:
+        is_error = any(marker in message for marker in _ERROR_MARKERS)
+        color = _COLOR_ERROR if is_error else _COLOR_NORMAL
+
+        fmt = QTextCharFormat()
+        fmt.setForeground(color)
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        cursor = _debug_textbox.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(f"[{timestamp}] {message}", fmt)
+        _debug_textbox.setTextCursor(cursor)
+        _debug_textbox.ensureCursorVisible()
+    except Exception:
+        pass
+
+
+# ── window ───────────────────────────────────────────────────────────────────
+
+def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
+    """Create (or raise) the debug console window using PySide6."""
+    global _debug_window, _debug_textbox, debug_mode_enabled
+
+    # If already open, just bring it to the front.
+    if _debug_window is not None and _debug_window.isVisible():
+        _debug_window.raise_()
+        _debug_window.activateWindow()
         return
 
     debug_mode_enabled = True
-    debug_window = ctk.CTkToplevel(app)
-    debug_window.title("Debug Console")
-    debug_window.geometry("800x600")
-    debug_window.configure(fg_color=colors["app_bg"])
 
-    debug_window.attributes('-topmost', True)
-    debug_window.transient(app)
-    debug_window.lift()
-    debug_window.focus_force()
+    # ── window ──
+    win = QDialog(parent)
+    win.setWindowTitle("Debug Console")
+    win.resize(800, 600)
+    # Allow the dialog to be maximised / minimised like a normal window.
+    win.setWindowFlags(
+        win.windowFlags()
+        | Qt.WindowMaximizeButtonHint
+        | Qt.WindowMinimizeButtonHint
+    )
+    win.setStyleSheet(
+        f"background:{colors.get('app_bg', '#0a0a0a')};"
+        f"color:{colors.get('text', '#ffffff')};"
+    )
 
-    header_frame = ctk.CTkFrame(debug_window, corner_radius=12,
-                                fg_color=colors["frame_bg"])
-    header_frame.pack(fill="x", padx=10, pady=10)
+    col = QVBoxLayout(win)
+    col.setContentsMargins(10, 10, 10, 10)
+    col.setSpacing(6)
 
-    ctk.CTkLabel(header_frame, text="Debug Console",
-                font=ctk.CTkFont(size=16, weight="bold"),
-                text_color=colors["text"]).pack(side="left", padx=20, pady=10)
+    # ── header bar ──
+    header = QFrame()
+    header.setStyleSheet(
+        f"QFrame {{"
+        f"  background:{colors.get('frame_bg', '#1a1a1a')};"
+        f"  border-radius:10px;"
+        f"  border:none;"
+        f"}}"
+    )
+    h_row = QHBoxLayout(header)
+    h_row.setContentsMargins(16, 8, 8, 8)
 
-    def clear_debug():
-        debug_textbox.delete("0.0", "end")
+    title_lbl = QLabel("Debug Console")
+    title_lbl.setFont(QFont("", 14, QFont.Bold))
+    title_lbl.setStyleSheet("background:transparent;border:none;")
+    h_row.addWidget(title_lbl)
+    h_row.addStretch()
+
+    _btn_style = (
+        f"QPushButton {{"
+        f"  background:{colors.get('card_bg', '#1e1e1e')};"
+        f"  color:{colors.get('text', '#ffffff')};"
+        f"  border-radius:6px;border:none;padding:4px 14px;"
+        f"}}"
+        f"QPushButton:hover {{"
+        f"  background:{colors.get('card_hover', '#2a2a2a')};"
+        f"}}"
+    )
+
+    def _clear():
+        _debug_textbox.clear()
         print("[DEBUG] Console cleared")
 
-    def copy_debug():
-        content = debug_textbox.get("0.0", "end-1c")
-        app.clipboard_clear()
-        app.clipboard_append(content)
-        print("[DEBUG] Content copied")
+    def _copy():
+        QApplication.clipboard().setText(_debug_textbox.toPlainText())
+        print("[DEBUG] Content copied to clipboard")
 
-    ctk.CTkButton(header_frame, text="Copy All", width=80, command=copy_debug,
-                 fg_color=colors["card_bg"],
-                 hover_color=colors["card_hover"]).pack(side="right", padx=5, pady=10)
+    copy_btn = QPushButton("Copy All")
+    copy_btn.setFixedSize(84, 30)
+    copy_btn.setStyleSheet(_btn_style)
+    copy_btn.clicked.connect(_copy)
+    h_row.addWidget(copy_btn)
 
-    ctk.CTkButton(header_frame, text="Clear", width=80, command=clear_debug,
-                 fg_color=colors["card_bg"],
-                 hover_color=colors["card_hover"]).pack(side="right", padx=5, pady=10)
+    clear_btn = QPushButton("Clear")
+    clear_btn.setFixedSize(72, 30)
+    clear_btn.setStyleSheet(_btn_style)
+    clear_btn.clicked.connect(_clear)
+    h_row.addWidget(clear_btn)
 
-    text_color = colors["accent"] if colors["app_bg"] == "#0a0a0a" else "#1a1a1a"
+    col.addWidget(header)
 
-    debug_textbox = ctk.CTkTextbox(debug_window, wrap="word",
-                                   fg_color=colors["card_bg"],
-                                   text_color=text_color,
-                                   font=("Consolas", 10))
-    debug_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+    # ── text area ──
+    # Always use a dark terminal background regardless of the app theme —
+    # orange-on-white in light mode is nearly unreadable.
+    textbox = QTextEdit()
+    textbox.setReadOnly(True)
+    textbox.setFont(QFont("Consolas", 10))
+    textbox.setStyleSheet(
+        "QTextEdit {"
+        "  background:#111111;"
+        "  color:#FF8C00;"
+        "  border-radius:8px;border:none;"
+        "  padding:8px;"
+        "}"
+    )
+    col.addWidget(textbox)
+    _debug_textbox = textbox
 
-    def on_close():
-        global debug_mode_enabled
+    # ── close handler ──
+    def _on_close():
+        global debug_mode_enabled, _debug_window, _debug_textbox
         debug_mode_enabled = False
-        debug_window.destroy()
-
+        _debug_window = None
+        _debug_textbox = None
+        # Restore the real stdout if we replaced it.
+        if isinstance(sys.stdout, DebugOutput):
+            sys.stdout = sys.__stdout__
         if on_close_callback and callable(on_close_callback):
             on_close_callback()
 
-    debug_window.protocol("WM_DELETE_WINDOW", on_close)
+    win.finished.connect(lambda _result: _on_close())
+
+    _debug_window = win
+    win.show()
     print("[DEBUG] Debug console opened")
 
-def toggle_debug_mode(app, colors, on_close=None):
-    """Toggle debug mode on/off"""
-    global debug_mode_enabled, debug_output
+
+# ── public toggle ─────────────────────────────────────────────────────────────
+
+def toggle_debug_mode(app, colors: dict, on_close=None) -> None:
+    """Toggle the debug console on or off."""
+    global debug_mode_enabled, _debug_window
+
     if debug_mode_enabled:
-        if debug_window and debug_window.winfo_exists():
-            debug_window.destroy()
-        debug_mode_enabled = False
-
-        if hasattr(sys, '_original_stdout'):
-            sys.stdout = sys._original_stdout
-
-        if on_close and callable(on_close):
-            on_close()
+        # Close if it's open.
+        if _debug_window is not None and _debug_window.isVisible():
+            _debug_window.close()   # triggers finished → _on_close
+        else:
+            # Window was already gone; clean up state manually.
+            debug_mode_enabled = False
+            if isinstance(sys.stdout, DebugOutput):
+                sys.stdout = sys.__stdout__
+            if on_close and callable(on_close):
+                on_close()
     else:
         create_debug_window(app, colors, on_close_callback=on_close)
+        # Redirect stdout only if not already redirected.
+        if not isinstance(sys.stdout, DebugOutput):
+            sys.stdout = DebugOutput()
+        print("[DEBUG] Debug console activated — output redirection enabled")
 
-        debug_output = DebugOutput()
-        if not hasattr(sys, '_original_stdout'):
-            sys._original_stdout = sys.stdout
-        sys.stdout = debug_output
-        print("[DEBUG] Debug console activated - output redirection enabled")
+
+# ── scroll helper (kept for compatibility) ────────────────────────────────────
+
+def setup_universal_scroll_handler(app) -> None:
+    """
+    No-op in the PySide6 build — QScrollArea handles wheel events natively.
+    Kept so any call sites that import this function don't break.
+    """
+    pass

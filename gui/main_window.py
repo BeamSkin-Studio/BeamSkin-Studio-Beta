@@ -1,564 +1,419 @@
-"""
-Main Window - Entry point for the BeamSkin Studio application
-"""
-from typing import Dict, Optional
-import customtkinter as ctk
-from PIL import Image
+from __future__ import annotations
 import os
+from typing import Dict, Optional
 
-from gui.state import state
-from core.localization import t, get_localization
-from gui.components.preview import HoverPreviewManager
-from gui.components.navigation import Sidebar, Topbar
-from gui.components.dialogs import show_update_dialog, show_wip_warning, show_notification
-from gui.tabs.settings import SettingsTab
-from gui.tabs.car_list import CarListTab
-from gui.tabs.generator import GeneratorTab
-from gui.tabs.howto import HowToTab
-from gui.tabs.add_vehicles import AddVehiclesTab, load_added_vehicles_at_startup
-from gui.tabs.about import AboutTab
+from PySide6.QtCore    import Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PySide6.QtGui     import QPixmap, QIcon, QColor
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QFrame, QLabel, QVBoxLayout,
+    QHBoxLayout, QStackedWidget, QApplication, QSizePolicy,
+)
 
-# ── Try to load the real Online tab; fall back to the placeholder if missing ──
+from gui.theme   import COLORS, APP_QSS, font, drop_shadow, fade_in
+from gui.state   import state
+from gui.icon_helper import set_window_icon
+from gui.widgets import Toast, FadeStack, Spinner
+
+from gui.components.navigation import Topbar, Sidebar
+from gui.components.preview    import HoverPreviewManager, create_preview_overlay
+
 try:
-    from gui.tabs.online_tab import OnlineTab as _OnlineTabClass
-    _ONLINE_TAB_AVAILABLE = True
-    print("[DEBUG] gui.tabs.online_tab loaded — Online tab is AVAILABLE")
+    from core.localization import t, get_localization
 except ImportError:
-    _OnlineTabClass = None
-    _ONLINE_TAB_AVAILABLE = False
-    print("[DEBUG] gui.tabs.online_tab NOT found — Online tab will show unavailable placeholder")
+    def t(key, **kw): return key
+    def get_localization(): return None
 
-# ─────────────────────────────────────────────────────────────────────────────
 
-class OnlineUnavailableTab(ctk.CTkFrame):
+# OFFLINE PLACEHOLDER
 
-    def __init__(self, parent, **kwargs):
-        kwargs.pop("notification_callback", None)
-        super().__init__(parent, fg_color=state.colors["app_bg"], corner_radius=0)
-        self._build_overlay()
+class OnlineUnavailableTab(QWidget):
+    def __init__(self, parent=None, **_):
+        print(f"[DEBUG] __init__() called")
+        super().__init__(parent)
+        self.setStyleSheet(f"background:{COLORS['app_bg']};")
+        col = QVBoxLayout(self)
+        col.setAlignment(Qt.AlignCenter)
+        col.setSpacing(12)
 
-    def _build_overlay(self):
-        overlay = ctk.CTkFrame(
-            self,
-            fg_color=state.colors["app_bg"],
-            corner_radius=0,
-        )
-        overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        icon = QLabel("🚧")
+        icon.setFont(font(52))
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setStyleSheet("background:transparent;border:none;")
+        col.addWidget(icon)
 
-        card = ctk.CTkFrame(
-            overlay,
-            fg_color=state.colors["frame_bg"],
-            corner_radius=16,
-            border_width=1,
-            border_color=state.colors["border"],
-        )
-        card.place(relx=0.5, rely=0.5, anchor="center")
+        title = QLabel(t("online.unavailable", default="Online Features Unavailable"))
+        title.setFont(font(20, "bold"))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        col.addWidget(title)
 
-        ctk.CTkLabel(
-            card,
-            text="🚧",
-            font=ctk.CTkFont(size=52),
-        ).pack(padx=48, pady=(36, 8))
-
-        ctk.CTkLabel(
-            card,
-            text=t("online.unavailable"),
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=state.colors["text"],
-        ).pack(padx=48, pady=(0, 6))
-
-        ctk.CTkLabel(
-            card,
-            text=t("online.online_server"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text_secondary"],
-            justify="center",
-        ).pack(padx=48, pady=(0, 28))
+        sub = QLabel(t("online.online_server",
+                        default="This feature requires an active server connection."))
+        sub.setFont(font(13))
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        col.addWidget(sub)
 
     def refresh_ui(self):
-        """Called during language/theme rebuilds — recreate the overlay labels."""
-        for widget in self.winfo_children():
-            widget.destroy()
-        self.configure(fg_color=state.colors["app_bg"])
-        self._build_overlay()
+        print(f"[DEBUG] refresh_ui() called")
+        pass
 
-# ─────────────────────────────────────────────────────────────────────────────
 
-from utils.debug import setup_universal_scroll_handler
+# MAIN  WINDOW
 
-print(f"[DEBUG] Loading class: BeamSkinStudioApp")
-
-class BeamSkinStudioApp(ctk.CTk):
+class BeamSkinStudioApp(QMainWindow):
 
     def __init__(self):
-
-        print(f"[DEBUG] __init__ called")
+        print(f"[DEBUG] __init__() called")
         super().__init__()
-        self.withdraw()
+        QApplication.instance().setStyleSheet(APP_QSS)
 
-        # Load current language immediately
-        localization = get_localization()
-        print(f"[DEBUG] Loaded language: {localization.current_language}")
+        self.setWindowTitle("BeamSkin Studio")
+        set_window_icon(self)
+        self.resize(1600, 1000)
+        self.setMinimumSize(1000, 700)
 
-        self.title("BeamSkin Studio")
+        central = QWidget()
+        self.setCentralWidget(central)
+        self._root_layout = QVBoxLayout(central)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.setSpacing(0)
 
-        icon_path = os.path.join("gui", "Icons", "BeamSkin_Studio.ico")
-        if os.path.exists(icon_path):
-            try:
-                self.iconbitmap(icon_path)
-                print(f"[DEBUG] Set window icon: {icon_path}")
-            except Exception as e:
-                print(f"[DEBUG] Failed to set icon: {e}")
-
-        self.geometry("1600x1200")
-        self.minsize(1000, 1000)
-        self.configure(fg_color=state.colors["app_bg"])
-
-        ctk.set_appearance_mode("dark" if state.current_theme == "dark" else "light")
-        ctk.set_default_color_theme("blue")
-
-        self.preview_overlay = self._create_preview_overlay()
-        self.preview_manager = HoverPreviewManager(self, self.preview_overlay)
-
-        self.steam_icon_white: Optional[ctk.CTkImage] = None
-        self.steam_icon_black: Optional[ctk.CTkImage] = None
-        self.folder_icon_white: Optional[ctk.CTkImage] = None
-        self.folder_icon_black: Optional[ctk.CTkImage] = None
-
-        self.logo_white: Optional[ctk.CTkImage] = None
-        self.logo_black: Optional[ctk.CTkImage] = None
-
-        self._load_output_icons()
-        self._load_logos()
-
-        self.topbar: Optional[Topbar] = None
-        self.sidebar: Optional[Sidebar] = None
-        self.main_container: Optional[ctk.CTkFrame] = None
-        self.tabs: Dict[str, ctk.CTkFrame] = {}
-        self.current_tab: str = "generator"
+        self.tabs: Dict[str, QWidget] = {}
+        self.current_tab = "generator"
 
         self._setup_ui()
-        self._update_output_icons()
+        self.show()
+        self._post_init()
 
-        self.after(150, self._apply_startup_language)
-
-        self.protocol("WM_DELETE_WINDOW", self._on_closing)
-
-    def show_notification(self, message: str, type: str = "info", duration: int = 3000):
-
-        print(f"[DEBUG] show_notification called")
-        show_notification(self, message, type, duration)
-
-    def _create_preview_overlay(self) -> ctk.CTkFrame:
-        preview_overlay = ctk.CTkFrame(
-            self,
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["accent"],
-            border_width=2,
-            corner_radius=10
-        )
-        return preview_overlay
-
-    def _load_output_icons(self):
-        icon_dir = os.path.join("gui", "Icons")
-        icon_size = (20, 20)
-
-        try:
-            steam_white_path = os.path.join(icon_dir, "Steam_logo_white.png")
-            steam_black_path = os.path.join(icon_dir, "Steam_logo_black.png")
-
-            if os.path.exists(steam_white_path):
-                self.steam_icon_white = ctk.CTkImage(
-                    light_image=Image.open(steam_white_path),
-                    dark_image=Image.open(steam_white_path),
-                    size=icon_size
-                )
-                print(f"[DEBUG] Loaded Steam white icon from: {steam_white_path}")
-
-            if os.path.exists(steam_black_path):
-                self.steam_icon_black = ctk.CTkImage(
-                    light_image=Image.open(steam_black_path),
-                    dark_image=Image.open(steam_black_path),
-                    size=icon_size
-                )
-                print(f"[DEBUG] Loaded Steam black icon from: {steam_black_path}")
-
-            folder_white_path = os.path.join(icon_dir, "Folder_logo_white.png")
-            folder_black_path = os.path.join(icon_dir, "Folder_logo_black.png")
-
-            if os.path.exists(folder_white_path):
-                self.folder_icon_white = ctk.CTkImage(
-                    light_image=Image.open(folder_white_path),
-                    dark_image=Image.open(folder_white_path),
-                    size=icon_size
-                )
-                print(f"[DEBUG] Loaded Folder white icon from: {folder_white_path}")
-
-            if os.path.exists(folder_black_path):
-                self.folder_icon_black = ctk.CTkImage(
-                    light_image=Image.open(folder_black_path),
-                    dark_image=Image.open(folder_black_path),
-                    size=icon_size
-                )
-                print(f"[DEBUG] Loaded Folder black icon from: {folder_black_path}")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to load output icons: {e}")
-
-    def _load_logos(self):
-        icon_dir = os.path.join("gui", "Icons")
-
-        logo_size = (100, 50)
-
-        try:
-            logo_white_path = os.path.join(icon_dir, "BeamSkin_Studio_White.png")
-            logo_black_path = os.path.join(icon_dir, "BeamSkin_Studio_Black.png")
-
-            if os.path.exists(logo_white_path):
-                self.logo_white = ctk.CTkImage(
-                    light_image=Image.open(logo_white_path),
-                    dark_image=Image.open(logo_white_path),
-                    size=logo_size
-                )
-                print(f"[DEBUG] Loaded white logo from: {logo_white_path}")
-
-            if os.path.exists(logo_black_path):
-                self.logo_black = ctk.CTkImage(
-                    light_image=Image.open(logo_black_path),
-                    dark_image=Image.open(logo_black_path),
-                    size=logo_size
-                )
-                print(f"[DEBUG] Loaded black logo from: {logo_black_path}")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to load logos: {e}")
-
-    def _update_output_icons(self):
-        if self.sidebar:
-            if state.current_theme == "dark":
-                steam_icon = self.steam_icon_white
-                folder_icon = self.folder_icon_white
-                logo = self.logo_white
-            else:
-                steam_icon = self.steam_icon_black
-                folder_icon = self.folder_icon_black
-                logo = self.logo_black
-
-            self.sidebar.update_icons(steam_icon, folder_icon)
-            print(f"[DEBUG] Updated output icons for {state.current_theme} theme")
-
-        if self.topbar and logo:
-            self.topbar.update_logo(logo)
-            print(f"[DEBUG] Updated logo for {state.current_theme} theme")
 
     def _setup_ui(self):
-        current_logo = self.logo_white if state.current_theme == "dark" else self.logo_black
+        print(f"[DEBUG] _setup_ui() called")
+        logo_px = self._load_logo_pixmap()
+        self.topbar = Topbar(self, logo_pixmap=logo_px)
+        self.topbar.view_changed.connect(self.switch_view)
+        self.topbar.generate_clicked.connect(self._generate_mod)
+        self._root_layout.addWidget(self.topbar)
 
-        self.topbar = Topbar(
-            self,
-            on_view_change=self.switch_view,
-            on_generate=self._generate_mod,
-            logo_image=current_logo
+        content_row = QHBoxLayout()
+        content_row.setContentsMargins(0, 0, 0, 0)
+        content_row.setSpacing(0)
+
+        self.sidebar = Sidebar(self)
+        # Sidebar now emits (carid, display_name, variant_suffix).
+        self.sidebar.add_vehicle_requested.connect(
+            self._add_vehicle_from_sidebar
         )
-        self.topbar.pack(fill="x", side="top")
+        content_row.addWidget(self.sidebar)
 
-        self.main_container = ctk.CTkFrame(self, fg_color=state.colors["app_bg"])
-        self.main_container.pack(fill="both", expand=True)
+        self._stack = FadeStack()
+        self._stack.setStyleSheet(f"background:{COLORS['app_bg']};")
+        content_row.addWidget(self._stack, 1)
 
-        self.sidebar = Sidebar(self.main_container, self.preview_manager)
-        self.sidebar.pack(fill="y", side="left")
+        wrapper = QWidget()
+        wrapper.setLayout(content_row)
+        self._root_layout.addWidget(wrapper, 1)
 
-        self._create_tabs()
+        _central = self.centralWidget()
+        self._preview_overlay = create_preview_overlay(_central)
+        self.preview_manager  = HoverPreviewManager(_central, self._preview_overlay)
 
-        self.sidebar.populate_vehicles(self._add_vehicle_to_project_from_sidebar)
+        self._build_tabs()
 
-        generator_tab = self.tabs.get("generator")
-        if generator_tab and isinstance(generator_tab, GeneratorTab):
-            generator_tab.set_sidebar_references(
-                self.sidebar.mod_name_entry,
-                self.sidebar.author_entry,
-                self.sidebar  # stable object; entries looked up dynamically after rebuilds
-            )
+    def _build_tabs(self):
+        print(f"[DEBUG] _build_tabs: building all tab widgets")
+        from gui.tabs.generator    import GeneratorTab
+        from gui.tabs.howto        import HowToTab
+        from gui.tabs.car_list     import CarListTab
+        from gui.tabs.add_vehicles import AddVehiclesTab
+        from gui.tabs.settings     import SettingsTab
+        from gui.tabs.about        import AboutTab
 
+        try:
+            from gui.tabs.online_tab import OnlineTab as _OnlineTab
+            _online_cls    = _OnlineTab
+            _online_kwargs = {"notification_callback": self.show_notification}
+        except Exception as e:
+            print(f"[WARN] Could not import OnlineTab: {e}")
+            _online_cls    = OnlineUnavailableTab
+            _online_kwargs = {}
+
+        tab_classes = {
+            "generator":    (GeneratorTab,   {"preview_manager": self.preview_manager,
+                                               "notification_callback": self.show_notification}),
+            "howto":        (HowToTab,       {}),
+            "carlist":      (CarListTab,     {}),
+            "add_vehicles": (AddVehiclesTab, {"notification_callback": self.show_notification,
+                                               "refresh_vehicle_list_callback": self._refresh_vehicle_list}),
+            "settings":     (SettingsTab,    {"notification_callback": self.show_notification}),
+            "about":        (AboutTab,       {}),
+            "online_tab":   (_online_cls,    _online_kwargs),
+        }
+
+        for name, (cls, kwargs) in tab_classes.items():
+            try:
+                tab = cls(self, **kwargs)
+            except TypeError:
+                try:
+                    tab = cls(self)
+                except Exception as e:
+                    print(f"[ERROR] Could not create tab '{name}': {e}")
+                    tab = OnlineUnavailableTab(self)
+            except Exception as e:
+                print(f"[ERROR] Could not create tab '{name}': {e}")
+                import traceback; traceback.print_exc()
+                tab = OnlineUnavailableTab(self)
+
+            self.tabs[name] = tab
+            self._stack.addWidget(tab)
+
+        gen = self.tabs.get("generator")
+        if gen and hasattr(gen, "add_car_to_project"):
+            self.sidebar.populate_vehicles(self._add_vehicle_from_sidebar)
         self.switch_view("generator")
 
-        self.after(50, lambda: setup_universal_scroll_handler(self))
-
-    def _create_tabs(self):
-
-        self.tabs["generator"] = GeneratorTab(
-            self.main_container,
-            notification_callback=self.show_notification
-        )
-
-        self.tabs["howto"] = HowToTab(self.main_container)
-
-        self.tabs["carlist"] = CarListTab(self.main_container, self.preview_manager, self)
-
-        self.tabs["add_vehicles"] = AddVehiclesTab(
-            self.main_container,
-            notification_callback=self.show_notification
-        )
-
-        self.tabs["settings"] = SettingsTab(
-            self.main_container,
-            self.main_container,
-            self.topbar.menu_frame,
-            self.topbar.menu_buttons,
-            self.switch_view,
-            notification_callback=self.show_notification
-        )
-
-        self.tabs["about"] = AboutTab(self.main_container)
-
-        if _ONLINE_TAB_AVAILABLE:
-            self.tabs["online_tab"] = _OnlineTabClass(
-                self.main_container,
-                notification_callback=self.show_notification
+        if gen and hasattr(gen, "set_sidebar_references"):
+            gen.set_sidebar_references(
+                self.sidebar._mod_entry,
+                self.sidebar._author_entry,
             )
-            print("[DEBUG] Online tab: using real OnlineTab")
-        else:
-            self.tabs["online_tab"] = OnlineUnavailableTab(
-                self.main_container,
-                notification_callback=self.show_notification
-            )
-            print("[DEBUG] Online tab: using OnlineUnavailableTab (file missing)")
+
 
     def switch_view(self, view_name: str):
+        print(f"[DEBUG] switch_view: switching to {view_name!r}")
+        if view_name not in self.tabs:
+            print(f"[DEBUG] Tab '{view_name}' not found")
+            return
 
-        print(f"[DEBUG] switch_view called")
-        print(f"[DEBUG] Switching to view: {view_name}")
+        self.topbar.set_active(view_name)
+        self.sidebar.setVisible(view_name == "generator")
 
-        for btn_name, btn in self.topbar.menu_buttons.items():
-            if btn_name == view_name:
-                btn.configure(
-                    fg_color=state.colors["tab_selected"],
-                    hover_color=state.colors["tab_selected_hover"],
-                    text_color=state.colors["text"],
-                    font=ctk.CTkFont(size=12, weight="bold")
-                )
-            else:
-                btn.configure(
-                    fg_color=state.colors["tab_unselected"],
-                    hover_color=state.colors["tab_unselected_hover"],
-                    text_color=state.colors["text_secondary"],
-                    font=ctk.CTkFont(size=12, weight="normal")
-                )
-
-        for tab_name, tab in self.tabs.items():
-            tab.pack_forget()
-
-        if view_name != "generator":
-            self.sidebar.pack_forget()
-        else:
-            self.sidebar.pack(fill="y", side="left")
-
-        if view_name == "generator":
-            self.topbar.generate_button.pack(side="right", padx=25)
-        else:
-            self.topbar.generate_button.pack_forget()
-
-        if view_name in self.tabs:
-
-            self.tabs[view_name].pack(fill="both", expand=True, side="left")
-            print(f"[DEBUG] Showing tab: {view_name}")
-        else:
-            print(f"[DEBUG] ERROR: Tab '{view_name}' not found")
-
+        idx = self._stack.indexOf(self.tabs[view_name])
+        self._stack.setCurrentIndex(idx)
         self.current_tab = view_name
 
-        self.update_idletasks()
-        self.after(50, lambda: setup_universal_scroll_handler(self))
 
     def _generate_mod(self):
-        print("[DEBUG] Generate mod button clicked")
-
-        generator_tab = self.tabs.get("generator")
-        if generator_tab and isinstance(generator_tab, GeneratorTab):
-
-            generator_tab.generate_mod(
+        print(f"[DEBUG] _generate_mod: triggering mod generation")
+        gen = self.tabs.get("generator")
+        if gen and hasattr(gen, "generate_mod"):
+            gen.generate_mod(
                 self.topbar.generate_button,
-                self.sidebar.output_mode_var,
-                self.sidebar.custom_output_var
+                self.sidebar.get_output_mode(),
+                self.sidebar.get_custom_output(),
+                self.sidebar.get_unpacked(),
             )
-        else:
-            print("[DEBUG] ERROR: Generator tab not found or wrong type")
 
-    def _add_vehicle_to_project_from_sidebar(self, carid: str, display_name: str):
-        print(f"[DEBUG] Sidebar: Add vehicle clicked - {display_name} ({carid})")
 
-        generator_tab = self.tabs.get("generator")
-        if generator_tab and isinstance(generator_tab, GeneratorTab):
+    def _add_vehicle_from_sidebar(self, carid: str, display_name: str, variant: str = ""):
+        """
+        Callback wired to sidebar.add_vehicle_requested.
 
-            generator_tab.add_car_to_project(carid, display_name)
+        Parameters
+        ----------
+        carid        : Vehicle ID (e.g. "pickup")
+        display_name : Human-readable name including variant if applicable
+                       (e.g. "Pickup (Ambulance)").  This is already formatted
+                       by VehicleVariantExpander before the signal is emitted.
+        variant      : Body-variant suffix, e.g. "" (normal), "ambulance", "box".
+        """
+        print(f"[DEBUG] _add_vehicle_from_sidebar() called")
+        gen = self.tabs.get("generator")
+        if gen and hasattr(gen, "add_car_to_project"):
+            gen.add_car_to_project(carid, display_name, variant)
+            # The sidebar widget is removed on add, so Qt never fires leaveEvent
+            # on it — force-hide the preview here so it doesn't get stuck.
+            if hasattr(self, "preview_manager"):
+                self.preview_manager.hide_hover_preview(force=True)
+            self.show_notification(
+                f"Added {display_name} to project", type="success"
+            )
 
-            for btn_frame, car_id, _, add_btn_frame in state.sidebar_vehicle_buttons:
-                if car_id == carid:
-                    add_btn_frame.pack_forget()
-                    break
 
-            self.sidebar.expanded_vehicle_carid = None
+    def _refresh_vehicle_list(self):
+        """
+        Called by AddVehiclesTab after a vehicle/variant is added or deleted.
 
-            print(f"[DEBUG] Successfully added {display_name} to generator tab")
-        else:
-            print(f"[DEBUG] ERROR: Could not find generator tab")
+        Mirrors generator._build_car_id_list(): uses load_added_vehicles_json()
+        (the same source of truth used at startup) to sync state.added_vehicles,
+        then repopulates the sidebar, the generator's car list, and the CarListTab.
+        """
+        try:
+            from utils.file_ops import load_added_vehicles_json
+            vehicles = load_added_vehicles_json()
+            state.added_vehicles.clear()
+            state.added_vehicles.update(vehicles)
+        except Exception as e:
+            print(f"[WARNING] _refresh_vehicle_list: could not reload vehicles: {e}")
+
+        if hasattr(self, "sidebar"):
+            self.sidebar.populate_vehicles(self._add_vehicle_from_sidebar)
+
+        gen = self.tabs.get("generator")
+        if gen and hasattr(gen, "refresh_vehicle_list"):
+            try:
+                gen.refresh_vehicle_list()
+            except Exception as e:
+                print(f"[WARNING] _refresh_vehicle_list: gen.refresh_vehicle_list failed: {e}")
+
+        # Keep CarListTab in sync — without this, added/deleted vehicles only
+        # appear there after a full app restart.
+        carlist = self.tabs.get("carlist")
+        if carlist and hasattr(carlist, "refresh_vehicle_list"):
+            try:
+                carlist.refresh_vehicle_list()
+            except Exception as e:
+                print(f"[WARNING] _refresh_vehicle_list: carlist.refresh_vehicle_list failed: {e}")
+
+    def show_notification(
+        self, message: str, type: str = "info", duration: int = 3000
+    ):
+        cw = self.centralWidget() or self
+        toast = Toast(cw, message, kind=type, duration=duration)
+        toast.move(
+            cw.width()  - toast.width()  - 20,
+            cw.height() - toast.height() - 20,
+        )
+        toast.show()
+        toast.raise_()
+
+
+    def _load_logo_pixmap(self) -> Optional[QPixmap]:
+        print(f"[DEBUG] _load_logo_pixmap() called")
+        icon_dir = os.path.join("gui", "Icons")
+        path = os.path.join(icon_dir, "BeamSkin_Studio_White.png")
+        if os.path.exists(path):
+            return QPixmap(path)
+        return None
+
+
+    def _post_init(self):
+        print(f"[DEBUG] _post_init() called")
+        QTimer.singleShot(150, self._apply_startup_language)
 
     def _apply_startup_language(self):
         try:
-            from core.localization import get_localization, set_language
+            from core.localization import set_language
             from core.settings import app_settings
-
-            loc        = get_localization()
-            saved_lang = app_settings.get("language", "en_US")
-
-            print(f"[DEBUG] _apply_startup_language: saved={saved_lang!r}  current={loc.current_language!r}")
-            if saved_lang != loc.current_language or not loc.translations:
-                ok = set_language(saved_lang)
-                print(f"[DEBUG] set_language({saved_lang!r}) -> {ok}")
-
-            # Always refresh all widgets on startup so the UI reflects the
-            # loaded language even when saved_lang == current_language.
-            settings_tab = self.tabs.get("settings")
-            if settings_tab and hasattr(settings_tab, "_refresh_all_ui"):
-                settings_tab._refresh_all_ui()
-                print("[DEBUG] _apply_startup_language: full UI refresh done")
-            else:
-                for tab_name, tab in self.tabs.items():
-                    if hasattr(tab, "refresh_ui"):
-                        try:
-                            tab.refresh_ui()
-                        except Exception as e:
-                            print(f"[ERROR] refresh_ui failed for {tab_name}: {e}")
-
+            lang = app_settings.get("language", "en_US")
+            set_language(lang)
+            self._refresh_all_tabs()
         except Exception as e:
-            import traceback
-            print(f"[ERROR] _apply_startup_language failed: {e}")
-            traceback.print_exc()
+            print(f"[ERROR] _apply_startup_language: {e}")
 
-        # Sidebar.refresh_ui() destroys and recreates entry widgets; re-wire
-        # the generator tab's references so load/save/clear project still work.
-        self._rewire_sidebar_references()
+    def _refresh_all_tabs(self):
+        print(f"[DEBUG] _refresh_all_tabs: refreshing all tab UIs")
+        for name, tab in self.tabs.items():
+            if hasattr(tab, "refresh_ui"):
+                try:
+                    tab.refresh_ui()
+                except Exception as e:
+                    print(f"[ERROR] refresh_ui for {name}: {e}")
+        if hasattr(self, "topbar"):
+            try:
+                self.topbar.refresh_ui()
+            except Exception as e:
+                print(f"[ERROR] topbar.refresh_ui: {e}")
+        if hasattr(self, "sidebar"):
+            try:
+                self.sidebar.refresh_ui(
+                    getattr(self, "_add_vehicle_from_sidebar", None)
+                )
+                gen = self.tabs.get("generator")
+                if gen and hasattr(gen, "set_sidebar_references"):
+                    gen.set_sidebar_references(
+                        self.sidebar._mod_entry,
+                        self.sidebar._author_entry,
+                    )
+            except Exception as e:
+                print(f"[ERROR] sidebar.refresh_ui: {e}")
 
-    def _on_closing(self):
-        print("[DEBUG] \nShutting down BeamSkin Studio...")
-        self.destroy()
-
-    def show_startup_warning(self):
-
-        print(f"[DEBUG] show_startup_warning called")
-        show_wip_warning(self)
 
     def show_setup_wizard(self):
-        print("[DEBUG] Showing first-time setup wizard...")
-
+        print(f"[DEBUG] show_setup_wizard() called")
         from gui.components.setup_wizard import show_setup_wizard
         from core.settings import set_beamng_paths, mark_setup_complete
 
-        def on_setup_complete(paths: dict):
-            print(f"[DEBUG] Setup wizard completed with paths: {paths}")
-
-            set_beamng_paths(
-                beamng_install=paths.get("beamng_install", ""),
-                mods_folder=paths.get("mods_folder", "")
-            )
-
+        def _done(paths: dict):
+            set_beamng_paths(**paths)
             mark_setup_complete()
-
-            # Apply the language chosen in the wizard to all already-built tabs.
-            # _apply_startup_language fired 150 ms after launch (while the wizard
-            # was still open) and saw no change at that point, so we must do the
-            # refresh here now that the wizard has finished.
-            from core.localization import get_localization
-            from core.settings import app_settings as _app_settings
-            _chosen_lang = _app_settings.get("language", "en_US")
-            _loc = get_localization()
-            print(f"[DEBUG] on_setup_complete: refreshing UI for language={_chosen_lang!r}")
-            # Ensure the localization object is loaded with the chosen language
-            if _loc.current_language != _chosen_lang:
-                _loc.set_language(_chosen_lang)
-            settings_tab = self.tabs.get("settings")
-            if settings_tab and hasattr(settings_tab, "_refresh_all_ui"):
-                settings_tab._refresh_all_ui()
-                print("[DEBUG] on_setup_complete: full UI refresh via _refresh_all_ui")
-            else:
-                for _tab_name, _tab in self.tabs.items():
-                    if hasattr(_tab, "refresh_ui"):
-                        try:
-                            _tab.refresh_ui()
-                        except Exception as _e:
-                            print(f"[ERROR] refresh_ui failed for {_tab_name}: {_e}")
-                print("[DEBUG] on_setup_complete: individual tab refresh done")
-
-            if "settings" in self.tabs:
-                settings_tab = self.tabs["settings"]
-                try:
-                    if hasattr(settings_tab, 'path_config'):
-                        settings_tab.path_config.reload_paths()
-                        print("[DEBUG] Reloaded paths in settings tab")
-                    else:
-                        print("[DEBUG] Settings tab doesn't have path_config attribute")
-                except Exception as e:
-                    print(f"[DEBUG] Could not reload paths in settings tab: {e}")
-            else:
-                print("[DEBUG] Settings tab not found in self.tabs")
-
-            if paths.get("beamng_install") or paths.get("mods_folder"):
-                self.show_notification(
-                    "Setup complete! Paths saved successfully.",
-                    type="success",
-                    duration=3000
-                )
-
-            # Re-wire sidebar references in case the setup wizard triggered a
-            # language change that caused Sidebar.refresh_ui() to run.
-            self._rewire_sidebar_references()
-
-            def _post_setup_startup():
-                self.show_startup_warning()  # blocks (wait_window) until dismissed
-                from gui.components.changelog_dialog import show_changelog_if_needed
-                from core.updater import CURRENT_VERSION
-                show_changelog_if_needed(self, CURRENT_VERSION)
-
-            self.after(500, _post_setup_startup)
-
-        show_setup_wizard(self, state.colors, on_setup_complete)
-
-    def _rewire_sidebar_references(self):
-        """Re-wire generator tab's sidebar entry references after any sidebar rebuild.
-
-        Must be called any time Sidebar.refresh_ui() is invoked, because that
-        method destroys and recreates mod_name_entry / author_entry.  Holding a
-        stale reference to a destroyed widget causes the 'invalid command name'
-        error when load_project (or clear_project) tries to manipulate those entries.
-        """
-        generator_tab = self.tabs.get("generator")
-        if generator_tab and isinstance(generator_tab, GeneratorTab) and self.sidebar:
             try:
-                generator_tab.set_sidebar_references(
-                    self.sidebar.mod_name_entry,
-                    self.sidebar.author_entry,
-                    self.sidebar  # stable object; entries looked up dynamically after rebuilds
-                )
-                print("[DEBUG] _rewire_sidebar_references: sidebar references updated")
+                from core.localization import set_language as _set_lang
+                from core.settings import app_settings
+                _set_lang(app_settings.get("language", "en_US"))
             except Exception as e:
-                print(f"[ERROR] _rewire_sidebar_references failed: {e}")
+                print(f"[WARNING] _done: could not apply wizard language: {e}")
+            self._refresh_all_tabs()
+            if paths.get("beamng_install") or paths.get("mods_folder"):
+                self.show_notification("Setup complete! Paths saved.", type="success")
+            QTimer.singleShot(400, self.show_startup_warning)
+
+        show_setup_wizard(self, state.colors, _done)
+
+    def show_startup_warning(self):
+        print(f"[DEBUG] show_startup_warning() called")
+        from gui.components.dialogs import show_wip_warning
+        show_wip_warning(self)
+        QTimer.singleShot(200, self._maybe_show_changelog)
+
+    def _maybe_show_changelog(self):
+        print(f"[DEBUG] _maybe_show_changelog() called")
+        from gui.components.changelog_dialog import show_changelog_if_needed
+        from core.updater import CURRENT_VERSION
+        show_changelog_if_needed(self, CURRENT_VERSION)
 
     def prompt_update(self, new_version: str):
-
-        print(f"[DEBUG] prompt_update called")
+        print(f"[DEBUG] prompt_update() called")
+        from gui.components.dialogs import show_update_dialog
         show_update_dialog(self, new_version)
 
+
+    def show_startup_sequence(self):
+        print(f"[DEBUG] show_startup_sequence() called")
+        if not self.isVisible():
+            self.show()
+        self.raise_()
+        self.activateWindow()
+        try:
+            from core.settings import is_setup_complete
+            if not is_setup_complete():
+                QTimer.singleShot(100, self.show_setup_wizard)
+                return
+        except ImportError:
+            pass
+        QTimer.singleShot(100, self.show_startup_warning)
+
+
+    def closeEvent(self, event):
+        print(f"[DEBUG] closeEvent: application closing")
+        print("[DEBUG] Shutting down BeamSkin Studio...")
+        event.accept()
+
+
+# ENTRY POINT
+
 def main():
+    import sys
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore    import Qt
 
-    print(f"[DEBUG] main called")
-    print("[DEBUG] Starting BeamSkin Studio...")
+    try:
+        from gui.tabs.add_vehicles import load_added_vehicles_at_startup
+        load_added_vehicles_at_startup()
+    except Exception:
+        pass
 
-    print("[DEBUG] Loading custom vehicles from added_vehicles.json...")
-    load_added_vehicles_at_startup()
+    app = QApplication.instance() or QApplication(sys.argv)
+    app.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
 
-    app = BeamSkinStudioApp()
+    window = BeamSkinStudioApp()
+    sys.exit(app.exec())
 
-    app.mainloop()
 
 if __name__ == "__main__":
     main()
+
+

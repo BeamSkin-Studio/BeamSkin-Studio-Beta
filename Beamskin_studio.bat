@@ -11,105 +11,48 @@ set "LOG_FILE=%TEMP%\BeamSkinStudio_launch.log"
 if exist "%LOG_FILE%" del /f /q "%LOG_FILE%"
 
 :: -----------------------------------------------------------
-:: Step 1: Locate Python — try multiple methods
+:: Step 1: Find a Python version that has all dependencies
+:: Probes py launcher versions in preference order, then falls
+:: back to plain "python" for installs not registered with py.
 :: -----------------------------------------------------------
-set "PYTHON_CMD="
+echo Detecting compatible Python installation...
+set "PYEXE="
 
-:: 1a. Try 'python' directly (classic PATH entry)
-python --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python"
-    goto :python_found
-)
-
-:: 1b. Try 'py' (Windows Python Launcher — common with 3.12 installs)
-py --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=py"
-    goto :python_found
-)
-
-:: 1c. Try 'py -3' (explicit Python 3 via launcher)
-py -3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=py -3"
-    goto :python_found
-)
-
-:: 1d. Try 'python3' (sometimes set up this way)
-python3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python3"
-    goto :python_found
-)
-
-:: 1e. Probe common install paths for Python 3.12, 3.11, 3.10
-for %%V in (312 311 310 39 38) do (
-    for %%P in (
-        "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
-        "%ProgramFiles%\Python%%V\python.exe"
-        "%ProgramFiles(x86)%\Python%%V\python.exe"
-    ) do (
-        if exist %%P (
-            set "PYTHON_CMD=%%P"
-            goto :python_found
-        )
-    )
-)
-
-:: 1f. Check the Windows Store stub location
-for %%P in (
-    "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe"
-    "%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe"
-) do (
-    if exist %%P (
-        :: Windows Store stubs silently do nothing — test they actually work
-        %%P --version >nul 2>&1
+for %%V in (3.13 3.12 3.11 3.10 3.9) do (
+    if not defined PYEXE (
+        py -%%V --version >nul 2>&1
         if !errorlevel! equ 0 (
-            set "PYTHON_CMD=%%P"
-            goto :python_found
+            py -%%V -c "import PySide6, PIL, requests, win32api, imageio" >nul 2>&1
+            if !errorlevel! equ 0 (
+                set "PYEXE=py -%%V"
+                echo Found compatible Python %%V with all dependencies.
+            )
         )
     )
 )
 
-:: Nothing worked
-call :show_error "Python Not Found" "Python 3 could not be found on this system.^^Please install Python 3.8+ from https://python.org^^and make sure to check 'Add Python to PATH' during setup,^^then run install.bat before launching."
-exit /b 1
+:: Fallback: plain "python" (covers installs not registered with py launcher)
+if not defined PYEXE (
+    python --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        python -c "import PySide6, PIL, requests, win32api, imageio" >nul 2>&1
+        if !errorlevel! equ 0 (
+            set "PYEXE=python"
+            echo Found compatible Python via system PATH.
+        )
+    )
+)
 
-:python_found
-:: Confirm the found Python is version 3.x (not some Python 2 remnant)
-%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info.major==3 else 1)" >nul 2>&1
-if %errorlevel% neq 0 (
-    call :show_error "Python Version Error" "A Python installation was found but it is not Python 3.^^Please install Python 3.8+ from https://python.org"
+if not defined PYEXE (
+    call :show_error "No Compatible Python Found" "No Python installation with all required dependencies was found.^^Please run install.bat to install dependencies."
     exit /b 1
 )
 
 :: -----------------------------------------------------------
-:: Step 2: Check critical dependencies
+:: Step 2: Locate the entry point
 :: -----------------------------------------------------------
-%PYTHON_CMD% -c "import customtkinter" >nul 2>&1
-if %errorlevel% neq 0 (
-    call :show_error "Missing Dependency" "customtkinter is not installed.^^Please run install.bat to install dependencies."
-    exit /b 1
-)
-
-%PYTHON_CMD% -c "import PIL" >nul 2>&1
-if %errorlevel% neq 0 (
-    call :show_error "Missing Dependency" "Pillow (PIL) is not installed.^^Please run install.bat to install dependencies."
-    exit /b 1
-)
-
-%PYTHON_CMD% -c "import requests" >nul 2>&1
-if %errorlevel% neq 0 (
-    call :show_error "Missing Dependency" "requests is not installed.^^Please run install.bat to install dependencies."
-    exit /b 1
-)
-
-:: -----------------------------------------------------------
-:: Step 3: Check main files exist
-:: -----------------------------------------------------------
-if exist "launchers-scripts\quick_launcher.py" (
-    set "LAUNCH_FILE=launchers-scripts\quick_launcher.py"
+if exist "launchers-scripts\launcher.py" (
+    set "LAUNCH_FILE=launchers-scripts\launcher.py"
     goto :launch
 )
 
@@ -118,26 +61,33 @@ if exist "main.py" (
     goto :launch
 )
 
-call :show_error "Files Not Found" "Neither quick_launcher.py nor main.py could be found.^^Make sure you are running this from the BeamSkin Studio root folder.^^Expected location: %CD%"
+call :show_error "Files Not Found" "Neither launcher.py nor main.py could be found.^^Make sure you are running this from the BeamSkin Studio root folder.^^Expected location: %CD%"
 exit /b 1
 
 :: -----------------------------------------------------------
-:: Step 4: Launch — capture output, detect crash
+:: Step 3: Launch via VBScript — no console, full crash guard
 :: -----------------------------------------------------------
 :launch
-%PYTHON_CMD% "%LAUNCH_FILE%" > "%LOG_FILE%" 2>&1
-set EXIT_CODE=%errorlevel%
+set "ABS_LAUNCH=%CD%\%LAUNCH_FILE%"
+set "ABS_WORKDIR=%CD%"
 
-if %EXIT_CODE% neq 0 (
-    call :show_error_with_log "BeamSkin Studio crashed on startup (Exit Code: %EXIT_CODE%)"
-    exit /b %EXIT_CODE%
+:: Resolve actual python.exe path from whichever command was selected
+for /f "delims=" %%P in ('%PYEXE% -c "import sys; print(sys.executable)"') do set "RESOLVED_PYEXE=%%P"
+
+set "VBS=%TEMP%\BeamSkinStudio_launch.vbs"
+
+> "%VBS%" (
+    echo Set ws = CreateObject^("WScript.Shell"^)
+    echo ws.CurrentDirectory = "%ABS_WORKDIR%"
+    echo ec = ws.Run^(Chr^(34^) ^& "%RESOLVED_PYEXE%" ^& Chr^(34^) ^& " " ^& Chr^(34^) ^& "%ABS_LAUNCH%" ^& Chr^(34^), 0, True^)
+    echo If ec ^<^> 0 Then MsgBox "BeamSkin Studio crashed ^(Exit Code: " ^& ec ^& "^)." ^& Chr^(10^) ^& Chr^(10^) ^& "Run install.bat to repair dependencies.", 16, "BeamSkin Studio - Error"
 )
 
+start "" /B wscript.exe "%VBS%"
 exit /b 0
 
 :: -----------------------------------------------------------
 :: :show_error  title  message
-:: Simple popup for pre-launch errors (no log file needed)
 :: -----------------------------------------------------------
 :show_error
 set "_TITLE=%~1"
@@ -155,7 +105,6 @@ goto :eof
 
 :: -----------------------------------------------------------
 :: :show_error_with_log  title
-:: Full scrollable log viewer popup for crashes
 :: -----------------------------------------------------------
 :show_error_with_log
 set "_TITLE=%~1"

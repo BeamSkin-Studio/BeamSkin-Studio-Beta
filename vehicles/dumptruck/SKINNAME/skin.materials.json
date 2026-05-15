@@ -1,14 +1,12 @@
 {
-  "dumptruck_body.skin.speedy": {
-    "name": "dumptruck_body.skin.speedy",
-    "mapTo": "dumptruck_body.skin.speedy",
+  "dumptruck_body.skin.SKINNAME": {
+    "name": "dumptruck_body.skin.SKINNAME",
+    "mapTo": "dumptruck_body.skin.SKINNAME",
     "class": "Material",
     "Stages": [
       {
         "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_body_ao.data.png",
         "clearCoatFactor": 1,
-        "colorPaletteMap": "/vehicles/dumptruck/dumptruck_skin_speedy_p.color.png",
-        "colorPaletteMapUseUV": 1,
         "detailBaseColorMapStrength": 0.129999995,
         "detailMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_b.color.png",
         "detailNormalMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_nm.normal.png",
@@ -25,9 +23,8 @@
       },
       {
         "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_body_ao.data.png",
-        "baseColorMap": "/vehicles/dumptruck/dumptruck_body_mat_b.color.png",
+        "baseColorMap": "vehicles/dumptruck/SKINNAME/dumptruck_skin_SKINNAME.dds",
         "clearCoatFactor": null,
-        "colorPaletteMapUseUV": null,
         "detailBaseColorMapStrength": 0.00999999978,
         "detailMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_b.color.png",
         "detailNormalMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_nm.normal.png",
@@ -51,60 +48,15 @@
     "translucentBlendOp": "None",
     "version": 1.5
   },
-  "dumptruck_cab.skin.graffiti": {
-    "name": "dumptruck_cab.skin.graffiti",
-    "mapTo": "dumptruck_cab.skin.graffiti",
+  "dumptruck_cab.skin.SKINNAME": {
+    "name": "dumptruck_cab.skin.SKINNAME",
+    "mapTo": "dumptruck_cab.skin.SKINNAME",
     "class": "Material",
     "Stages": [
       {
         "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_cab_ao.data.png",
-        "baseColorFactor": null,
-        "baseColorMap": "/vehicles/dumptruck/dumptruck_cab_b.color.png",
+        "baseColorMap": "vehicles/dumptruck/SKINNAME/dumptruck_skin_SKINNAME.dds",
         "clearCoatFactor": null,
-        "colorPaletteMapUseUV": 1,
-        "metallicFactor": 1,
-        "metallicMap": "/vehicles/dumptruck/dumptruck_cab_m.data.png",
-        "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
-        "opacityMapUseUV": null,
-        "roughnessMap": "/vehicles/dumptruck/dumptruck_cab_r.data.png"
-      },
-      {
-        "baseColorFactor": null,
-        "clearCoatFactor": 0.100000001,
-        "colorPaletteMap": "/vehicles/dumptruck/dumptruck_skin_graffiti_p.color.png",
-        "colorPaletteMapUseUV": 1,
-        "metallicFactor": null,
-        "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
-        "opacityMap": "/vehicles/dumptruck/dumptruck_cab_graffiti_c.data.png",
-        "opacityMapUseUV": null
-      },
-      {
-        "baseColorFactor": [
-          0,
-          0,
-          0,
-          1
-        ],
-        "opacityMap": "/vehicles/dumptruck/dumptruck_skin_graffiti_c.data.png",
-        "opacityMapUseUV": 1
-      },
-      {}
-    ],
-    "activeLayers": 3,
-    "dynamicCubemap": true,
-    "translucentBlendOp": "None",
-    "version": 1.5
-  },
-  "dumptruck_cab.skin.speedy": {
-    "name": "dumptruck_cab.skin.speedy",
-    "mapTo": "dumptruck_cab.skin.speedy",
-    "class": "Material",
-    "Stages": [
-      {
-        "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_cab_ao.data.png",
-        "baseColorMap": "/vehicles/dumptruck/dumptruck_cab_b.color.png",
-        "clearCoatFactor": null,
-        "colorPaletteMapUseUV": null,
         "metallicFactor": 1,
         "metallicMap": "/vehicles/dumptruck/dumptruck_cab_m.data.png",
         "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
@@ -112,8 +64,6 @@
       },
       {
         "clearCoatFactor": 1,
-        "colorPaletteMap": "/vehicles/dumptruck/dumptruck_skin_speedy_p.color.png",
-        "colorPaletteMapUseUV": 1,
         "metallicFactor": 1,
         "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
         "opacityMap": "/vehicles/dumptruck/dumptruck_cab_c.data.png"
@@ -126,43 +76,3 @@
     "translucentBlendOp": "None",
     "version": 1.5
   },
-  "dumptruck_railing.skin.colorableRailing": {
-    "name": "dumptruck_railing.skin.colorableRailing",
-    "mapTo": "dumptruck_railing.skin.colorableRailing",
-    "class": "Material",
-    "Stages": [
-      {
-        "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_cab_ao.data.png",
-        "colorPaletteMap": "/vehicles/common/nullcolormaskB.color.png",
-        "clearCoatFactor": 1,
-        "metallicFactor": 1,
-        "metallicMap": "/vehicles/dumptruck/dumptruck_cab_m.data.png",
-        "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
-        "roughnessMap": "/vehicles/dumptruck/dumptruck_cab_r.data.png"
-      },
-      {},
-      {},
-      {}
-    ],
-    "activeLayers": 1,
-    "dynamicCubemap": true,
-    "translucentBlendOp": "None",
-    "version": 1.5
-  },
-  "hirochi_heavy_machinery_decals.skin.graffiti": {
-    "name": "hirochi_heavy_machinery_decals.skin.graffiti",
-    "mapTo": "hirochi_heavy_machinery_decals.skin.graffiti",
-    "class": "Material",
-    "Stages": [
-      {
-        "opacityFactor": 0
-      },
-      {},
-      {},
-      {}
-    ],
-    "translucent": true,
-    "translucentBlendOp": "PreMulAlpha",
-    "version": 1.5
-  }
-}

@@ -1,0 +1,11 @@
+{
+"van_skin_SKINNAMEAMBULANCE": {
+    "information":{
+        "authors":"Top Tier Studios",
+        "name":"Your Skin Name",
+        "value":1200,
+    }
+    "slotType" : "paint_design",
+    "globalSkin" : "SKINNAMEAMB",
+}
+}

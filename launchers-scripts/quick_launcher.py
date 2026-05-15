@@ -1,213 +1,288 @@
 """
-BeamSkin Studio - Quick Launcher
-Cross-platform splash screen and app launcher
+BeamSkin Studio - Quick Launcher  (PySide6 edition)
+Cross-platform splash screen and app launcher.
+Replaces the customtkinter version — no extra dependencies beyond PySide6.
 """
-import customtkinter as ctk
-from PIL import Image
-import subprocess
-import sys
-import time
-import threading
+
 import os
 import platform
+import subprocess
+import sys
+import tempfile
+
+from PySide6.QtCore    import Qt, QTimer
+from PySide6.QtGui     import QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QApplication, QLabel, QProgressBar, QVBoxLayout, QWidget,
+)
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+READY_SIGNAL     = os.path.join(tempfile.gettempdir(), "BeamSkinStudio_ready.signal")
+POLL_INTERVAL_MS = 100    # how often to check for the signal (ms)
+POLL_TIMEOUT_MS  = 15_000 # close anyway after this long if signal never arrives (ms)
+PROGRESS_STEP_MS = 21     # timer interval per progress tick (matches original)
 
 COLORS = {
-    "bg": "#0a0a0a",
-    "frame_bg": "#141414",
-    "card": "#1e1e1e",
-    "accent": "#e67e22",
-    "text": "#f5f5f5",
-    "text_secondary": "#999999"
+    "bg":             "#0a0a0a",
+    "frame_bg":       "#141414",
+    "card":           "#1e1e1e",
+    "accent":         "#e67e22",
+    "text":           "#f5f5f5",
+    "text_secondary": "#999999",
 }
 
 print(f"[DEBUG] Loading class: QuickLauncher")
 print(f"[DEBUG] Platform: {platform.system()}")
 
+
+# ── Splash window ─────────────────────────────────────────────────────────────
+
+class SplashWindow(QWidget):
+    """Frameless 600×450 splash with logo, subtitle labels, and progress bar."""
+
+    BORDER_WIDTH = 2
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self.setFixedSize(600, 450)
+        self.setStyleSheet(f"background-color: {COLORS['bg']};")
+
+        self._build_ui()
+        self._center()
+
+    # ── UI construction ───────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(
+            self.BORDER_WIDTH, self.BORDER_WIDTH,
+            self.BORDER_WIDTH, self.BORDER_WIDTH,
+        )
+        outer.setSpacing(0)
+
+        # Inner content area
+        inner = QWidget()
+        inner.setStyleSheet(f"background-color: {COLORS['bg']};")
+        outer.addWidget(inner)
+
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignCenter)
+
+        # Logo
+        logo_lbl = self._make_logo_label()
+        layout.addWidget(logo_lbl, alignment=Qt.AlignHCenter)
+        layout.addSpacing(20)
+
+        # Tagline
+        tagline = QLabel("Professional Skin Modding Tool")
+        tagline.setFont(self._font(13))
+        tagline.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        tagline.setAlignment(Qt.AlignCenter)
+        layout.addWidget(tagline)
+        layout.addSpacing(25)
+
+        # Loading label
+        loading = QLabel("Loading BeamSkin Studio...")
+        loading.setFont(self._font(15, bold=True))
+        loading.setStyleSheet(f"color: {COLORS['text']}; background: transparent;")
+        loading.setAlignment(Qt.AlignCenter)
+        layout.addWidget(loading)
+        layout.addSpacing(25)
+
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedSize(420, 8)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {COLORS['card']};
+                border: none;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLORS['accent']};
+                border-radius: 4px;
+            }}
+        """)
+        layout.addWidget(self.progress_bar, alignment=Qt.AlignHCenter)
+        layout.addSpacing(15)
+
+        # "Please wait" label
+        wait_lbl = QLabel("Please wait...")
+        wait_lbl.setFont(self._font(11))
+        wait_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        wait_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(wait_lbl)
+
+    def _make_logo_label(self) -> QLabel:
+        lbl = QLabel()
+        lbl.setFixedSize(200, 200)
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setStyleSheet("background: transparent;")
+
+        logo_path = self._find_logo()
+        if logo_path:
+            px = QPixmap(logo_path).scaled(
+                200, 200,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            lbl.setPixmap(px)
+            print(f"[DEBUG] Loaded logo from: {logo_path}")
+        else:
+            lbl.setText("🎨")
+            lbl.setFont(self._font(72))
+            lbl.setStyleSheet(f"color: {COLORS['text']}; background: transparent;")
+            print("[DEBUG] Logo not found — using fallback emoji")
+
+        return lbl
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _find_logo() -> str | None:
+        """Return logo path relative to this script's parent directory, or None."""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(script_dir)
+        candidate = os.path.join(parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png")
+        return candidate if os.path.exists(candidate) else None
+
+    @staticmethod
+    def _font(size: int, bold: bool = False) -> QFont:
+        f = QFont()
+        f.setPointSize(size)
+        if bold:
+            f.setBold(True)
+        return f
+
+    def _center(self):
+        screen = QApplication.primaryScreen().geometry()
+        self.move(
+            (screen.width()  - self.width())  // 2,
+            (screen.height() - self.height()) // 2,
+        )
+
+    # ── Accent border (painted, not via stylesheet, to avoid layout issues) ──
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        pen = QPen(QColor(COLORS["accent"]))
+        pen.setWidth(self.BORDER_WIDTH)
+        painter.setPen(pen)
+        # inset by half the pen width so it's fully inside the widget
+        offset = self.BORDER_WIDTH // 2
+        painter.drawRect(
+            offset, offset,
+            self.width()  - self.BORDER_WIDTH,
+            self.height() - self.BORDER_WIDTH,
+        )
+
+
+# ── Launcher controller ───────────────────────────────────────────────────────
+
 class QuickLauncher:
     def __init__(self):
-        print(f"[DEBUG] __init__ called")
+        print("[DEBUG] __init__ called")
+
+        self.app = QApplication.instance() or QApplication(sys.argv)
 
         self.launch_main_app()
 
-        self.app = ctk.CTk()
-        self.app.title("BeamSkin Studio")
-        self.app.geometry("600x450")
-        self.app.resizable(False, False)
-        self.app.configure(fg_color=COLORS["bg"])
+        self.window = SplashWindow()
+        self.window.show()
+        self.window.raise_()
+        self.window.activateWindow()
 
-        if platform.system() != "Darwin":
-            self.app.attributes('-topmost', True)
+        self._progress_step   = 0
+        self._poll_elapsed_ms = 0
 
-        try:
-            self.app.overrideredirect(True)
-        except:
+        self._progress_timer = QTimer()
+        self._progress_timer.setInterval(PROGRESS_STEP_MS)
+        self._progress_timer.timeout.connect(self._on_progress_tick)
 
-            pass
+        self._poll_timer = QTimer()
+        self._poll_timer.setInterval(POLL_INTERVAL_MS)
+        self._poll_timer.timeout.connect(self._poll_for_ready)
 
-        self.logo_image = self._load_logo()
-
-        self.center_window()
-
-        self.create_ui()
-
-        self.app.lift()
-        self.app.focus_force()
-
-    def _load_logo(self):
-        """Load the BeamSkin Studio logo"""
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = os.path.dirname(script_dir)
-
-        logo_path = os.path.join(parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png")
-
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-
-                logo_image = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(350, 175)
-                )
-                print(f"[DEBUG] Loaded logo from: {logo_path}")
-                return logo_image
-            else:
-                print(f"[DEBUG] Logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load logo: {e}")
-            return None
+    # ── Subprocess ────────────────────────────────────────────────────────────
 
     def launch_main_app(self):
-        print(f"[DEBUG] launch_main_app called - launching main.py NOW")
-        """Launch main.py immediately"""
+        print("[DEBUG] launch_main_app called - launching main.py NOW")
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = os.path.dirname(script_dir)
-        main_py_path = os.path.join(parent_dir, "main.py")
+        script_dir  = os.path.dirname(os.path.abspath(__file__))
+        parent_dir  = os.path.dirname(script_dir)
+        main_py     = os.path.join(parent_dir, "main.py")
+        system      = platform.system()
 
-        system = platform.system()
-
-        if system == 'Windows':
-
+        if system == "Windows":
             self.process = subprocess.Popen(
-                ["pythonw", main_py_path],
+                ["pythonw", main_py],
                 cwd=parent_dir,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-        elif system == 'Darwin':
-
-            self.process = subprocess.Popen(
-                ["python3", main_py_path],
-                cwd=parent_dir,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
         else:
-
             self.process = subprocess.Popen(
-                ["python3", main_py_path],
+                ["python3", main_py],
                 cwd=parent_dir,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
 
         print(f"[DEBUG] main.py launched, PID: {self.process.pid}")
 
-    def wait_and_close(self):
-        print(f"[DEBUG] wait_and_close called")
-        """Animate progress bar, then wait for main app to load, then close"""
+    # ── Progress animation ────────────────────────────────────────────────────
 
-        for i in range(101):
-            self.progress_bar.set(i / 100)
-            self.app.update()
-            time.sleep(0.038)
+    def _on_progress_tick(self):
+        self._progress_step += 1
+        self.window.progress_bar.setValue(self._progress_step)
 
-        time.sleep(0.5)
+        if self._progress_step >= 100:
+            self._progress_timer.stop()
+            print("[DEBUG] Progress complete, waiting for ready signal...")
+            self._poll_timer.start()
 
-        self.app.destroy()
+    # ── Ready-signal polling ──────────────────────────────────────────────────
+
+    def _poll_for_ready(self):
+        self._poll_elapsed_ms += POLL_INTERVAL_MS
+
+        if os.path.exists(READY_SIGNAL):
+            print(f"[DEBUG] Ready signal received after ~{self._poll_elapsed_ms}ms — closing splash")
+            try:
+                os.remove(READY_SIGNAL)
+            except Exception:
+                pass
+            self._close()
+            return
+
+        if self._poll_elapsed_ms >= POLL_TIMEOUT_MS:
+            print(f"[DEBUG] Ready signal timeout ({POLL_TIMEOUT_MS}ms) — closing splash anyway")
+            self._close()
+
+    def _close(self):
+        self._poll_timer.stop()
+        self.window.close()
+        self.app.quit()
+
+    # ── Entry point ───────────────────────────────────────────────────────────
 
     def run(self):
-        print(f"[DEBUG] run called")
-        """Start the launcher"""
+        print("[DEBUG] run called")
+        self._progress_timer.start()
+        sys.exit(self.app.exec())
 
-        threading.Thread(target=self.wait_and_close, daemon=True).start()
 
-        self.app.mainloop()
-
-    def center_window(self):
-        print(f"[DEBUG] center_window called")
-        """Center the window on screen"""
-        self.app.update_idletasks()
-        x = (self.app.winfo_screenwidth() // 2) - (600 // 2)
-        y = (self.app.winfo_screenheight() // 2) - (450 // 2)
-        self.app.geometry(f"600x450+{x}+{y}")
-
-    def create_ui(self):
-        print(f"[DEBUG] create_ui called")
-        """Create the launcher UI"""
-
-        main_frame = ctk.CTkFrame(
-            self.app,
-            fg_color=COLORS["frame_bg"],
-            border_width=2,
-            border_color=COLORS["accent"]
-        )
-        main_frame.pack(fill="both", expand=True)
-
-        content_frame = ctk.CTkFrame(main_frame, fg_color=COLORS["bg"])
-        content_frame.pack(fill="both", expand=True, padx=30, pady=30)
-
-        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        header_frame.pack(expand=True)
-
-        if self.logo_image:
-
-            ctk.CTkLabel(
-                header_frame,
-                text="",
-                image=self.logo_image
-            ).pack(pady=(0, 20))
-        else:
-
-            ctk.CTkLabel(
-                header_frame,
-                text="🎨",
-                font=ctk.CTkFont(size=72)
-            ).pack(pady=(0, 15))
-
-        ctk.CTkLabel(
-            header_frame,
-            text="Professional Skin Modding Tool",
-            font=ctk.CTkFont(size=13),
-            text_color=COLORS["text_secondary"]
-        ).pack(pady=(0, 25))
-
-        ctk.CTkLabel(
-            header_frame,
-            text="Loading BeamSkin Studio...",
-            font=ctk.CTkFont(size=15),
-            text_color=COLORS["text"]
-        ).pack(pady=(0, 25))
-
-        self.progress_bar = ctk.CTkProgressBar(
-            header_frame,
-            width=420,
-            height=8,
-            corner_radius=4,
-            fg_color=COLORS["card"],
-            progress_color=COLORS["accent"]
-        )
-        self.progress_bar.pack(pady=(0, 15))
-        self.progress_bar.set(0)
-
-        ctk.CTkLabel(
-            header_frame,
-            text="Please wait...",
-            font=ctk.CTkFont(size=11),
-            text_color=COLORS["text_secondary"]
-        ).pack()
+# ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     launcher = QuickLauncher()

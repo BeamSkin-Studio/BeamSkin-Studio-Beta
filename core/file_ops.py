@@ -1,3 +1,7 @@
+"""
+core/file_ops.py — Mod generation
+"""
+
 import os
 import shutil
 import tempfile
@@ -6,905 +10,992 @@ import getpass
 import re
 import json
 
-from core.colorable_ops import generate_colorable_skin
+from core.colorable_ops import (
+    generate_colorable_skin,
+    generate_colorable_skin_variant,
+    sanitize_skin_id,
+    sanitize_folder_name,
+)
 
-def sanitize_skin_id(name):
-    return name.replace(" ", "")
 
-def sanitize_folder_name(name):
-    return name.replace(" ", "_")
+# ─────────────────────────────────────────────────────────────────────────────
+# SANITISERS
+# ─────────────────────────────────────────────────────────────────────────────
 
-def sanitize_mod_name(name):
+def sanitize_mod_name(name: str) -> str:
     return name.strip().replace(" ", "_")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATH HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
 
 def get_beamng_mods_path():
     try:
         from core.settings import get_mods_folder_path
-        configured_path = get_mods_folder_path()
-        if configured_path and os.path.exists(configured_path):
-            print(f"[DEBUG] Using configured mods path: {configured_path}")
-            return configured_path
-        else:
-            print(f"[DEBUG] Configured mods path not set or doesn't exist")
+        configured = get_mods_folder_path()
+        if configured and os.path.exists(configured):
+            print(f"[DEBUG] Using configured mods path: {configured}")
+            return configured
     except ImportError:
-        print(f"[DEBUG] Could not import settings module")
-    
+        pass
+
     username = getpass.getuser()
-    default_path = os.path.join(
-        "C:\\Users",
-        username,
-        "AppData",
-        "Local",
-        "BeamNG.drive",
-        "0.33",
-        "mods"
+    default  = os.path.join(
+        "C:\\Users", username, "AppData", "Local",
+        "BeamNG.drive", "0.33", "mods"
     )
-    print(f"[DEBUG] Using default mods path: {default_path}")
-    return default_path
+    print(f"[DEBUG] Using default mods path: {default}")
+    return default
+
+
+def _find_normal_template(base_carid: str) -> str:
+    """Return path to the SKINNAME template folder for a normal vehicle."""
+    return os.path.join(os.getcwd(), "vehicles", base_carid, "SKINNAME")
+
+
+def _find_variant_template(base_carid: str, variant_suffix: str) -> str:
+    """
+    Return path to the variant template folder (case-insensitive scan).
+
+    Expected folder name: SKINNAME + suffix.upper()
+      pickup + "ambulance" → SKINNAMEAMBULANCE
+      van    + "box"       → SKINNAMEBOX
+
+    Falls back to the exact uppercase construction if scan finds nothing.
+    """
+    vehicles_dir = os.path.join(os.getcwd(), "vehicles", base_carid)
+    target_lower = f"skinname{variant_suffix.lower()}"
+
+    if os.path.isdir(vehicles_dir):
+        for entry in os.listdir(vehicles_dir):
+            if entry.lower() == target_lower and os.path.isdir(
+                os.path.join(vehicles_dir, entry)
+            ):
+                found = os.path.join(vehicles_dir, entry)
+                print(f"[DEBUG] Found variant template: {found}")
+                return found
+
+    # Fallback to the all-caps construction
+    fallback = os.path.join(vehicles_dir, f"SKINNAME{variant_suffix.upper()}")
+    print(f"[DEBUG] Variant template fallback: {fallback}")
+    return fallback
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ZIP
+# ─────────────────────────────────────────────────────────────────────────────
 
 def zip_folder(source_dir, zip_path):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root_dir, _, files in os.walk(source_dir):
             for file in files:
                 full_path = os.path.join(root_dir, file)
-                relative_path = os.path.relpath(full_path, source_dir)
-                zipf.write(full_path, relative_path)
+                rel_path  = os.path.relpath(full_path, source_dir)
+                zipf.write(full_path, rel_path)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DDS FILENAME VALIDATION
+# ─────────────────────────────────────────────────────────────────────────────
 
 def validate_and_fix_dds_filenames(skin_folder_path, car_id):
-    results = {
-        'renamed': [],
-        'already_correct': [],
-        'errors': []
-    }
-    
+    results = {"renamed": [], "already_correct": [], "errors": []}
     if not os.path.exists(skin_folder_path):
-        results['errors'].append((skin_folder_path, "Folder does not exist"))
+        results["errors"].append((skin_folder_path, "Folder does not exist"))
         return results
-    
+
     correct_pattern = re.compile(rf'^{re.escape(car_id)}_skin_.*\.dds$', re.IGNORECASE)
-    
+
     for filename in os.listdir(skin_folder_path):
-        if not filename.lower().endswith('.dds'):
+        if not filename.lower().endswith(".dds"):
             continue
-        
         file_path = os.path.join(skin_folder_path, filename)
-        
         if correct_pattern.match(filename):
-            print(f"[DEBUG] DDS file already correct: {filename}")
-            results['already_correct'].append(filename)
+            results["already_correct"].append(filename)
             continue
-        
-        print(f"[DEBUG] DDS file needs correction: {filename}")
-        
-        skin_name = None
-        
-        if '_skin_' in filename.lower():
-            parts = filename.split('_skin_')
-            if len(parts) >= 2:
-                skin_name = parts[-1].replace('.dds', '').replace('.DDS', '')
-        elif filename.lower().startswith('skin_'):
-            skin_name = filename[5:].replace('.dds', '').replace('.DDS', '')
-        elif 'skin' in filename.lower():
-            skin_index = filename.lower().find('skin')
-            skin_name = filename[skin_index + 4:].replace('.dds', '').replace('.DDS', '')
-            skin_name = skin_name.lstrip('_')
+
+        if "_skin_" in filename.lower():
+            parts     = filename.split("_skin_")
+            skin_name = parts[-1].replace(".dds", "").replace(".DDS", "") if len(parts) >= 2 else None
+        elif filename.lower().startswith("skin_"):
+            skin_name = filename[5:].replace(".dds", "").replace(".DDS", "")
+        elif "skin" in filename.lower():
+            idx       = filename.lower().find("skin")
+            skin_name = filename[idx + 4:].replace(".dds", "").replace(".DDS", "").lstrip("_")
         else:
-            skin_name = filename.replace('.dds', '').replace('.DDS', '')
-        
+            skin_name = filename.replace(".dds", "").replace(".DDS", "")
+
         if not skin_name:
-            results['errors'].append((filename, "Could not extract skin name"))
+            results["errors"].append((filename, "Could not extract skin name"))
             continue
-        
+
         new_filename = f"{car_id}_skin_{skin_name}.dds"
         new_file_path = os.path.join(skin_folder_path, new_filename)
-        
         if os.path.exists(new_file_path) and new_file_path != file_path:
-            results['errors'].append((filename, f"Target file already exists: {new_filename}"))
+            results["errors"].append((filename, f"Target already exists: {new_filename}"))
             continue
-        
         try:
             os.rename(file_path, new_file_path)
+            results["renamed"].append((filename, new_filename))
             print(f"[DEBUG] Renamed: {filename} -> {new_filename}")
-            results['renamed'].append((filename, new_filename))
         except Exception as e:
-            results['errors'].append((filename, f"Rename failed: {str(e)}"))
-    
+            results["errors"].append((filename, f"Rename failed: {e}"))
+
     return results
 
+
 def process_dds_files_in_mod(temp_mod_root):
-    total_results = {
-        'renamed': [],
-        'already_correct': [],
-        'errors': [],
-        'skins_processed': 0
-    }
-    
+    totals = {"renamed": [], "already_correct": [], "errors": [], "skins_processed": 0}
     vehicles_path = os.path.join(temp_mod_root, "vehicles")
-    
     if not os.path.exists(vehicles_path):
-        print("[WARNING] No vehicles folder found in mod")
-        return total_results
-    
+        return totals
+
     for car_id in os.listdir(vehicles_path):
         car_path = os.path.join(vehicles_path, car_id)
-        
         if not os.path.isdir(car_path):
             continue
-        
-        print(f"[DEBUG] Processing DDS files for car: {car_id}")
-        
         for item in os.listdir(car_path):
             item_path = os.path.join(car_path, item)
-            
             if not os.path.isdir(item_path):
                 continue
-            
-            print(f"[DEBUG]   Processing skin folder: {item}")
-            results = validate_and_fix_dds_filenames(item_path, car_id)
-            
-            total_results['renamed'].extend([(car_id, item, old, new) for old, new in results['renamed']])
-            total_results['already_correct'].extend([(car_id, item, f) for f in results['already_correct']])
-            total_results['errors'].extend([(car_id, item, f, err) for f, err in results['errors']])
-            total_results['skins_processed'] += 1
-    
-    print(f"\n[DEBUG] DDS File Processing Summary:")
-    print(f"[DEBUG]   Skins processed: {total_results['skins_processed']}")
-    print(f"[DEBUG]   Files renamed: {len(total_results['renamed'])}")
-    print(f"[DEBUG]   Files already correct: {len(total_results['already_correct'])}")
-    print(f"[DEBUG]   Errors: {len(total_results['errors'])}")
-    
-    if total_results['renamed']:
-        print(f"[DEBUG] Renamed files:")
-        for car_id, skin, old, new in total_results['renamed']:
-            print(f"[DEBUG]   {car_id}/{skin}: {old} -> {new}")
-    
-    if total_results['errors']:
-        print(f"[DEBUG] Errors:")
-        for car_id, skin, filename, error in total_results['errors']:
-            print(f"[DEBUG]   {car_id}/{skin}/{filename}: {error}")
-    
-    return total_results
+            res = validate_and_fix_dds_filenames(item_path, car_id)
+            totals["renamed"].extend([(car_id, item, o, n) for o, n in res["renamed"]])
+            totals["already_correct"].extend([(car_id, item, f) for f in res["already_correct"]])
+            totals["errors"].extend([(car_id, item, f, e) for f, e in res["errors"]])
+            totals["skins_processed"] += 1
+
+    print(f"[DEBUG] DDS processing: {totals['skins_processed']} skins, "
+          f"{len(totals['renamed'])} renamed, {len(totals['errors'])} errors")
+    return totals
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INFO JSON  (config data)
+# ─────────────────────────────────────────────────────────────────────────────
 
 def update_info_json_fields(json_path, config_type, config_name):
     try:
-        print(f"[DEBUG] Updating info JSON fields in: {os.path.basename(json_path)}")
-        
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             content = f.read()
-        
-        config_type_pattern = r'("Config Type"\s*:\s*")[^"]*(")'
-        if re.search(config_type_pattern, content):
-            content = re.sub(config_type_pattern, rf'\g<1>{config_type}\g<2>', content)
-            print(f"[DEBUG]   ✓ Set Config Type to: {config_type}")
-        else:
-            print(f"[WARNING]   'Config Type' key not found")
-        
-        configuration_pattern = r'("Configuration"\s*:\s*")[^"]*(")'
-        if re.search(configuration_pattern, content):
-            content = re.sub(configuration_pattern, rf'\g<1>{config_name}\g<2>', content)
-            print(f"[DEBUG]   ✓ Set Configuration to: {config_name}")
-        else:
-            print(f"[WARNING]   'Configuration' key not found")
-        
-        with open(json_path, 'w', encoding='utf-8') as f:
+
+        for pattern, value, label in [
+            (r'("Config Type"\s*:\s*")[^"]*(")',   config_type, "Config Type"),
+            (r'("Configuration"\s*:\s*")[^"]*(")', config_name, "Configuration"),
+        ]:
+            if re.search(pattern, content):
+                content = re.sub(pattern, rf'\g<1>{value}\g<2>', content)
+                print(f"[DEBUG]   ✓ Set {label} to: {value}")
+            else:
+                print(f"[WARNING]   '{label}' key not found in {os.path.basename(json_path)}")
+
+        with open(json_path, "w", encoding="utf-8") as f:
             f.write(content)
-        
         return True
-        
     except Exception as e:
-        print(f"[ERROR] Failed to update info JSON fields: {e}")
+        print(f"[ERROR] update_info_json_fields: {e}")
         return False
+
 
 def process_skin_config_data(skin_data, base_carid, skin_name, temp_mod_root, template_path):
     if "config_data" not in skin_data:
         return True
-    
-    config_data = skin_data["config_data"]
-    config_type = config_data.get("config_type", "Factory")
-    config_name = config_data.get("config_name", skin_data.get("name", skin_name))
-    pc_path = config_data.get("pc_file_path")
-    jpg_path = config_data.get("jpg_file_path")
-    
-    print(f"[DEBUG] ===== Processing config data for {skin_name} =====")
-    print(f"[DEBUG]   Config Type: {config_type}")
-    print(f"[DEBUG]   Config Name (in-game): {config_name}")
-    print(f"[DEBUG]   .pc file: {pc_path}")
-    print(f"[DEBUG]   .jpg file: {jpg_path}")
-    print(f"[DEBUG]   Template path: {template_path}")
-    print(f"[DEBUG]   Template exists: {os.path.exists(template_path)}")
-    
+
+    cd          = skin_data["config_data"]
+    config_type = cd.get("config_type", "Factory")
+    config_name = cd.get("config_name", skin_name)
+    pc_path     = cd.get("pc_file_path")
+    jpg_path    = cd.get("jpg_file_path")
+
+    print(f"[DEBUG] ===== Config data for {skin_name} =====")
+
     has_errors = False
     if pc_path and not os.path.exists(pc_path):
-        print(f"[ERROR]   .pc file not found: {pc_path}")
-        has_errors = True
+        print(f"[ERROR] .pc not found: {pc_path}"); has_errors = True
     if jpg_path and not os.path.exists(jpg_path):
-        print(f"[ERROR]   .jpg file not found: {jpg_path}")
-        has_errors = True
-    
+        print(f"[ERROR] .jpg not found: {jpg_path}"); has_errors = True
     if has_errors:
-        print(f"[ERROR] Config data validation failed for {skin_name}")
         return False
-    
+
     try:
         vehicle_root = os.path.join(temp_mod_root, "vehicles", base_carid)
         os.makedirs(vehicle_root, exist_ok=True)
-        print(f"[DEBUG]   Vehicle root: {vehicle_root}")
-        
+
         if pc_path:
-            dest_pc = os.path.join(vehicle_root, f"{skin_name}.pc")
-            shutil.copy2(pc_path, dest_pc)
-            print(f"[DEBUG]   ✓ Exported .pc: {dest_pc}")
-
+            shutil.copy2(pc_path,  os.path.join(vehicle_root, f"{skin_name}.pc"))
+            print(f"[DEBUG]   ✓ Copied .pc")
         if jpg_path:
-            dest_jpg = os.path.join(vehicle_root, f"{skin_name}.jpg")
-            shutil.copy2(jpg_path, dest_jpg)
-            print(f"[DEBUG]   ✓ Exported .jpg: {dest_jpg}")
+            shutil.copy2(jpg_path, os.path.join(vehicle_root, f"{skin_name}.jpg"))
+            print(f"[DEBUG]   ✓ Copied .jpg")
 
-        print(f"[DEBUG]   Searching for info template...")
-        
+        # Find info template
         vehicle_template_root = os.path.dirname(template_path)
-        
-        source_info_file = None
-        
-        if not os.path.exists(vehicle_template_root):
-            print(f"[ERROR]   Vehicle template root does not exist: {vehicle_template_root}")
-            return False
-        
-        print(f"[DEBUG]   Vehicle template root: {vehicle_template_root}")
-        
-        print(f"[DEBUG]   Files in vehicle root:")
-        for f in os.listdir(vehicle_template_root):
-            print(f"[DEBUG]     - {f}")
-        
-        for filename in ["info.json", "info_template.json"]:
-            potential_path = os.path.join(vehicle_template_root, filename)
-            if os.path.exists(potential_path):
-                source_info_file = potential_path
-                print(f"[DEBUG]   Found info file: {filename}")
-                break
-        
-        if not source_info_file:
-            for filename in os.listdir(vehicle_template_root):
-                if filename.startswith("info") and filename.endswith(".json"):
-                    source_info_file = os.path.join(vehicle_template_root, filename)
-                    print(f"[DEBUG]   Found info file (wildcard): {filename}")
-                    break
+        source_info = None
+        for fn in ["info.json", "info_template.json"]:
+            p = os.path.join(vehicle_template_root, fn)
+            if os.path.exists(p):
+                source_info = p; break
+        if not source_info:
+            for fn in os.listdir(vehicle_template_root):
+                if fn.startswith("info") and fn.endswith(".json"):
+                    source_info = os.path.join(vehicle_template_root, fn); break
 
-        if source_info_file:
-            dest_info = os.path.join(vehicle_root, f"info_{skin_name}.json")
-            print(f"[DEBUG]   Copying: {source_info_file}")
-            print(f"[DEBUG]   To: {dest_info}")
-            
-            shutil.copy2(source_info_file, dest_info)
-            
-            if os.path.exists(dest_info):
-                print(f"[DEBUG]   ✓ File copied successfully")
-                
-                result = update_info_json_fields(dest_info, config_type, config_name)
-                
-                if result:
-                    print(f"[DEBUG]   ✓ FINAL: Exported info_{skin_name}.json")
-                    print(f"[DEBUG]   ✓ Set Configuration to: '{config_name}'")
-                else:
-                    print(f"[WARNING]   Info JSON fields update failed")
-            else:
-                print(f"[ERROR]   File copy failed - destination does not exist!")
-                return False
-        else:
-            print(f"[ERROR]   No info.json template found in {template_path}")
+        if not source_info:
+            print(f"[ERROR] No info.json template in {vehicle_template_root}")
             return False
-        
-        print(f"[DEBUG] ===== Config data processing complete =====")
+
+        dest_info = os.path.join(vehicle_root, f"info_{skin_name}.json")
+        shutil.copy2(source_info, dest_info)
+        update_info_json_fields(dest_info, config_type, config_name)
+        print(f"[DEBUG] ===== Config data complete =====")
         return True
-        
+
     except Exception as e:
-        print(f"[ERROR] process_skin_config_data: {e}")
         import traceback
+        print(f"[ERROR] process_skin_config_data: {e}")
         traceback.print_exc()
         return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MATERIAL PROPERTIES  (non-colorable DDS skins)
+# ─────────────────────────────────────────────────────────────────────────────
 
 def process_material_properties(skin_data, base_carid, skin_id, dest_skin_folder):
     if "material_properties" not in skin_data:
         return True
-    
+
     material_props = skin_data["material_properties"]
     print(f"[DEBUG] ===== Processing material properties for {skin_id} =====")
-    print(f"[DEBUG]   Materials to update: {len(material_props)}")
-    print(f"[DEBUG]   Destination folder: {dest_skin_folder}")
-    
-    print(f"[DEBUG]   Material properties data structure (from skin_data):")
-    import json as json_module
-    print(f"[DEBUG]   {json_module.dumps(material_props, indent=4)}")
-    for mat_name, stages in material_props.items():
-        print(f"[DEBUG]     Material: {mat_name}")
-        for stage_key, props in stages.items():
-            print(f"[DEBUG]       Stage {stage_key} (type: {type(stage_key)}): {props}")
-    
+
+    mat_files = []
+    for root, _, files in os.walk(dest_skin_folder):
+        for fn in files:
+            if fn.endswith(".materials.json") or fn == "materials.json":
+                mat_files.append(os.path.join(root, fn))
+
+    if not mat_files:
+        print(f"[WARNING] No .materials.json found in {dest_skin_folder}")
+        return False
+
     try:
-        materials_files = []
-        for root, dirs, files in os.walk(dest_skin_folder):
-            for filename in files:
-                if filename.endswith('.materials.json') or filename == 'materials.json':
-                    materials_files.append(os.path.join(root, filename))
-        
-        if not materials_files:
-            print(f"[WARNING]   No .materials.json files found in {dest_skin_folder}")
-            return False
-        
-        print(f"[DEBUG]   Found {len(materials_files)} material file(s)")
-        for mf in materials_files:
-            print(f"[DEBUG]     - {mf}")
-        
-        for material_file in materials_files:
-            print(f"[DEBUG]   Processing: {os.path.basename(material_file)}")
-            
-            with open(material_file, 'r', encoding='utf-8') as f:
+        for mat_file in mat_files:
+            with open(mat_file, "r", encoding="utf-8") as f:
                 content = f.read()
-            
-            content = re.sub(r',(\s*[}\]])', r'\1', content)
-            
+            content = re.sub(r",(\s*[}\]])", r"\1", content)
             try:
-                materials_data = json.loads(content)
+                mat_data = json.loads(content)
             except json.JSONDecodeError as e:
-                print(f"[ERROR]     JSON decode error in {os.path.basename(material_file)}: {e}")
-                print(f"[ERROR]     Line {e.lineno}, column {e.colno}")
+                print(f"[ERROR] JSON decode error in {os.path.basename(mat_file)}: {e}")
                 continue
-            
-            print(f"[DEBUG]     Materials in file: {list(materials_data.keys())}")
-            
-            file_modified = False
-            
-            for material_name_template, stages in material_props.items():
-                if '.skin.' in material_name_template:
-                    base_material = material_name_template.split('.skin.')[0]
-                else:
-                    base_material = material_name_template
-                
-                print(f"[DEBUG]     Looking for materials starting with: {base_material}.skin.")
-                
-                actual_material_name = None
-                for mat_name in materials_data.keys():
-                    if mat_name.startswith(f"{base_material}.skin."):
-                        actual_material_name = mat_name
-                        print(f"[DEBUG]     Found match: {material_name_template} → {actual_material_name}")
-                        break
-                
-                if actual_material_name is None:
-                    print(f"[DEBUG]     No material found matching '{base_material}.skin.*', skipping")
+
+            modified = False
+            for template_name, stages in material_props.items():
+                prefix  = (template_name.split(".skin.")[0]
+                           if ".skin." in template_name else template_name)
+                actual  = next(
+                    (k for k in mat_data if k.startswith(f"{prefix}.skin.")), None
+                )
+                if not actual or "Stages" not in mat_data[actual]:
                     continue
-                
-                print(f"[DEBUG]     Found material '{actual_material_name}' in file")
-                
-                if "Stages" not in materials_data[actual_material_name]:
-                    print(f"[DEBUG]     Material '{actual_material_name}' has no Stages, skipping")
-                    continue
-                
-                material_stages = materials_data[actual_material_name]["Stages"]
-                print(f"[DEBUG]     Material has {len(material_stages)} stages")
-                
-                for stage_num_str, properties in stages.items():
-                    print(f"[DEBUG]     Processing stage_num_str: '{stage_num_str}' (type: {type(stage_num_str).__name__})")
-                    
+                for stage_str, props in stages.items():
                     try:
-                        stage_num = int(stage_num_str)
-                        print(f"[DEBUG]     Converted to stage_num: {stage_num} (type: int)")
-                    except (ValueError, TypeError) as e:
-                        print(f"[ERROR]     Cannot convert stage number '{stage_num_str}' to int: {e}")
+                        idx = int(stage_str)
+                    except (ValueError, TypeError):
                         continue
-                    
-                    if stage_num >= len(material_stages):
-                        print(f"[WARNING]     Stage {stage_num} does not exist for {actual_material_name} (material has {len(material_stages)} stages)")
+                    if idx >= len(mat_data[actual]["Stages"]):
                         continue
-                    
-                    stage = material_stages[stage_num]
-                    print(f"[DEBUG]     Updating stage {stage_num} with {len(properties)} properties")
-                    print(f"[DEBUG]     Stage {stage_num} current keys: {list(stage.keys())}")
-                    print(f"[DEBUG]     Properties to update: {properties}")
-                    
-                    for prop_name, prop_value in properties.items():
-                        old_value = stage.get(prop_name, "NOT_FOUND")
-                        stage[prop_name] = prop_value
-                        print(f"[DEBUG]       ✓ Set {actual_material_name}.Stages[{stage_num}].{prop_name}")
-                        print(f"[DEBUG]         Old: {old_value}")
-                        print(f"[DEBUG]         New: {prop_value}")
-                        file_modified = True
-            
-            if file_modified:
-                print(f"[DEBUG]   Writing updated material data to file...")
-                print(f"[DEBUG]   Sample of updated materials (first material only):")
-                first_material = list(materials_data.keys())[0] if materials_data else None
-                if first_material and "Stages" in materials_data[first_material]:
-                    import json as json_module
-                    print(f"[DEBUG]   {first_material}:")
-                    print(f"[DEBUG]   {json_module.dumps(materials_data[first_material]['Stages'], indent=6)}")
-                
-                with open(material_file, 'w', encoding='utf-8') as f:
-                    json.dump(materials_data, f, indent=2)
-                print(f"[DEBUG]   ✓ Updated {os.path.basename(material_file)}")
-                
-                print(f"[DEBUG]   Verifying file was written correctly...")
-                with open(material_file, 'r', encoding='utf-8') as f:
-                    verify_content = f.read()
-                    if "0.69" in verify_content:
-                        print(f"[DEBUG]   ✓ Verification: Found '0.69' in saved file")
-                    else:
-                        print(f"[WARNING]   Verification: Did NOT find '0.69' in saved file")
-            else:
-                print(f"[DEBUG]   No changes needed for {os.path.basename(material_file)}")
-        
-        print(f"[DEBUG] ===== Material properties processing complete =====")
+                    for k, v in props.items():
+                        old = mat_data[actual]["Stages"][idx].get(k, "NOT_FOUND")
+                        mat_data[actual]["Stages"][idx][k] = v
+                        modified = True
+                        print(f"[DEBUG]   ✓ {actual}.Stages[{idx}].{k}: {old} → {v}")
+
+            if modified:
+                with open(mat_file, "w", encoding="utf-8") as f:
+                    json.dump(mat_data, f, indent=2)
+                print(f"[DEBUG]   Saved {os.path.basename(mat_file)}")
+
+        print(f"[DEBUG] ===== Material properties complete =====")
         return True
-        
     except Exception as e:
-        print(f"[ERROR] process_material_properties: {e}")
         import traceback
+        print(f"[ERROR] process_material_properties: {e}")
         traceback.print_exc()
         return False
 
-def generate_mod(
-    mod_name,
-    vehicle_id,
-    skin_display_name,
-    dds_path,
-    output_path=None,
-    progress_callback=None,
-    author=None
-):
-    
-    print(f"\n{'='*60}")
-    print(f"SINGLE SKIN MOD GENERATION")
-    print(f"{'='*60}")
-    print(f"Mod Name: {mod_name}")
-    print(f"Vehicle ID: {vehicle_id}")
-    print(f"Skin Name: {skin_display_name}")
-    print(f"DDS Path: {dds_path}")
-    
-    mod_name = sanitize_mod_name(mod_name)
-    template_path = os.path.join(os.getcwd(), "vehicles", vehicle_id, "SKINNAME")
-    
-    if not os.path.exists(template_path):
-        raise FileNotFoundError(f"No template found for vehicle '{vehicle_id}'")
-    
-    temp_dir = tempfile.mkdtemp()
-    
-    try:
-        dest_skin_folder = os.path.join(temp_dir, "vehicles", vehicle_id, mod_name)
-        
-        def ignore_dds_files(directory, files):
-            return [f for f in files if f.lower().endswith(".dds")]
-        
-        shutil.copytree(template_path, dest_skin_folder, ignore=ignore_dds_files)
-        
-        if progress_callback: progress_callback(0.2)
-        
-        dds_filename = os.path.basename(dds_path)
-        shutil.copy(dds_path, os.path.join(dest_skin_folder, dds_filename))
-        dds_last = os.path.splitext(dds_filename)[0].split("_")[-1]
-        
-        if progress_callback: progress_callback(0.4)
-        
-        process_jbeam_files(dest_skin_folder, dds_last, skin_display_name, author or "Unknown", vehicle_id)
-        
-        if progress_callback: progress_callback(0.6)
-        
-        process_json_files(dest_skin_folder, vehicle_id, mod_name, dds_filename, dds_last)
-        
-        if progress_callback: progress_callback(0.8)
-        
-        mods_path = output_path or get_beamng_mods_path()
-        os.makedirs(mods_path, exist_ok=True)
-        zip_path = os.path.join(mods_path, f"{mod_name}.zip")
-        
-        zip_folder(temp_dir, zip_path)
-        
-        if progress_callback: progress_callback(1.0)
-        
-        return zip_path
-        
-    finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
 
-def generate_multi_skin_mod(
-    project_data,
-    output_path=None,
-    progress_callback=None
-):
-    print(f"\n{'='*60}")
-    print(f"MULTI-SKIN MOD GENERATION")
-    print(f"{'='*60}")
-    
-    mod_name = sanitize_mod_name(project_data["mod_name"])
-    author = project_data.get("author", "Unknown")
-    cars = project_data["cars"]
-    
-    total_cars = len(cars)
-    total_skins = sum(len(car_info['skins']) for car_info in cars.values())
-    
-    print(f"Mod Name: {mod_name}")
-    print(f"Author: {author}")
-    print(f"Total Cars: {total_cars}")
-    print(f"Total Skins: {total_skins}")
-    
-    temp_dir = tempfile.mkdtemp()
-    print(f"Temp directory: {temp_dir}")
-    
-    try:
-        processed_skins = 0
-        
-        for car_instance_id, car_info in cars.items():
-            base_carid = car_info.get("base_carid", car_instance_id)
-            skins = car_info["skins"]
-            
-            print(f"\n--- Processing {base_carid} ({len(skins)} skins) ---")
-            
-            template_path = os.path.join(os.getcwd(), "vehicles", base_carid, "SKINNAME")
-            
-            if not os.path.exists(template_path):
-                raise FileNotFoundError(
-                    f"No template found for vehicle '{base_carid}'.\n"
-                    f"Expected location: {template_path}\n\n"
-                    f"Please make sure the vehicle exists in the Developer tab."
-                )
-            
-            for skin_idx, skin in enumerate(skins):
-                skin_id = sanitize_skin_id(skin["name"])
-                skin_folder = sanitize_folder_name(skin["name"])
-                is_colorable = skin.get("is_colorable", False)
-
-                print(f"  [{skin_idx + 1}/{len(skins)}] Processing: {skin['name']} -> {skin_folder} ({'colorable' if is_colorable else 'DDS'})")
-
-                dest_skin_folder = os.path.join(
-                    temp_dir,
-                    "vehicles",
-                    base_carid,
-                    skin_folder
-                )
-
-                if is_colorable:
-                    generate_colorable_skin(
-                        template_path       = template_path,
-                        dest_skin_folder    = dest_skin_folder,
-                        vehicle_id          = base_carid,
-                        skin_name           = skin["name"],
-                        skin_folder         = skin_folder,
-                        data_map_source     = skin["data_map_path"],
-                        color_map_source    = skin["color_map_path"],
-                        author_name         = author,
-                        material_properties = skin.get("material_properties"),
-                    )
-
-                else:
-                    dds_path = skin["dds_path"]
-
-                    def ignore_dds_files(directory, files):
-                        return [f for f in files if f.lower().endswith(".dds")]
-
-                    shutil.copytree(template_path, dest_skin_folder, ignore=ignore_dds_files)
-
-                    dds_filename = os.path.basename(dds_path)
-                    dds_dest = os.path.join(dest_skin_folder, dds_filename)
-                    shutil.copy(dds_path, dds_dest)
-
-                    dds_identifier = os.path.splitext(dds_filename)[0].split("_")[-1]
-
-                    process_jbeam_files(
-                        dest_skin_folder,
-                        dds_identifier,
-                        skin["name"],
-                        author,
-                        base_carid
-                    )
-
-                    process_json_files(
-                        dest_skin_folder,
-                        base_carid,
-                        skin_folder,
-                        dds_filename,
-                        dds_identifier
-                    )
-
-                if "config_data" in skin:
-                    print(f"  → Processing config data...")
-                    success = process_skin_config_data(
-                        skin,
-                        base_carid,
-                        skin_folder,
-                        temp_dir,
-                        template_path
-                    )
-                    if not success:
-                        print(f"  [WARNING] Config data processing failed for {skin_folder}")
-
-                if "material_properties" in skin and not is_colorable:
-                    print(f"  → Processing material properties...")
-                    success = process_material_properties(
-                        skin,
-                        base_carid,
-                        skin_folder,
-                        dest_skin_folder
-                    )
-                    if not success:
-                        print(f"  [WARNING] Material properties processing failed for {skin_folder}")
-
-                processed_skins += 1
-                if progress_callback:
-                    progress = 0.1 + (processed_skins / total_skins) * 0.75
-                    progress_callback(progress)
-        
-        print(f"\n{'='*60}")
-        print(f"VALIDATING AND FIXING DDS FILENAMES")
-        print(f"{'='*60}")
-        
-        dds_results = process_dds_files_in_mod(temp_dir)
-        
-        if dds_results['renamed']:
-            print(f"\n✓ Fixed {len(dds_results['renamed'])} DDS filename(s)")
-            
-            print(f"\nUpdating skin.materials.json files with new DDS paths...")
-            for car_id, skin_folder, old_dds, new_dds in dds_results['renamed']:
-                skin_folder_path = os.path.join(temp_dir, "vehicles", car_id, skin_folder)
-                materials_json_path = os.path.join(skin_folder_path, "skin.materials.json")
-                
-                if os.path.exists(materials_json_path):
-                    try:
-                        with open(materials_json_path, "r", encoding="utf-8") as f:
-                            content = f.read()
-                        
-                        old_path = f"vehicles/{car_id}/{skin_folder}/{old_dds}"
-                        new_path = f"vehicles/{car_id}/{skin_folder}/{new_dds}"
-                        
-                        if old_path in content:
-                            content = content.replace(old_path, new_path)
-                            
-                            with open(materials_json_path, "w", encoding="utf-8") as f:
-                                f.write(content)
-                            
-                            print(f"  Updated {car_id}/{skin_folder}/skin.materials.json")
-                            print(f"    {old_path} -> {new_path}")
-                    except Exception as e:
-                        print(f"  [WARNING] Failed to update materials.json for {car_id}/{skin_folder}: {e}")
-        
-        if dds_results['errors']:
-            print(f"\n⚠ {len(dds_results['errors'])} DDS file(s) had errors")
-        
-        print(f"\nCreating final ZIP file...")
-        
-        if progress_callback:
-            progress_callback(0.9)
-        
-        mods_path = output_path or get_beamng_mods_path()
-        os.makedirs(mods_path, exist_ok=True)
-        zip_path = os.path.join(mods_path, f"{mod_name}.zip")
-        
-        print(f"ZIP path: {zip_path}")
-        
-        if os.path.exists(zip_path):
-            raise FileExistsError(
-                f"A mod named '{mod_name}.zip' already exists.\n"
-                f"Please choose a different name or delete the existing file."
-            )
-        
-        print(f"\n[DEBUG] Files being zipped from {temp_dir}:")
-        for root, dirs, files in os.walk(temp_dir):
-            for file in files:
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, temp_dir)
-                print(f"[DEBUG]   {rel_path}")
-        
-        zip_folder(temp_dir, zip_path)
-        
-        if progress_callback:
-            progress_callback(1.0)
-        
-        print(f"\n✓ Multi-skin mod created successfully!")
-        print(f"  Cars: {total_cars}")
-        print(f"  Skins: {total_skins}")
-        print(f"  Location: {zip_path}")
-        print(f"{'='*60}\n")
-        
-        return zip_path
-        
-    finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+# ─────────────────────────────────────────────────────────────────────────────
+# JBEAM / JSON  (used by DDS path in generate_mod and variant DDS)
+# ─────────────────────────────────────────────────────────────────────────────
 
 def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author, vehicle_id=None):
     for root_dir, _, files in os.walk(folder_path):
         for file in files:
             if not file.endswith(".jbeam"):
                 continue
-            
             file_path = os.path.join(root_dir, file)
-            
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
-            content = re.sub(
-                r'("authors"\s*:\s*")[^"]*(")',
-                rf'\g<1>{author}\g<2>',
-                content
-            )
-            
-            content = re.sub(
-                r'("name"\s*:\s*")[^"]*(")',
-                rf'\g<1>{skin_display_name}\g<2>',
-                content
-            )
-            
-            content = re.sub(
-                r'"([^"]+_skin_)SKINNAME"',
-                rf'"\g<1>{dds_identifier}"',
-                content
-            )
-            
-            content = re.sub(
-                r'("globalSkin"\s*:\s*")SKINNAME(")',
-                rf'\g<1>{dds_identifier}\g<2>',
-                content
-            )
-            
-            def replace_extra_skin(match):
-                return f'"{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'"([^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin,
-                content
-            )
-            
-            def replace_extra_skin_name(match):
-                return f'{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin_name,
-                content
-            )
-            content = re.sub(
-                r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin_name,
-                content
-            )
-            
+
+            content = re.sub(r'("authors"\s*:\s*")[^"]*(")', rf'\g<1>{author}\g<2>', content)
+            content = re.sub(r'("name"\s*:\s*")[^"]*(")', rf'\g<1>{skin_display_name}\g<2>', content)
+            # Replace the jbeam top-level key regardless of what placeholder word
+            # the template uses after _skin_ (e.g. SKINNAME, skinname, TESTING, …).
+            # When vehicle_id is known we anchor to it for precision; otherwise we
+            # fall back to matching the SKINNAME placeholder (case-insensitive).
             if vehicle_id:
                 content = re.sub(
-                    r'(?<![a-zA-Z0-9])carid',
-                    vehicle_id,
+                    rf'"({re.escape(vehicle_id)}_skin_)\w*"',
+                    rf'"\g<1>{dds_identifier}"',
                     content,
-                    flags=re.IGNORECASE
+                    flags=re.IGNORECASE,
                 )
-            
+            else:
+                content = re.sub(r'"([^"]+_skin_)SKINNAME\w*"', rf'"\g<1>{dds_identifier}"', content, flags=re.IGNORECASE)
+            content = re.sub(r'("globalSkin"\s*:\s*")[^"]*(")', rf'\g<1>{dds_identifier}\g<2>', content, flags=re.IGNORECASE)
+            content = re.sub(r'("skinName"\s*:\s*")[^"]*(")', rf'\g<1>{dds_identifier}\g<2>', content, flags=re.IGNORECASE)
+
+            def _extra(m):      return f'"{m.group(1)}{dds_identifier}"'
+            def _extra_name(m): return f'{m.group(1)}{dds_identifier}"'
+            content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',           _extra,      content)
+            content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"', _extra_name, content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',_extra_name, content)
+
+            if vehicle_id:
+                content = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id, content, flags=re.IGNORECASE)
+
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
+
 def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, dds_identifier):
+    """
+    Normal (single-body, single DDS) JSON processing.
+    Sets Stage[1].baseColorMap for every material entry to the same DDS path.
+    """
     for root_dir, _, files in os.walk(folder_path):
         for file in files:
             if not file.endswith(".json") or file.startswith("info"):
                 continue
-            
             file_path = os.path.join(root_dir, file)
-            
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                
-                for material_key, material_data in data.items():
-                    if not isinstance(material_data, dict):
+
+                for mat_key, mat_data in data.items():
+                    if not isinstance(mat_data, dict):
                         continue
-                    
-                    if "Stages" in material_data and isinstance(material_data["Stages"], list):
-                        stages = material_data["Stages"]
-                        
-                        if len(stages) > 1 and isinstance(stages[1], dict):
-                            stage2 = stages[1]
-                            if "baseColorMap" in stage2:
-                                old_path = stage2["baseColorMap"]
-                                
-                                if "SKINNAME" in old_path.upper():
-                                    new_path = re.sub(r'/SKINNAME/', f"/{skin_folder_name}/", old_path, flags=re.IGNORECASE)
-                                    new_path = re.sub(r'_skin_SKINNAME(\.\w+)', f"_skin_{dds_identifier}\\1", new_path, flags=re.IGNORECASE)
-                                    new_path = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id, new_path, flags=re.IGNORECASE)
-                                    print(f"[DEBUG] Replaced SKINNAME placeholder in baseColorMap for {material_key}:")
-                                else:
-                                    new_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{dds_filename}"
-                                    print(f"[DEBUG] Updated Stage 2 baseColorMap in {material_key}:")
-                                
-                                stage2["baseColorMap"] = new_path
-                                print(f"[DEBUG]   From: {old_path}")
-                                print(f"[DEBUG]   To:   {new_path}")
-                
+                    stages = mat_data.get("Stages", [])
+                    if len(stages) > 1 and isinstance(stages[1], dict):
+                        stage2 = stages[1]
+                        if "baseColorMap" in stage2:
+                            old = stage2["baseColorMap"]
+                            if "SKINNAME" in old.upper():
+                                new = re.sub(r'/SKINNAME/', f"/{skin_folder_name}/", old, flags=re.IGNORECASE)
+                                new = re.sub(r'_skin_SKINNAME(\.\w+)', f"_skin_{dds_identifier}\\1", new, flags=re.IGNORECASE)
+                                new = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id, new, flags=re.IGNORECASE)
+                            else:
+                                new = f"vehicles/{vehicle_id}/{skin_folder_name}/{dds_filename}"
+                            stage2["baseColorMap"] = new
+                            print(f"[DEBUG] Stage 2 baseColorMap [{mat_key}]: {old} → {new}")
+
                 content = json.dumps(data, indent=2)
-                
             except json.JSONDecodeError:
-                print(f"[DEBUG] JSON parse failed for {file_path}, using regex fallback")
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
-            
-            def replace_skin_ref(match):
-                return f'"{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'"([^"]+\.skin\.)[^"]+"',
-                replace_skin_ref,
-                content
-            )
-            
-            content = re.sub(
-                r'"([^"]+\.skin_[^.]*\.)[^"]+"',
-                replace_skin_ref,
-                content
-            )
-            
-            def replace_skin_name(match):
-                return f'{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',
-                replace_skin_name,
-                content
-            )
-            content = re.sub(
-                r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',
-                replace_skin_name,
-                content
-            )
-            
-            content = re.sub(
-                r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',
-                replace_skin_name,
-                content
-            )
-            content = re.sub(
-                r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',
-                replace_skin_name,
-                content
-            )
-            
-            def replace_extra_skin_all(match):
-                return f'"{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'"([^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin_all,
-                content
-            )
-            
-            def replace_extra_skin_name_all(match):
-                return f'{match.group(1)}{dds_identifier}"'
-            
-            content = re.sub(
-                r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin_name_all,
-                content
-            )
-            content = re.sub(
-                r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',
-                replace_extra_skin_name_all,
-                content
-            )
-            
-            content = re.sub(
-                r'/SKINNAME/',
-                f'/{skin_folder_name}/',
-                content,
-                flags=re.IGNORECASE
-            )
-            content = re.sub(
-                r'_skin_SKINNAME(\.\w+)',
-                f'_skin_{dds_identifier}\\1',
-                content,
-                flags=re.IGNORECASE
-            )
-            
-            content = re.sub(
-                r'(?<![a-zA-Z0-9])carid',
-                vehicle_id,
-                content,
-                flags=re.IGNORECASE
-            )
-            
-            
+
+            def _ref(m):  return f'"{m.group(1)}{dds_identifier}"'
+            def _nm(m):   return f'{m.group(1)}{dds_identifier}"'
+            content = re.sub(r'"([^"]+\.skin\.)[^"]+"',                     _ref, content)
+            content = re.sub(r'"([^"]+\.skin_[^.]*\.)[^"]+"',               _ref, content)
+            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',        _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',       _nm,  content)
+            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',  _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"', _nm,  content)
+            content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',                _ref, content)
+            content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',   _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',  _nm,  content)
+            content = re.sub(r'/SKINNAME/', f'/{skin_folder_name}/', content, flags=re.IGNORECASE)
+            content = re.sub(r'_skin_SKINNAME(\.\w+)', f'_skin_{dds_identifier}\\1', content, flags=re.IGNORECASE)
+            content = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id, content, flags=re.IGNORECASE)
+
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
+
+
+def process_json_files_variant_dds(
+    folder_path, vehicle_id, skin_folder_name,
+    car_dds_filename,           # DDS 1 → car body  (pickup.skin.*, md_series_main.skin.*, etc.)
+    var_dds_filename,           # DDS 2 → variant body (ambulance.skin.*, box.skin.*, etc.)
+    dds_identifier,
+    car_skin_folder_name=None,  # base folder for the car-body DDS (no variant suffix);
+                                # defaults to skin_folder_name when not provided
+    variant_suffix="",          # e.g. "ambulance" — used to identify the variant body material
+):
+    """
+    Variant DDS (2 DDS, single folder) JSON processing.
+
+    Routes each material entry's Stage[1].baseColorMap to the correct DDS:
+      material starts with "<variant_suffix>.skin." → var_dds_filename  (in skin_folder_name)
+      everything else                               → car_dds_filename  (in car_skin_folder_name)
+    """
+    car_folder   = car_skin_folder_name or skin_folder_name
+    car_dds_path = f"vehicles/{vehicle_id}/{car_folder}/{car_dds_filename}"
+    var_dds_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{var_dds_filename}"
+    var_prefix   = f"{variant_suffix}.skin."
+
+    for root_dir, _, files in os.walk(folder_path):
+        for file in files:
+            if not file.endswith(".json") or file.startswith("info"):
+                continue
+            file_path = os.path.join(root_dir, file)
+            print(f"[DEBUG] process_json_files_variant_dds: {file_path}")
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+            raw_clean = re.sub(r",(\s*[}\]])", r"\1", raw)
+
+            try:
+                data      = json.loads(raw_clean); parsed_ok = True
+            except json.JSONDecodeError:
+                print(f"[WARNING] JSON parse failed: {file_path}"); parsed_ok = False
+
+            if parsed_ok:
+                for mat_key, mat_data in data.items():
+                    if not isinstance(mat_data, dict):
+                        continue
+                    stages = mat_data.get("Stages", [])
+                    if len(stages) < 2 or not isinstance(stages[1], dict):
+                        continue
+
+                    is_var   = mat_key.lower().startswith(var_prefix.lower())
+                    dds_path = var_dds_path if is_var else car_dds_path
+                    label    = "variant body" if is_var else "car body"
+
+                    old = stages[1].get("baseColorMap", "")
+                    stages[1]["baseColorMap"] = dds_path
+                    print(f"[DEBUG]   '{mat_key}' ({label}) Stage[1].baseColorMap: {old} → {dds_path}")
+
+                content = json.dumps(data, indent=2)
+            else:
+                content = raw
+
+            # SKINNAME placeholder replacements
+            def _ref(m):  return f'"{m.group(1)}{dds_identifier}"'
+            def _nm(m):   return f'{m.group(1)}{dds_identifier}"'
+            content = re.sub(r'"([^"]+\.skin\.)[^"]+"',                     _ref, content)
+            content = re.sub(r'"([^"]+\.skin_[^.]*\.)[^"]+"',               _ref, content)
+            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',        _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',       _nm,  content)
+            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',  _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"', _nm,  content)
+            content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',                _ref, content)
+            content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',   _nm,  content)
+            content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',  _nm,  content)
+            content = re.sub(r'/SKINNAME/', f'/{skin_folder_name}/', content, flags=re.IGNORECASE)
+            content = re.sub(r'_skin_SKINNAME(\.\w+)', f'_skin_{dds_identifier}\\1', content, flags=re.IGNORECASE)
+            content = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id, content, flags=re.IGNORECASE)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"[DEBUG] Processed json (variant-DDS): {file_path}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VARIANT DDS  SKIN GENERATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _generate_variant_dds_skin(
+    template_path,
+    dest_skin_folder,
+    base_carid,
+    variant_suffix,
+    skin,
+    skin_folder,
+    author,
+):
+    """
+    Generate a variant DDS skin (2 DDS files, 1 template folder).
+
+    skin["dds_path"]   = car body DDS   → pickup.skin.*   Stage[1].baseColorMap
+    skin["dds_path_2"] = variant body DDS → ambulance.skin.* Stage[1].baseColorMap
+    """
+    dds_path_1 = skin["dds_path"]
+    dds_path_2 = skin.get("dds_path_2", "")
+
+    if not dds_path_1:
+        raise ValueError(f"Missing dds_path for variant skin '{skin['name']}'")
+    if not dds_path_2:
+        raise ValueError(f"Missing dds_path_2 (variant body DDS) for skin '{skin['name']}'")
+
+    def _ignore_dds(d, f):
+        return [x for x in f if x.lower().endswith(".dds")]
+
+    if os.path.exists(dest_skin_folder):
+        shutil.rmtree(dest_skin_folder)
+    shutil.copytree(template_path, dest_skin_folder, ignore=_ignore_dds)
+    print(f"[DEBUG] Variant template copied: {dest_skin_folder}")
+
+    # Normalise both DDS filenames regardless of what the user called them.
+    # car body  → {base_carid}_skin_{skin_id}.dds   (matches pickup.skin.* material)
+    # var body  → {variant_suffix}_skin_{skin_id}.dds (matches ambulance.skin.* material)
+    # This keeps dds_identifier, jbeam, and materials.json in sync from the start.
+    dds_identifier = sanitize_skin_id(skin["name"])
+    car_fn = f"{base_carid}_skin_{dds_identifier}.dds"
+    var_fn = f"{variant_suffix}_skin_{dds_identifier}.dds"
+
+    shutil.copy(dds_path_1, os.path.join(dest_skin_folder, car_fn))
+    shutil.copy(dds_path_2, os.path.join(dest_skin_folder, var_fn))
+    print(f"[DEBUG] Copied car-body DDS  : {car_fn}")
+    print(f"[DEBUG] Copied variant-body DDS: {var_fn}")
+
+    process_jbeam_files(dest_skin_folder, dds_identifier, skin["name"], author, base_carid)
+
+    # Both DDS files (car body + variant body) are copied into the same
+    # dest_skin_folder (e.g. "ambulansambulance"), so both material entries
+    # must reference that same folder.  Do NOT strip the variant suffix to
+    # derive a separate "base" folder — that produced wrong paths like
+    # vehicles/van/ambulans/ instead of vehicles/van/ambulansambulance/.
+    process_json_files_variant_dds(
+        dest_skin_folder, base_carid, skin_folder,
+        car_fn, var_fn, dds_identifier,
+        variant_suffix=variant_suffix,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REFLECTIVITY MAP  (rough_met.png)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Canonical field order for Stage[1] after reflectivity injection.
+# Scalars / UseUV flags first, then map paths.
+_STAGE1_KEY_ORDER = [
+    "ambientOcclusionMap",
+    "useAnisotropic",
+    "diffuseMapUseUV",
+    "clearCoatFactor",
+    "clearCoatRoughnessFactor",
+    "metallicFactor",
+    "roughnessFactor",
+    "metallicMapUseUV",
+    "roughnessMapUseUV",
+    "metallicMap",
+    "roughnessMap",
+    "clearCoatMap",
+    "normalMap",
+    "opacityMap",
+    "baseColorMap",
+]
+
+
+def _inject_rough_met(skin_data, base_carid, skin_folder, dest_skin_folder,
+                      variant_suffix=""):
+    """
+    Copy rough_met file(s) into the skin folder and patch every material's
+    Stage[1] with metallicMap / roughnessMap / *UseUV fields.
+
+    Non-variant skins (variant_suffix == ""):
+        rough_met_path  → rough_met.png
+        All materials   → vehicles/<carid>/<skin_folder>/rough_met.png
+
+    Variant skins (variant_suffix != ""):
+        rough_met_path   → rough_met.png              (car body)
+        rough_met_path_2 → rough_met_<suffix>.png     (variant body, e.g. rough_met_ambulance.png)
+        <carid>.skin.*  materials → rough_met.png
+        <suffix>.skin.* materials → rough_met_<suffix>.png
+    """
+    rough_met_src = skin_data.get("rough_met_path", "")
+    if not rough_met_src:
+        return True
+    if not os.path.exists(rough_met_src):
+        print(f"[WARNING] rough_met source not found: {rough_met_src}")
+        return False
+
+    is_variant = bool(variant_suffix)
+
+    # ── copy file(s) ──────────────────────────────────────────────────────── #
+    dest_png_1 = os.path.join(dest_skin_folder, "rough_met.png")
+    shutil.copy2(rough_met_src, dest_png_1)
+    print(f"[DEBUG] Copied rough_met (body): {rough_met_src} → {dest_png_1}")
+
+    var_filename = None
+    if is_variant:
+        rough_met_src_2 = skin_data.get("rough_met_path_2", "")
+        if not rough_met_src_2:
+            print(f"[WARNING] rough_met_path_2 missing for variant skin — body file used for both")
+            is_variant = False  # fall back to single-file behaviour
+        elif not os.path.exists(rough_met_src_2):
+            print(f"[WARNING] rough_met_path_2 source not found: {rough_met_src_2}")
+            is_variant = False
+        else:
+            var_filename = f"rough_met_{variant_suffix}.png"
+            dest_png_2   = os.path.join(dest_skin_folder, var_filename)
+            shutil.copy2(rough_met_src_2, dest_png_2)
+            print(f"[DEBUG] Copied rough_met (variant body): {rough_met_src_2} → {dest_png_2}")
+
+    # ── build per-body reference paths ────────────────────────────────────── #
+    ref_body    = f"/vehicles/{base_carid}/{skin_folder}/rough_met.png"
+    ref_variant = (
+        f"/vehicles/{base_carid}/{skin_folder}/{var_filename}"
+        if var_filename else ref_body
+    )
+    var_prefix  = f"{variant_suffix}.skin."
+
+    # ── patch materials.json ──────────────────────────────────────────────── #
+    mat_files = []
+    for root, _, files in os.walk(dest_skin_folder):
+        for fn in files:
+            if fn.endswith(".materials.json") or fn == "materials.json":
+                mat_files.append(os.path.join(root, fn))
+
+    if not mat_files:
+        print(f"[WARNING] _inject_rough_met: no .materials.json in {dest_skin_folder}")
+        return False
+
+    for mat_file in mat_files:
+        with open(mat_file, "r", encoding="utf-8") as fh:
+            raw = fh.read()
+        raw_clean = re.sub(r",(\s*[}\]])", r"\1", raw)
+        try:
+            mat_data = json.loads(raw_clean)
+        except json.JSONDecodeError as exc:
+            print(f"[WARNING] _inject_rough_met JSON error in {os.path.basename(mat_file)}: {exc}")
+            continue
+
+        modified = False
+        for mat_key, mat_val in mat_data.items():
+            if not isinstance(mat_val, dict):
+                continue
+            stages = mat_val.get("Stages", [])
+            if len(stages) < 2 or not isinstance(stages[1], dict):
+                continue
+
+            # Route to the correct file based on material key prefix
+            is_var_body = mat_key.lower().startswith(var_prefix.lower())
+            ref = ref_variant if (is_var_body and is_variant) else ref_body
+            label = "variant body" if (is_var_body and is_variant) else "body"
+
+            stage1 = stages[1]
+            stage1["metallicMap"]              = ref
+            stage1["roughnessMap"]             = ref
+            stage1["metallicMapUseUV"]         = 1
+            stage1["roughnessMapUseUV"]        = 1
+            stage1["metallicFactor"]           = 0.95
+            stage1["roughnessFactor"]          = 0.7
+            stage1["clearCoatRoughnessFactor"] = 0.03
+            # Rebuild in canonical key order (scalars/UseUV before map paths)
+            ordered = {k: stage1[k] for k in _STAGE1_KEY_ORDER if k in stage1}
+            ordered.update({k: v for k, v in stage1.items() if k not in ordered})
+            stages[1] = ordered
+            modified = True
+            print(f"[DEBUG]   ✓ rough_met ({label}) injected into '{mat_key}' Stage[1] → {ref}")
+
+        if modified:
+            with open(mat_file, "w", encoding="utf-8") as fh:
+                json.dump(mat_data, fh, indent=2)
+            print(f"[DEBUG]   Saved {os.path.basename(mat_file)}")
+
+    return True
+
+
+
+
+def generate_mod(
+    mod_name, vehicle_id, skin_display_name, dds_path,
+    output_path=None, progress_callback=None, author=None,
+):
+    print(f"\n{'='*60}\nSINGLE SKIN MOD GENERATION\n{'='*60}")
+    mod_name      = sanitize_mod_name(mod_name)
+    template_path = _find_normal_template(vehicle_id)
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(f"No template found for vehicle '{vehicle_id}'")
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        dest = os.path.join(temp_dir, "vehicles", vehicle_id, mod_name)
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        shutil.copytree(template_path, dest,
+                        ignore=lambda d, f: [x for x in f if x.lower().endswith(".dds")])
+        if progress_callback: progress_callback(0.2)
+
+        dds_filename   = os.path.basename(dds_path)
+        shutil.copy(dds_path, os.path.join(dest, dds_filename))
+        dds_identifier = os.path.splitext(dds_filename)[0].split("_")[-1]
+        if progress_callback: progress_callback(0.4)
+
+        process_jbeam_files(dest, dds_identifier, skin_display_name, author or "Unknown", vehicle_id)
+        if progress_callback: progress_callback(0.6)
+        process_json_files(dest, vehicle_id, mod_name, dds_filename, dds_identifier)
+        if progress_callback: progress_callback(0.8)
+
+        mods_path = output_path or get_beamng_mods_path()
+        os.makedirs(mods_path, exist_ok=True)
+        zip_path = os.path.join(mods_path, f"{mod_name}.zip")
+        zip_folder(temp_dir, zip_path)
+        if progress_callback: progress_callback(1.0)
+        return zip_path
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-SKIN MOD GENERATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_multi_skin_mod(project_data, output_path=None, progress_callback=None, unpacked=False):
+    print(f"\n{'='*60}\nMULTI-SKIN MOD GENERATION\n{'='*60}")
+
+    mod_name    = sanitize_mod_name(project_data["mod_name"])
+    author      = project_data.get("author", "Unknown")
+    cars        = project_data["cars"]
+    total_cars  = len(cars)
+    total_skins = sum(len(ci["skins"]) for ci in cars.values())
+
+    print(f"Mod:    {mod_name}")
+    print(f"Author: {author}")
+    print(f"Cars:   {total_cars}   Skins: {total_skins}")
+
+    # ── duplicate skin-folder name check ─────────────────────────────────── #
+    # Two skins with the same sanitized folder name for the same vehicle would
+    # cause WinError 183 on Windows when shutil.copytree tries to create the
+    # already-existing destination folder.
+    for car_instance_id, car_info in cars.items():
+        base_carid = car_info.get("base_carid", car_instance_id)
+        _vsuffix   = car_info.get("variant_suffix", "")
+        seen_folders: dict = {}
+        for skin in car_info.get("skins", []):
+            folder = sanitize_folder_name(skin["name"]) + _vsuffix
+            if folder in seen_folders:
+                raise ValueError(
+                    f"Vehicle '{base_carid}' has two skins that produce the same "
+                    f"folder name '{folder}':\n"
+                    f"  • {seen_folders[folder]!r}\n"
+                    f"  • {skin['name']!r}\n\n"
+                    f"Please give each skin a unique name."
+                )
+            seen_folders[folder] = skin["name"]
+
+    temp_dir = tempfile.mkdtemp()
+    print(f"Temp:   {temp_dir}")
+
+    try:
+        processed_skins = 0
+
+        for car_instance_id, car_info in cars.items():
+            base_carid     = car_info.get("base_carid", car_instance_id)
+            variant_suffix = car_info.get("variant_suffix", "")   # "" = normal
+            skins          = car_info["skins"]
+            is_variant     = variant_suffix != ""
+
+            print(f"\n--- {base_carid}"
+                  f"{f' [{variant_suffix}]' if is_variant else ''}"
+                  f" ({len(skins)} skins) ---")
+
+            # ── resolve template folder ────────────────────────────────────── #
+            if is_variant:
+                template_path = _find_variant_template(base_carid, variant_suffix)
+            else:
+                template_path = _find_normal_template(base_carid)
+
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(
+                    f"No template found for vehicle '{base_carid}'"
+                    f"{f' variant={variant_suffix}' if is_variant else ''}.\n"
+                    f"Expected: {template_path}\n\n"
+                    f"Make sure the vehicle (and its variant template) exists "
+                    f"in the Developer tab."
+                )
+
+            # ── process each skin ──────────────────────────────────────────── #
+            for skin_idx, skin in enumerate(skins):
+                skin_name    = skin["name"]
+                skin_id      = sanitize_skin_id(skin_name)
+                # Variant skins get the suffix appended to the folder name so
+                # the output mirrors the expected BeamNG structure, e.g.:
+                #   skin "testing" + variant "ambulance" → folder "testingambulance"
+                skin_folder  = sanitize_folder_name(skin_name) + (variant_suffix if is_variant else "")
+                is_colorable = skin.get("is_colorable", False)
+
+                print(f"  [{skin_idx+1}/{len(skins)}] '{skin_name}' → {skin_folder}"
+                      f" ({'colorable' if is_colorable else 'DDS'}"
+                      f"{' + variant' if is_variant else ''})")
+
+                dest_skin_folder = os.path.join(
+                    temp_dir, "vehicles", base_carid, skin_folder
+                )
+
+                # ── COLORABLE ──────────────────────────────────────────────── #
+                if is_colorable:
+                    if is_variant:
+                        # 4 PNGs — one pair per body, single template folder
+                        generate_colorable_skin_variant(
+                            template_path      = template_path,
+                            dest_skin_folder   = dest_skin_folder,
+                            vehicle_id         = base_carid,
+                            variant_suffix     = variant_suffix,
+                            skin_name          = skin_name,
+                            skin_folder        = skin_folder,
+                            data_map_source    = skin["data_map_path"],
+                            color_map_source   = skin["color_map_path"],
+                            data_map_source_2  = skin["data_map_path_2"],
+                            color_map_source_2 = skin["color_map_path_2"],
+                            author_name        = author,
+                            material_properties= skin.get("material_properties"),
+                        )
+                    else:
+                        # 2 PNGs — normal single-body colorable
+                        generate_colorable_skin(
+                            template_path      = template_path,
+                            dest_skin_folder   = dest_skin_folder,
+                            vehicle_id         = base_carid,
+                            skin_name          = skin_name,
+                            skin_folder        = skin_folder,
+                            data_map_source    = skin["data_map_path"],
+                            color_map_source   = skin["color_map_path"],
+                            author_name        = author,
+                            material_properties= skin.get("material_properties"),
+                        )
+
+                # ── DDS (non-colorable) ────────────────────────────────────── #
+                else:
+                    if is_variant:
+                        # 2 DDS — routed per material entry
+                        _generate_variant_dds_skin(
+                            template_path    = template_path,
+                            dest_skin_folder = dest_skin_folder,
+                            base_carid       = base_carid,
+                            variant_suffix   = variant_suffix,
+                            skin             = skin,
+                            skin_folder      = skin_folder,
+                            author           = author,
+                        )
+                    else:
+                        # 1 DDS — standard single-body
+                        dds_path = skin["dds_path"]
+
+                        if os.path.exists(dest_skin_folder):
+                            shutil.rmtree(dest_skin_folder)
+                        shutil.copytree(
+                            template_path, dest_skin_folder,
+                            ignore=lambda d, f: [x for x in f if x.lower().endswith(".dds")]
+                        )
+                        # Normalise the DDS filename regardless of what the user called it.
+                        # This keeps dds_identifier, jbeam, and materials.json in sync
+                        # even when the source file has an arbitrary name.
+                        dds_identifier = skin_id
+                        dds_filename   = f"{base_carid}_skin_{skin_id}.dds"
+                        shutil.copy(dds_path, os.path.join(dest_skin_folder, dds_filename))
+
+                        process_jbeam_files(
+                            dest_skin_folder, dds_identifier, skin_name, author, base_carid
+                        )
+                        process_json_files(
+                            dest_skin_folder, base_carid, skin_folder,
+                            dds_filename, dds_identifier,
+                        )
+
+                # ── config data ────────────────────────────────────────────── #
+                if "config_data" in skin:
+                    print(f"  → Config data...")
+                    ok = process_skin_config_data(
+                        skin, base_carid, skin_folder, temp_dir, template_path
+                    )
+                    if not ok:
+                        print(f"  [WARNING] Config data failed for {skin_folder}")
+
+                # ── material properties (DDS only — colorable handles it) ───── #
+                if "material_properties" in skin and not is_colorable:
+                    print(f"  → Material properties...")
+                    ok = process_material_properties(
+                        skin, base_carid, skin_folder, dest_skin_folder
+                    )
+                    if not ok:
+                        print(f"  [WARNING] Material properties failed for {skin_folder}")
+
+                # ── reflectivity map (rough_met.png) ──────────────────────── #
+                if "rough_met_path" in skin:
+                    print(f"  → Reflectivity map...")
+                    ok = _inject_rough_met(
+                        skin, base_carid, skin_folder, dest_skin_folder,
+                        variant_suffix=variant_suffix,
+                    )
+                    if not ok:
+                        print(f"  [WARNING] Reflectivity map injection failed for {skin_folder}")
+
+                processed_skins += 1
+                if progress_callback:
+                    progress_callback(0.1 + (processed_skins / total_skins) * 0.75)
+
+        # ── DDS filename validation ────────────────────────────────────────── #
+        print(f"\n{'='*60}\nVALIDATING DDS FILENAMES\n{'='*60}")
+        dds_results = process_dds_files_in_mod(temp_dir)
+
+        if dds_results["renamed"]:
+            print(f"✓ Fixed {len(dds_results['renamed'])} DDS filename(s)")
+            for car_id, skin_folder, old_dds, new_dds in dds_results["renamed"]:
+                skin_folder_path = os.path.join(temp_dir, "vehicles", car_id, skin_folder)
+                for mat_fn in ["skin.materials.json", "materials.json"]:
+                    mat_path = os.path.join(skin_folder_path, mat_fn)
+                    if os.path.exists(mat_path):
+                        try:
+                            with open(mat_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                            old_path = f"vehicles/{car_id}/{skin_folder}/{old_dds}"
+                            new_path = f"vehicles/{car_id}/{skin_folder}/{new_dds}"
+                            if old_path in content:
+                                content = content.replace(old_path, new_path)
+                                with open(mat_path, "w", encoding="utf-8") as f:
+                                    f.write(content)
+                                print(f"  Updated {car_id}/{skin_folder}/{mat_fn}")
+                        except Exception as e:
+                            print(f"  [WARNING] materials.json update failed: {e}")
+
+        # ── zip / unpacked ─────────────────────────────────────────────────── #
+        print(f"\n{'Copying unpacked mod folder' if unpacked else 'Creating ZIP'}…")
+        if progress_callback:
+            progress_callback(0.9)
+
+        mods_path = output_path or get_beamng_mods_path()
+        os.makedirs(mods_path, exist_ok=True)
+
+        if unpacked:
+            dest_folder = os.path.join(mods_path, mod_name)
+            if os.path.exists(dest_folder):
+                raise FileExistsError(
+                    f"A mod folder named '{mod_name}' already exists.\n"
+                    f"Please choose a different name or delete the existing folder."
+                )
+            shutil.copytree(temp_dir, dest_folder)
+            if progress_callback:
+                progress_callback(1.0)
+            print(f"\n✓ Multi-skin mod created (unpacked)!")
+            print(f"  Cars: {total_cars}  Skins: {total_skins}")
+            print(f"  Location: {dest_folder}")
+            print(f"{'='*60}\n")
+            return dest_folder
+        else:
+            zip_path = os.path.join(mods_path, f"{mod_name}.zip")
+            if os.path.exists(zip_path):
+                raise FileExistsError(
+                    f"A mod named '{mod_name}.zip' already exists.\n"
+                    f"Please choose a different name or delete the existing file."
+                )
+            print(f"[DEBUG] Files to zip from {temp_dir}:")
+            for root, _, files in os.walk(temp_dir):
+                for file in files:
+                    print(f"[DEBUG]   {os.path.relpath(os.path.join(root, file), temp_dir)}")
+            zip_folder(temp_dir, zip_path)
+            if progress_callback:
+                progress_callback(1.0)
+            print(f"\n✓ Multi-skin mod created!")
+            print(f"  Cars: {total_cars}  Skins: {total_skins}")
+            print(f"  Location: {zip_path}")
+            print(f"{'='*60}\n")
+            return zip_path
+
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)

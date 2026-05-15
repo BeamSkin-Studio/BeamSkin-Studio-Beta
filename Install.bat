@@ -2,237 +2,156 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo BeamSkin Studio - Dependency Installer ^& Auto-Updater
+echo BeamSkin Studio - Dependency Installer
 echo ============================================================
 echo.
 
-:: -----------------------------------------------------------
-:: Step 1: Locate Python — try multiple methods
-:: -----------------------------------------------------------
-echo [1/7] Checking Python installation...
-set "PYTHON_CMD="
+:: ── [1/7] Find a compatible Python (3.9 – 3.13) via py launcher ─────────────
+echo [1/7] Detecting compatible Python installation...
+set "PY="
 
-:: 1a. Try 'python' directly (classic PATH entry)
-python --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python"
-    goto :python_found
-)
-
-:: 1b. Try 'py' (Windows Python Launcher — common with 3.12 installs)
-py --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=py"
-    goto :python_found
-)
-
-:: 1c. Try 'py -3' (explicit Python 3 via launcher)
-py -3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=py -3"
-    goto :python_found
-)
-
-:: 1d. Try 'python3'
-python3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python3"
-    goto :python_found
-)
-
-:: 1e. Probe common install paths for 3.12, 3.11, 3.10, 3.9, 3.8
-for %%V in (312 311 310 39 38) do (
-    for %%P in (
-        "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
-        "%ProgramFiles%\Python%%V\python.exe"
-        "%ProgramFiles(x86)%\Python%%V\python.exe"
-    ) do (
-        if exist %%P (
-            %%P --version >nul 2>&1
+for %%V in (3.13 3.12 3.11 3.10 3.9) do (
+    if not defined PY (
+        py -%%V --version >nul 2>&1
+        if !errorlevel! equ 0 (
+            py -%%V -c "import sys; exit(0 if sys.version_info>=(3,9) else 1)" >nul 2>&1
             if !errorlevel! equ 0 (
-                set "PYTHON_CMD=%%P"
-                goto :python_found
+                set "PY=py -%%V"
+                echo [OK] Found Python %%V via py launcher.
             )
         )
     )
 )
 
-:: 1f. Check Windows Store location (verify it's not a dead stub)
-for %%P in (
-    "%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe"
-    "%LOCALAPPDATA%\Microsoft\WindowsApps\python3.exe"
-) do (
-    if exist %%P (
-        %%P --version >nul 2>&1
+:: Fallback: plain "python" for installs not registered with the py launcher
+if not defined PY (
+    python --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        python -c "import sys; exit(0 if sys.version_info>=(3,9) else 1)" >nul 2>&1
         if !errorlevel! equ 0 (
-            set "PYTHON_CMD=%%P"
-            goto :python_found
+            set "PY=python"
+            echo [OK] Found compatible Python via system PATH.
+        ) else (
+            echo [WARNING] Python on PATH is older than 3.9 - skipping.
         )
     )
 )
 
-:: Nothing found — offer to download and install Python automatically
-echo.
-echo [WARNING] Python was not found on this system.
-echo.
-set /p "DO_INSTALL=Download and install Python 3.11 automatically? [Y/N]: "
-if /i not "%DO_INSTALL%"=="Y" (
-    echo Cancelled. Please install Python 3.8+ from https://python.org
-    echo Make sure to check "Add Python to PATH" during setup.
-    pause
-    exit /b 1
-)
-
-echo Downloading Python 3.11.9...
-if not exist "%TEMP%\BeamSkinStudio" mkdir "%TEMP%\BeamSkinStudio"
-powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%TEMP%\BeamSkinStudio\python_installer.exe'}"
-if %errorlevel% neq 0 (
-    echo [ERROR] Download failed. Check your internet connection and try again.
-    pause
-    exit /b 1
-)
-
-echo Installing Python (this may take a minute)...
-set "PY_INSTALL_DIR=%ProgramFiles%\Python311"
-start /wait "%TEMP%\BeamSkinStudio\python_installer.exe" /quiet InstallAllUsers=1 PrependPath=1 TargetDir="%PY_INSTALL_DIR%"
-if %errorlevel% neq 0 (
-    echo [ERROR] Python installer returned an error. Try installing manually from https://python.org
-    pause
-    exit /b 1
-)
-
-:: Point directly at the known install path — do NOT restart the script.
-:: Restarting won't work because the new PATH only takes effect in a fresh
-:: login session; the re-launched cmd would loop back here and install again.
-set "PYTHON_CMD=%PY_INSTALL_DIR%\python.exe"
-if not exist "%PYTHON_CMD%" (
-    echo [ERROR] Python was installed but could not be found at %PY_INSTALL_DIR%
-    echo Please close this window, open a new Command Prompt, and run install.bat again.
-    pause
-    exit /b 1
-)
-echo   [OK] Python 3.11 installed successfully.
-
-:python_found
-:: Confirm it's actually Python 3 (not a Python 2 remnant on PATH)
-%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info.major==3 else 1)" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Found Python installation is not Python 3.
-    echo Please install Python 3.8+ from https://python.org
-    pause
-    exit /b 1
-)
-
-for /f "tokens=*" %%V in ('%PYTHON_CMD% --version 2^>^&1') do set "PY_VER=%%V"
-echo   [OK] Found: %PY_VER% ^(using: %PYTHON_CMD%^)
-
-:: -----------------------------------------------------------
-:: Step 2: Detect all Python installations
-:: -----------------------------------------------------------
-echo.
-echo [2/7] Detecting Python installations...
-set "PYTHON_LIST=%TEMP%\python_installations.txt"
-where python > "%PYTHON_LIST%" 2>nul
-where py >> "%PYTHON_LIST%" 2>nul
-set INSTALL_COUNT=0
-for /f "delims=" %%p in ('type "%PYTHON_LIST%" 2^>nul') do (
-    set /a INSTALL_COUNT+=1
-)
-echo   Total: !INSTALL_COUNT! Python executable(s) detected on PATH.
-
-:: -----------------------------------------------------------
-:: Step 3: Upgrade pip
-:: -----------------------------------------------------------
-echo.
-echo [3/7] Updating pip...
-%PYTHON_CMD% -m pip install --upgrade pip --quiet
-if %errorlevel% neq 0 (
-    echo   [WARNING] pip upgrade failed — continuing anyway.
-) else (
-    echo   [OK] pip is up to date.
-)
-
-:: -----------------------------------------------------------
-:: Step 4: Install / upgrade Pillow separately (verbose on fail)
-:: -----------------------------------------------------------
-echo.
-echo [4/7] Checking Pillow (image processing)...
-%PYTHON_CMD% -c "import PIL" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo   Pillow not found - installing...
-    %PYTHON_CMD% -m pip install Pillow --quiet
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to install Pillow. Check your internet connection.
+:: Nothing found — download and install Python 3.11 then re-probe
+if not defined PY (
+    echo [WARNING] No compatible Python found ^(3.9+^).
+    echo.
+    echo Downloading and installing Python 3.11...
+    if not exist "%TEMP%\BeamSkinStudio" mkdir "%TEMP%\BeamSkinStudio"
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%TEMP%\BeamSkinStudio\python_installer.exe'}"
+    if !errorlevel! neq 0 (
+        echo [ERROR] Failed to download Python installer. Check your internet connection.
         pause
         exit /b 1
     )
-    echo   [OK] Pillow installed.
-) else (
-    echo   [OK] Pillow present - upgrading if needed...
-    %PYTHON_CMD% -m pip install --upgrade Pillow --quiet
+    start /wait "" "%TEMP%\BeamSkinStudio\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=1
+    :: Refresh PATH so py launcher can see the new install
+    for /f "tokens=2*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "SYS_PATH=%%B"
+    for /f "tokens=2*" %%A in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USR_PATH=%%B"
+    set "PATH=!SYS_PATH!;!USR_PATH!"
+    py -3.11 --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        set "PY=py -3.11"
+        echo [OK] Python 3.11 installed successfully.
+    ) else (
+        echo Relaunching installer in a fresh shell to pick up new PATH...
+        start "" cmd /c ""%~f0""
+        exit
+    )
 )
 
-:: -----------------------------------------------------------
-:: Step 5: Install / upgrade remaining dependencies
-:: -----------------------------------------------------------
-echo.
-echo [5/7] Installing remaining dependencies...
-echo   (CustomTkinter, Requests, pywin32, emoji-country-flag, deep-translator)
-%PYTHON_CMD% -m pip install --upgrade customtkinter requests pywin32 emoji-country-flag deep-translator --quiet
+:: ── [2/7] Report detected version ───────────────────────────────────────────
+echo [2/7] Confirming Python version...
+for /f "delims=" %%v in ('%PY% -c "import sys; print(sys.version.split()[0])"') do set PY_VER=%%v
+echo [OK] Using Python !PY_VER!  ^(!PY!^)
+
+:: ── [3/7] Count all Python installs ─────────────────────────────────────────
+echo [3/7] Detecting Python installations...
+set INSTALL_COUNT=0
+for /f "delims=" %%p in ('where python 2^>nul') do set /a INSTALL_COUNT+=1
+echo Total: !INSTALL_COUNT! Python installation(s) detected on PATH.
+
+:: ── [4/7] Upgrade pip ───────────────────────────────────────────────────────
+echo [4/7] Auto-updating pip...
+%PY% -m pip install --upgrade pip --quiet
 if %errorlevel% neq 0 (
-    echo [ERROR] One or more dependencies failed to install.
+    echo [WARNING] pip upgrade failed - continuing anyway...
+)
+
+:: ── [5/7] Install / upgrade dependencies ────────────────────────────────────
+echo [5/7] Installing / upgrading required dependencies...
+
+call :install_if_missing "PIL"      "Pillow"   "Pillow - image processing"
+call :install_if_missing "PySide6"  "PySide6"  "PySide6 - GUI framework"
+call :install_if_missing "requests" "requests" "requests - HTTP"
+call :install_if_missing "win32api" "pywin32"  "pywin32 - Windows APIs"
+call :install_if_missing "imageio"  "imageio"  "imageio - extended DDS/texture support"
+
+:: imageio plugin for DDS variants (BC7 / DX10 etc.)
+echo   Checking imageio-ffmpeg (DDS plugin)...
+%PY% -c "import imageio; imageio.plugins.freeimage.download()" >nul 2>&1
+%PY% -m pip install --upgrade imageio[ffmpeg] --quiet >nul 2>&1
+
+goto :after_helpers
+
+:install_if_missing
+    set "_label=%~3"
+    echo   Checking !_label!...
+    %PY% -c "import %~1" >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo   Not found - installing %~2...
+        %PY% -m pip install %~2 --quiet
+        if !errorlevel! neq 0 (
+            echo [ERROR] Failed to install %~2!
+            pause
+            exit /b 1
+        )
+        echo   [OK] %~2 installed.
+    ) else (
+        echo   [OK] !_label! already present - skipping.
+    )
+    exit /b 0
+
+:after_helpers
+
+:: ── [6/7] Verify all core imports ───────────────────────────────────────────
+echo [6/7] Verifying installation...
+%PY% -c "import PySide6; import PIL; import requests; import win32api; import imageio; print('[OK] All core dependencies verified')"
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Dependency verification failed!
+    echo         Check the error printed above, then run install.bat again.
     pause
     exit /b 1
 )
-echo   [OK] All dependencies installed.
 
-:: -----------------------------------------------------------
-:: Step 6: Verify imports
-:: -----------------------------------------------------------
-echo.
-echo [6/7] Verifying installations...
-%PYTHON_CMD% -c "import customtkinter; import PIL; import requests; import flag; import deep_translator; print('  [OK] All dependencies verified.')"
-if %errorlevel% neq 0 (
-    echo [ERROR] Verification failed — one or more packages may not have installed correctly.
-    pause
-    exit /b 1
-)
-
-:: -----------------------------------------------------------
-:: Step 7: Launch BeamSkin Studio
-:: -----------------------------------------------------------
-echo.
+:: ── [7/7] Launch BeamSkin Studio ────────────────────────────────────────────
 echo [7/7] Starting BeamSkin Studio...
 timeout /t 2 /nobreak >nul
 
-if exist "BeamSkin Studio.bat" (
-    start "" "BeamSkin Studio.bat"
-    exit
-)
 if exist "Beamskin_studio.bat" (
     start "" "Beamskin_studio.bat"
     exit
 )
+if exist "BeamSkin Studio.bat" (
+    start "" "BeamSkin Studio.bat"
+    exit
+)
 
 echo.
 echo ============================================================
-echo  [ERROR] Could not find the BeamSkin Studio launcher.
+echo  [ERROR] Could not find the BeamSkin Studio launcher bat.
 echo ============================================================
 echo.
-echo  This usually means one of the following:
+echo  Make sure you are running install.bat from the BeamSkin
+echo  Studio root folder (where main.py lives).
 echo.
-echo  1. The launcher file is missing from this folder.
-echo     - Try launching it manually if it exists elsewhere
-echo       in the BeamSkin Studio folder.
-echo.
-echo  2. The program files are incomplete or weren't fully downloaded.
-echo     - Re-download BeamSkin Studio and run install.bat again
-echo       from the newly extracted folder.
-echo.
-echo  3. If the issue persists, contact the developer:
-echo       Email: burztworkshop@gmail.com
-echo.
-echo ============================================================
+echo  If the issue persists, contact: burztworkshop@gmail.com
 echo.
 pause
-exit
+exit /b 1

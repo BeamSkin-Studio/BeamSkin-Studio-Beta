@@ -1,596 +1,1013 @@
-"""
-Navigation Components - Sidebar and Topbar
-"""
-from typing import Callable, Optional
-import customtkinter as ctk
-from tkinter import filedialog
-from gui.state import state
-from gui.components.preview import HoverPreviewManager
-from core.localization import t
-from gui.icon_helper import set_window_icon
+from __future__ import annotations
+import os
+from typing import Callable, Dict, List, Optional, Tuple
 
-print(f"[DEBUG] Loading class: Sidebar")
+from PySide6.QtCore   import Qt, Signal, QSize, QTimer, QPropertyAnimation, QEasingCurve
+from PySide6.QtGui    import QFont, QIcon, QPixmap
+from PySide6.QtWidgets import (
+    QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+    QScrollArea, QLineEdit, QSizePolicy, QButtonGroup,
+    QRadioButton, QFileDialog, QApplication,
+)
 
-class Sidebar(ctk.CTkFrame):
-    """Left sidebar with project settings and vehicle list"""
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.widgets import (AnimButton, GhostButton, VehicleCard,
+                          HSeparator, LabelledEntry, Badge, Spinner,
+                          ToggleSwitch)
+from gui.state   import state
 
-    def __init__(self, parent: ctk.CTk, preview_manager: HoverPreviewManager):
+try:
+    from core.localization import t
+except ImportError:
+    def t(key, **kw): return key
 
-        print(f"[DEBUG] __init__ called")
-        super().__init__(parent, width=260, fg_color=state.colors["sidebar_bg"], corner_radius=0)
-        self.pack_propagate(False)
-        self.preview_manager = preview_manager
 
-        self.output_mode_var = ctk.StringVar(value="steam")
-        self.custom_output_var = ctk.StringVar()
-        self.sidebar_search_var = ctk.StringVar()
-        self.sidebar_search_placeholder = t("common.search_vehicle")
+# VARIANT  DETECTION  HELPER
 
-        # Kept in __init__ so user-typed values survive a UI rebuild
-        self.mod_name_var = ctk.StringVar()
-        self.author_var = ctk.StringVar()
-        self._mod_name_is_placeholder = True
-        self._author_is_placeholder = True
+def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
+    """
+    Scan vehicles/<carid>/ for SKINNAME* subdirectories.
 
-        self.expanded_vehicle_carid: Optional[str] = None
+    Returns a list of (variant_suffix, display_label) tuples.
+      ("",          "Normal")     — the standard body (SKINNAME folder)
+      ("ambulance", "Ambulance")  — SKINNAMEAMBULANCE folder
+      ("box",       "Box")        — SKINNAMEBOX folder
+      …
 
-        self.custom_output_frame: Optional[ctk.CTkFrame] = None
-        self.sidebar_scroll: Optional[ctk.CTkScrollableFrame] = None
+    Always returns at least [("", "Normal")].
+    The list is sorted: normal first, then alphabetically by label.
+    """
+    vehicles_dir = os.path.join("vehicles", carid)
+    if not os.path.isdir(vehicles_dir):
+        return [("", "Normal")]
 
-        self._setup_ui()
+    variants: List[Tuple[str, str]] = []
+    for entry in os.listdir(vehicles_dir):
+        full = os.path.join(vehicles_dir, entry)
+        if not os.path.isdir(full):
+            continue
+        dl = entry.lower()
+        if dl == "skinname":
+            variants.append(("", "Normal"))
+        elif dl.startswith("skinname"):
+            suffix = dl[len("skinname"):]          # e.g. "ambulance", "box"
+            variants.append((suffix, suffix.capitalize()))
 
-    def _setup_ui(self):
-        """Set up the sidebar UI"""
+    if not variants:
+        return [("", "Normal")]
 
-        sidebar_header = ctk.CTkFrame(self, height=40, fg_color="transparent")
-        sidebar_header.pack(fill="x", padx=15, pady=(10, 0))
-        sidebar_header.pack_propagate(False)
+    variants.sort(key=lambda x: (x[0] != "", x[1].lower()))
+    return variants
 
-        ctk.CTkLabel(
-            sidebar_header,
-            text=t("project.title").upper(),
-            font=ctk.CTkFont(size=13, weight="bold"),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(side="top", fill="x", pady=(5, 0))
 
-        ctk.CTkLabel(
-            self,
-            text=t("project.mod_name"),
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(5, 5))
+# VEHICLE  VARIANT  EXPANDER
 
-        self.mod_name_entry = ctk.CTkEntry(
-            self,
-            textvariable=self.mod_name_var,
-            height=36,
-            fg_color=state.colors["frame_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"]
+class VehicleVariantExpander(QFrame):
+    """
+    Sidebar widget for vehicles with multiple body variants.
+
+    Layout (collapsed):
+      ▶  Pickup                    2 variants
+
+    Layout (expanded):
+      ▼  Pickup                    2 variants
+      ┌────────────────────────┐
+      │  [Normal]  [Ambulance] │
+      └────────────────────────┘
+
+    Each variant pill is clickable until that variant has been added to the
+    project, at which point it grays out.  When all variants are added the
+    whole widget hides itself.
+    """
+
+    variant_add_requested = Signal(str, str, str)   # carid, display_name, variant_suffix
+
+    def __init__(
+        self,
+        carid:        str,
+        display_name: str,
+        variants:     List[Tuple[str, str]],   # [(suffix, label), …]
+        parent:       QWidget | None = None,
+        is_custom:    bool = False,
+    ):
+        super().__init__(parent)
+        self.carid        = carid
+        self.display_name = display_name
+        self.variants     = variants
+        self._expanded    = False
+        self._added:      set = set()      # variant suffixes already in project
+        self._buttons:    Dict[str, QPushButton] = {}
+
+        self.setStyleSheet("background:transparent;border:none;")
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(2)
+
+        self._header = QFrame()
+        self._header.setFixedHeight(38)
+        self._header.setCursor(Qt.PointingHandCursor)
+        self._apply_header_style(False)
+        hrow = QHBoxLayout(self._header)
+        hrow.setContentsMargins(10, 0, 10, 0)
+        hrow.setSpacing(8)
+
+        self._arrow = QLabel("▶")
+        self._arrow.setFont(font(10))
+        self._arrow.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        self.mod_name_entry.pack(fill="x", padx=15, pady=(0, 10))
+        hrow.addWidget(self._arrow)
 
-        self.mod_name_placeholder = t("project.mod_name_placeholder")
-        if self._mod_name_is_placeholder:
-            self.mod_name_var.set("")
-            self.mod_name_entry.insert(0, self.mod_name_placeholder)
-            self.mod_name_entry.configure(text_color="#888888")
-        else:
-            self.mod_name_entry.configure(text_color=state.colors["text"])
-
-        self.mod_name_entry.bind("<FocusIn>", self._on_mod_name_focus_in)
-        self.mod_name_entry.bind("<FocusOut>", self._on_mod_name_focus_out)
-
-        ctk.CTkLabel(
-            self,
-            text=t("project.author_name"),
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(0, 5))
-
-        self.author_entry = ctk.CTkEntry(
-            self,
-            textvariable=self.author_var,
-            height=36,
-            fg_color=state.colors["frame_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"]
+        name_lbl = QLabel(display_name)
+        name_lbl.setFont(font(13, "bold"))
+        name_lbl.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
         )
-        self.author_entry.pack(fill="x", padx=15, pady=(0, 15))
+        hrow.addWidget(name_lbl, 1)
 
-        self.author_placeholder = t("project.author_name_placeholder")
-        if self._author_is_placeholder:
-            self.author_var.set("")
-            self.author_entry.insert(0, self.author_placeholder)
-            self.author_entry.configure(text_color="#888888")
-        else:
-            self.author_entry.configure(text_color=state.colors["text"])
+        if is_custom:
+            mod_badge = QLabel("mod")
+            mod_badge.setFont(font(8))
+            mod_badge.setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['text_secondary']};
+                    background: transparent;
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 3px;
+                    padding: 0px 4px;
+                }}
+            """)
+            hrow.addWidget(mod_badge)
 
-        self.author_entry.bind("<FocusIn>", self._on_author_focus_in)
-        self.author_entry.bind("<FocusOut>", self._on_author_focus_out)
+        badge = QLabel(f"{len(variants)} variants")
+        badge.setFont(font(8))
+        badge.setStyleSheet(f"""
+            color:{COLORS['text_secondary']};
+            background:transparent;
+            border:1px solid {COLORS['border']};
+            border-radius:6px;
+            padding:0px 5px;
+        """)
+        hrow.addWidget(badge)
 
-        ctk.CTkLabel(
-            self,
-            text=t("project.output_mode"),
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(0, 5))
+        self._header.mousePressEvent = lambda _e: self._toggle()
+        outer.addWidget(self._header)
 
-        steam_option_sidebar = ctk.CTkFrame(self, fg_color=state.colors["frame_bg"], corner_radius=8, height=45)
-        steam_option_sidebar.pack(fill="x", padx=15, pady=(0, 5))
-        steam_option_sidebar.pack_propagate(False)
+        self._panel = QFrame()
+        self._panel.setVisible(False)
+        self._panel.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['frame_bg']};
+                border-radius:8px;
+                border:1px solid {COLORS['border']};
+            }}
+        """)
+        panel_col = QVBoxLayout(self._panel)
+        panel_col.setContentsMargins(8, 8, 8, 8)
+        panel_col.setSpacing(4)
 
-        self.steam_icon_label = ctk.CTkLabel(steam_option_sidebar, text="", image=None)
-        self.steam_icon_label.pack(side="left", padx=(10, 5), pady=10)
-
-        self.steam_radio_sidebar = ctk.CTkRadioButton(
-            steam_option_sidebar,
-            text=t("project.steam_path"),
-            variable=self.output_mode_var,
-            value="steam",
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=13, weight="bold")
+        hint = QLabel("Select body variant to add:")
+        hint.setFont(font(10))
+        hint.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        self.steam_radio_sidebar.pack(side="left", padx=0, pady=10)
-
-        custom_option_sidebar = ctk.CTkFrame(self, fg_color=state.colors["frame_bg"], corner_radius=8, height=45)
-        custom_option_sidebar.pack(fill="x", padx=15, pady=(0, 5))
-        custom_option_sidebar.pack_propagate(False)
-
-        self.custom_icon_label = ctk.CTkLabel(custom_option_sidebar, text="", image=None)
-        self.custom_icon_label.pack(side="left", padx=(10, 5), pady=10)
-
-        self.custom_radio_sidebar = ctk.CTkRadioButton(
-            custom_option_sidebar,
-            text=t("project.custom_location"),
-            variable=self.output_mode_var,
-            value="custom",
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
-        self.custom_radio_sidebar.pack(side="left", padx=0, pady=10)
-
-        self.custom_option_sidebar = custom_option_sidebar
-
-        # Wrap trace callback to handle widget destruction gracefully
-        def safe_update_output_mode(*args):
-            try:
-                self._update_output_mode()
-            except Exception:
-                pass  # Silently ignore errors during widget destruction
-        
-        self.output_mode_var.trace_add("write", safe_update_output_mode)
-
-        self.custom_output_frame = ctk.CTkFrame(self, fg_color="transparent")
-
-        custom_output_entry = ctk.CTkEntry(
-            self.custom_output_frame,
-            textvariable=self.custom_output_var,
-            placeholder_text=t("project.select_output"),
-            placeholder_text_color="#888888",
-            state="readonly",
-            height=32,
-            fg_color=state.colors["frame_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=10)
-        )
-        custom_output_entry.pack(side="left", fill="x", expand=True, padx=(15, 5))
-
-        custom_browse_btn = ctk.CTkButton(
-            self.custom_output_frame,
-            text="📁",
-            width=32,
-            height=32,
-            command=self.select_custom_output,
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"],
-            text_color=state.colors["text"],
-            corner_radius=8,
-            font=ctk.CTkFont(size=14)
-        )
-        custom_browse_btn.pack(side="right", padx=(0, 15))
-
-        separator = ctk.CTkFrame(self, height=2, fg_color=state.colors["border"])
-        separator.pack(fill="x", padx=15, pady=(10, 10))
-
-        ctk.CTkLabel(
-            self,
-            text=t("project.add_vehicle"),
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(0, 5))
-
-        search_frame = ctk.CTkFrame(self, fg_color="transparent")
-        search_frame.pack(fill="x", padx=15, pady=(0, 8))
-
-        self.sidebar_search_entry = ctk.CTkEntry(
-            search_frame,
-            textvariable=self.sidebar_search_var,
-            height=32,
-            fg_color=state.colors["frame_bg"],
-            border_color=state.colors["border"],
-            border_width=1,
-            text_color=state.colors["text"],
-            font=ctk.CTkFont(size=11),
-            corner_radius=6
-        )
-        self.sidebar_search_entry.pack(fill="x")
-
-        self.sidebar_search_placeholder = t("common.search_vehicle")
-        self.sidebar_search_var.set(self.sidebar_search_placeholder)
-        self.sidebar_search_entry.configure(text_color="#888888")
-
-        self.sidebar_search_entry.bind("<FocusIn>", self._on_search_focus_in)
-        self.sidebar_search_entry.bind("<FocusOut>", self._on_search_focus_out)
-
-        # Wrap trace callback to handle widget destruction gracefully
-        def safe_filter(*args):
-            try:
-                self._filter_vehicles()
-            except Exception:
-                pass  # Silently ignore errors during widget destruction
-        
-        self.sidebar_search_var.trace_add("write", safe_filter)
-
-        self.sidebar_scroll = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent",
-            scrollbar_button_color=state.colors["border"],
-            scrollbar_button_hover_color=state.colors["card_hover"]
-        )
-        self.sidebar_scroll.pack(fill="both", expand=True, padx=15, pady=(0, 10))
-
-    def _on_mod_name_focus_in(self, event):
-        """Handle focus in for mod name entry"""
-        if self._mod_name_is_placeholder:
-            self.mod_name_entry.delete(0, "end")
-            self.mod_name_entry.configure(text_color=state.colors["text"])
-            self._mod_name_is_placeholder = False
-
-    def _on_mod_name_focus_out(self, event):
-        """Handle focus out for mod name entry"""
-        if not self.mod_name_entry.get():
-            self.mod_name_entry.insert(0, self.mod_name_placeholder)
-            self.mod_name_entry.configure(text_color="#888888")
-            self._mod_name_is_placeholder = True
-
-    def _on_author_focus_in(self, event):
-        """Handle focus in for author entry"""
-        if self._author_is_placeholder:
-            self.author_entry.delete(0, "end")
-            self.author_entry.configure(text_color=state.colors["text"])
-            self._author_is_placeholder = False
-
-    def _on_author_focus_out(self, event):
-        """Handle focus out for author entry"""
-        if not self.author_entry.get():
-            self.author_entry.insert(0, self.author_placeholder)
-            self.author_entry.configure(text_color="#888888")
-            self._author_is_placeholder = True
-
-    def _on_search_focus_in(self, event):
-        """Handle focus in for search entry - remove placeholder"""
-        if self.sidebar_search_var.get() == self.sidebar_search_placeholder:
-            self.sidebar_search_var.set("")
-            self.sidebar_search_entry.configure(text_color=state.colors["text"])
-
-    def _on_search_focus_out(self, event):
-        """Handle focus out for search entry - restore placeholder if empty"""
-        if not self.sidebar_search_var.get():
-            self.sidebar_search_var.set(self.sidebar_search_placeholder)
-            self.sidebar_search_entry.configure(text_color="#888888")
-
-    def _update_output_mode(self):
-        """Update output mode visibility"""
-        if self.output_mode_var.get() == "custom":
-
-            self.custom_output_frame.pack(fill="x", pady=(0, 10), padx=0, after=self.custom_option_sidebar)
-        else:
-            self.custom_output_frame.pack_forget()
-
-    def _filter_vehicles(self):
-        """Filter vehicle buttons based on search"""
-        try:
-            search_query = self.sidebar_search_var.get()
-
-            if search_query == self.sidebar_search_placeholder:
-                search_query = ""
-
-            search_query = search_query.lower()
-
-            for container, carid, display_name, add_btn_frame in state.sidebar_vehicle_buttons:
-                # Safety check: widget may have been destroyed during UI refresh
-                if not container.winfo_exists():
-                    continue
-
-                matches = (
-                    not search_query or
-                    search_query in display_name.lower() or
-                    search_query in carid.lower()
-                )
-
-                if matches:
-                    container.pack(fill="x", pady=2, padx=0)
-                else:
-                    container.pack_forget()
-        except Exception as e:
-            print(f"[DEBUG] Error filtering vehicles: {e}")
-
-    def _get_real_value(self, value: str, placeholder: str) -> str:
-        """Get real value, ignoring placeholder"""
-        return "" if value == placeholder else value
-
-    def select_custom_output(self):
-
-        print(f"[DEBUG] select_custom_output called")
-        """Select custom output directory"""
-        temp_window = ctk.CTkToplevel(self.winfo_toplevel())
-        set_window_icon(temp_window)
-        temp_window.withdraw()
-        temp_window.attributes('-alpha', 0)
-
-        if self.custom_output_frame.winfo_ismapped():
-            x = self.custom_output_frame.winfo_rootx()
-            y = self.custom_output_frame.winfo_rooty() + self.custom_output_frame.winfo_height() + 10
-            temp_window.geometry(f"1x1+{x}+{y}")
-
-        temp_window.update()
-
-        folder = filedialog.askdirectory(
-            title="Select Output Directory",
-            parent=temp_window
-        )
-
-        temp_window.destroy()
-
-        if folder:
-            self.custom_output_var.set(folder)
-            self.output_mode_var.set("custom")
-            print(f"[DEBUG] Custom output directory selected: {folder}")
-
-    def populate_vehicles(self, add_callback: Callable[[str, str], None]):
-
-        print(f"[DEBUG] populate_vehicles called")
-        """Populate sidebar with vehicle buttons
-
-        Args:
-            add_callback: Function that takes (carid, display_name) and adds vehicle to project
-        """
-        print("[DEBUG] Populating sidebar with vehicles...")
-
-        # Clear stale widget references from any previous build before repopulating
-        state.sidebar_vehicle_buttons.clear()
-
-        all_vehicles = {}
-
-        for carid, display_name in state.vehicle_ids.items():
-            if carid not in state.added_vehicles:
-                all_vehicles[carid] = display_name
-
-        for carid, carname in state.added_vehicles.items():
-            all_vehicles[carid] = carname
-
-        sorted_vehicles = sorted(all_vehicles.items(), key=lambda x: x[1].lower())
-
-        for carid, display_name in sorted_vehicles:
-            self._add_vehicle_button(carid, display_name, add_callback)
-
-        print(f"[DEBUG] Added {len(state.sidebar_vehicle_buttons)} vehicles to sidebar")
-
-    def _add_vehicle_button(self, carid: str, display_name: str, add_callback: Callable[[str, str], None]):
-        """Add a single vehicle button to the sidebar
-
-        Args:
-            carid: Vehicle ID
-            display_name: Display name for the vehicle
-            add_callback: Function that takes (carid, display_name) to add vehicle
-        """
-
-        insert_position = len(state.sidebar_vehicle_buttons)
-        for i, (container, cid, dname, add_btn_frame) in enumerate(state.sidebar_vehicle_buttons):
-            if dname.lower() > display_name.lower():
-                insert_position = i
-                break
-
-        container_frame = ctk.CTkFrame(self.sidebar_scroll, corner_radius=8, fg_color="transparent")
-
-        btn = ctk.CTkButton(
-            container_frame,
-            text=display_name,
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"],
-            height=38,
-            corner_radius=8,
-            text_color=state.colors["text"],
-            anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold")
-        )
-        btn.pack(fill="x")
-
-        add_button_frame = ctk.CTkFrame(container_frame, fg_color="transparent")
-
-        add_btn = ctk.CTkButton(
-            add_button_frame,
-            text="➕ " + t("project.add_vehicle_to_project"), 
-            command=lambda c=carid, d=display_name: add_callback(c, d),
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            height=32,
-            corner_radius=6,
-            font=ctk.CTkFont(size=12, weight="bold")
-        )
-        add_btn.pack(fill="x")
-
-        btn.configure(command=lambda c=carid, frame=add_button_frame: self._toggle_vehicle_add_button(c, frame))
-
-        btn.bind("<Enter>", lambda e, c=carid: self.preview_manager.schedule_hover_preview(c, btn))
-        btn.bind("<Leave>", lambda e: self.preview_manager.hide_hover_preview())
-
-        state.sidebar_vehicle_buttons.insert(insert_position, (container_frame, carid, display_name, add_button_frame))
-
-        for widget in self.sidebar_scroll.winfo_children():
-            if widget in [container for container, _, _, _ in state.sidebar_vehicle_buttons]:
-                widget.pack_forget()
-
-        for container, cid, dname, add_frame in state.sidebar_vehicle_buttons:
-            container.pack(fill="x", pady=2, padx=0)
-
-    def _toggle_vehicle_add_button(self, carid: str, add_button_frame: ctk.CTkFrame):
-        """Toggle the add button for a vehicle"""
-        if self.expanded_vehicle_carid == carid:
-
-            add_button_frame.pack_forget()
-            self.expanded_vehicle_carid = None
-        else:
-
-            if self.expanded_vehicle_carid is not None:
-                for btn_frame, car_id, _, add_btn_frame in state.sidebar_vehicle_buttons:
-                    if car_id == self.expanded_vehicle_carid:
-                        add_btn_frame.pack_forget()
-                        break
-
-            add_button_frame.pack(fill="x", padx=5, pady=(0, 5))
-            self.expanded_vehicle_carid = carid
-
-    def refresh_ui(self, populate_callback: Callable[[str, str], None] = None):
-        """Rebuild the sidebar UI for language/theme changes, preserving user data"""
-        if populate_callback:
-            self._populate_callback = populate_callback
-        for widget in self.winfo_children():
-            widget.destroy()
-        self.configure(fg_color=state.colors["sidebar_bg"])
-        self._setup_ui()
-        if hasattr(self, '_populate_callback') and self._populate_callback:
-            self.populate_vehicles(self._populate_callback)
-
-    def update_icons(self, steam_icon, folder_icon):
-
-        print(f"[DEBUG] update_icons called")
-        """Update output icons based on current theme"""
-        if steam_icon:
-            self.steam_icon_label.configure(image=steam_icon)
-        if folder_icon:
-            self.custom_icon_label.configure(image=folder_icon)
-
-print(f"[DEBUG] Loading class: Topbar")
-
-class Topbar(ctk.CTkFrame):
-    """Top navigation bar with menu and generate button"""
-
-    def __init__(self, parent: ctk.CTk, on_view_change: Callable[[str], None], on_generate: Callable[[], None],
-                 logo_image=None):
-
-        print(f"[DEBUG] __init__ called")
-
-        super().__init__(parent, height=60, fg_color=state.colors["topbar_bg"], corner_radius=0)
-        self.pack_propagate(False)
-
-        self.on_view_change = on_view_change
-        self.on_generate = on_generate
-        self.logo_image = logo_image
-
-        self.menu_buttons = {}
-
-        self._setup_ui()
-
-    def _setup_ui(self):
-        """Set up the topbar UI"""
-
-        logo_container = ctk.CTkFrame(self, fg_color="transparent")
-
-        logo_container.pack(side="left", padx=25)
-
-        if self.logo_image:
-            logo_label = ctk.CTkLabel(
-                logo_container,
-                text="",
-                image=self.logo_image
+        panel_col.addWidget(hint)
+
+        for suffix, label in variants:
+            btn = QPushButton(label)
+            btn.setFont(font(12, "bold"))
+            btn.setFixedHeight(32)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet(self._pill_style())
+            btn.clicked.connect(
+                lambda checked=False, s=suffix, lb=label: self._on_pill(s, lb)
             )
-            logo_label.pack(side="left", padx=(0, 0))
+            panel_col.addWidget(btn)
+            self._buttons[suffix] = btn
+
+        outer.addWidget(self._panel)
+
+
+    def _apply_header_style(self, hover: bool):
+        self._header.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border-radius:8px;
+                border:1px solid {COLORS['border']};
+            }}
+            QFrame:hover {{
+                border-color:{COLORS['accent']};
+                background:{COLORS['card_hover']};
+            }}
+        """)
+
+    def _pill_style(self) -> str:
+        print(f"[DEBUG] _pill_style() called")
+        return f"""
+            QPushButton {{
+                background:{COLORS['card_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:6px;
+                padding:4px 12px;
+            }}
+            QPushButton:hover {{
+                background:{COLORS['accent']};
+                color:{COLORS['accent_text']};
+                border-color:{COLORS['accent']};
+            }}
+        """
+
+
+    def _toggle(self):
+        print(f"[DEBUG] VehicleVariantExpander._toggle: expanded={not self._expanded}")
+        self._expanded = not self._expanded
+        self._arrow.setText("▼" if self._expanded else "▶")
+        self._panel.setVisible(self._expanded)
+
+    def _on_pill(self, suffix: str, label: str):
+        print(f"[DEBUG] _on_pill() called")
+        # No guard here — clicking an already-added variant simply re-selects
+        # it in the generator (which shows its skin form) rather than blocking.
+        vname = (f"{self.display_name} ({label})"
+                 if suffix else self.display_name)
+        self.variant_add_requested.emit(self.carid, vname, suffix)
+
+    def mark_variant_added(self, suffix: str):
+        """
+        Called by the sidebar after a variant has been added to the project.
+        Hides the specific variant pill, matching the behaviour of single-body
+        vehicle cards which are removed from the list on add.
+        """
+        print(f"[DEBUG] mark_variant_added() called")
+        self._added.add(suffix)
+        # Hide the specific variant pill that was just added
+        if suffix in self._buttons:
+            self._buttons[suffix].setVisible(False)
+        # Hide the whole expander once every variant has been added
+        if {s for s, _ in self.variants}.issubset(self._added):
+            self.setVisible(False)
+
+
+# NAV  PILL  BUTTON  (topbar tab)
+
+class NavPill(QPushButton):
+    """Animated topbar tab button with underline indicator."""
+
+    def __init__(
+        self,
+        text: str,
+        view_name: str,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(text, parent)
+        self.view_name = view_name
+        self._active   = False
+        self.setFont(font(13))
+        self.setMinimumHeight(36)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.NoFocus)
+        self._apply(False)
+
+    def _apply(self, active: bool):
+        print(f"[DEBUG] _apply() called")
+        self._active = active
+        if active:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['accent']};
+                    color: {COLORS['accent_text']};
+                    border-radius: 8px;
+                    border: none;
+                    padding: 6px 16px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['accent_hover']};
+                }}
+            """)
         else:
+            self.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {COLORS['text_secondary']};
+                    border-radius: 8px;
+                    border: none;
+                    padding: 6px 16px;
+                    font-size: 13px;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['card_hover']};
+                    color: {COLORS['text']};
+                }}
+            """)
 
-            title_container = ctk.CTkFrame(logo_container, fg_color="transparent")
-            title_container.pack(side="left")
+    def set_active(self, active: bool):
+        print(f"[DEBUG] set_active() called")
+        if self._active != active:
+            self._apply(active)
 
-            ctk.CTkLabel(
-                title_container,
-                text="BeamSkin Studio",
-                font=ctk.CTkFont(size=20, weight="bold"),
-                text_color=state.colors["accent"]
-            ).pack(anchor="w")
 
-            ctk.CTkLabel(
-                title_container,
-                text="Professional Skin Modding Tool",
-                font=ctk.CTkFont(size=10),
-                text_color=state.colors["text_secondary"]
-            ).pack(anchor="w")
+# TOPBAR
 
-        self.menu_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.menu_frame.pack(side="left", padx=(150, 40))
+class Topbar(QFrame):
+    """Top navigation bar."""
 
-        menu_items = [
-            (t("menu.generator"), "generator"),
-            (t("menu.HowToTab"), "howto"),
-            (t("menu.carlist"), "carlist"),
+    view_changed     = Signal(str)
+    generate_clicked = Signal()
+
+    def __init__(
+        self,
+        parent: QWidget,
+        logo_pixmap: Optional[QPixmap] = None,
+    ):
+        super().__init__(parent)
+        self.logo_pixmap  = logo_pixmap
+        self.menu_buttons: Dict[str, NavPill] = {}
+        self._active_view = "generator"
+
+        self.setFixedHeight(60)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['topbar_bg']};
+                border-bottom: 1px solid {COLORS['border']};
+            }}
+        """)
+
+        self._build()
+
+    def _build(self):
+        print(f"[DEBUG] _build() called")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 0, 20, 0)
+        layout.setSpacing(0)
+
+        # logo / brand
+        logo_px = self.logo_pixmap or self._load_logo_pixmap()
+        if logo_px:
+            logo = QLabel()
+            logo.setFixedSize(80, 40)
+            scaled = logo_px.scaled(80, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo.setPixmap(scaled)
+            logo.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            logo.setStyleSheet("background:transparent;border:none;")
+            layout.addWidget(logo)
+            layout.addSpacing(12)
+        else:
+            brand = QLabel("BeamSkin Studio")
+            brand.setFont(font(18, "bold"))
+            brand.setStyleSheet(
+                f"color:{COLORS['accent']};background:transparent;border:none;"
+            )
+            layout.addWidget(brand)
+            layout.addSpacing(8)
+
+        # menu pills
+        items = [
+            (t("menu.generator"),    "generator"),
+            (t("menu.HowToTab"),     "howto"),
+            (t("menu.carlist"),      "carlist"),
             (t("menu.add_vehicles"), "add_vehicles"),
-            (t("menu.settings"), "settings"),
-            (t("menu.about"), "about"),
-            (t("menu.online"), "online_tab"),
+            (t("menu.settings"),     "settings"),
+            (t("menu.about"),        "about"),
+            (t("menu.online"),       "online_tab"),
+        ]
+        for label, name in items:
+            btn = NavPill(label, name, self)
+            btn.clicked.connect(lambda checked=False, n=name: self.view_changed.emit(n))
+            self.menu_buttons[name] = btn
+            layout.addWidget(btn)
+            layout.addSpacing(2)
+
+        layout.addStretch()
+
+        # generate button
+        self.generate_button = AnimButton(
+            t("project.generate_mod", default="Generate Mod"),
+            icon_text="✨",
+            fg=COLORS["accent"],
+            fg_hover=COLORS["accent_hover"],
+            font_size=13,
+            bold=True,
+            padding="8px 20px",
+        )
+        self.generate_button.setFixedHeight(40)
+        self.generate_button.clicked.connect(self.generate_clicked)
+        layout.addWidget(self.generate_button)
+
+        self.set_active("generator")
+
+    def _load_logo_pixmap(self) -> Optional[QPixmap]:
+        """Load the theme-appropriate topbar logo (White in dark, Black in light)."""
+        icon_dir = os.path.join("gui", "Icons")
+        suffix   = "White" if state.theme_mode == "dark" else "Black"
+        path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
+        if os.path.exists(path):
+            return QPixmap(path).scaled(80, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return None
+
+    def set_active(self, view_name: str):
+        self._active_view = view_name
+        for name, btn in self.menu_buttons.items():
+            btn.set_active(name == view_name)
+        self.generate_button.setVisible(view_name == "generator")
+
+    def refresh_ui(self, logo_pixmap: Optional[QPixmap] = None):
+        """Rebuild the topbar in place (called after language/theme change)."""
+        print(f"[DEBUG] _load_logo_pixmap() called")
+        if logo_pixmap:
+            self.logo_pixmap = logo_pixmap
+        else:
+            reloaded = self._load_logo_pixmap()
+            if reloaded:
+                self.logo_pixmap = reloaded
+
+        saved_view = self._active_view
+
+        old = self.layout()
+        if old is not None:
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.setParent(None)
+                    w.deleteLater()
+            _tmp = QWidget()
+            _tmp.setLayout(old)
+
+        self.menu_buttons.clear()
+        self._build()
+        self.set_active(saved_view)
+
+
+# SIDEBAR
+
+class Sidebar(QFrame):
+    """Left sidebar — project settings + vehicle picker."""
+
+    # Signal now carries 3 args: carid, display_name, variant_suffix
+    # variant_suffix is "" for normal vehicles and "ambulance" / "box" / etc
+    # for variant bodies on vehicles like Pickup and Van.
+    add_vehicle_requested = Signal(str, str, str)
+
+    def __init__(self, parent: QWidget):
+        print(f"[DEBUG] __init__() called")
+        super().__init__(parent)
+        self.setFixedWidth(320)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['sidebar_bg']};
+                border-right: 1px solid {COLORS['border']};
+            }}
+        """)
+
+        self._populate_callback: Optional[Callable] = None
+        self._vehicle_cards: List[VehicleCard] = []
+        # Tracks VehicleVariantExpander widgets keyed by carid.
+        self._variant_expanders: Dict[str, VehicleVariantExpander] = {}
+
+        self._mod_name_text = ""
+        self._author_text   = ""
+        self.output_mode    = "steam"
+        self.custom_output  = ""
+        self.unpacked       = False
+
+        self._build()
+
+
+    def _build(self):
+        print(f"[DEBUG] _build() called")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background:transparent; border:none; }}
+            QScrollArea > QWidget > QWidget {{ background:transparent; }}
+        """)
+
+        inner = QWidget()
+        inner.setStyleSheet("background:transparent;")
+        inner_layout = QVBoxLayout(inner)
+        inner_layout.setContentsMargins(14, 14, 14, 14)
+        inner_layout.setSpacing(8)
+
+        sec = QLabel(t("project.title", default="PROJECT").upper())
+        sec.setFont(font(11, "bold"))
+        sec.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;letter-spacing:1px;"
+        )
+        inner_layout.addWidget(sec)
+
+        self._mod_entry = LabelledEntry(
+            t("project.mod_name", default="Mod Name"),
+            t("project.mod_name_placeholder", default="MySkinPack"),
+        )
+        self._mod_entry.set_text(self._mod_name_text)
+        inner_layout.addWidget(self._mod_entry)
+
+        self._author_entry = LabelledEntry(
+            t("project.author_name", default="Author"),
+            t("project.author_name_placeholder", default="Your name"),
+        )
+        self._author_entry.set_text(self._author_text)
+        inner_layout.addWidget(self._author_entry)
+
+        out_lbl = QLabel(t("project.output_mode", default="Output Mode"))
+        out_lbl.setFont(font(11, "bold"))
+        out_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        inner_layout.addWidget(out_lbl)
+
+        unpacked_frame = QFrame()
+        unpacked_frame.setFixedHeight(44)
+        unpacked_frame.setStyleSheet("background:transparent;border:none;")
+        uf_row = QHBoxLayout(unpacked_frame)
+        uf_row.setContentsMargins(10, 0, 10, 0)
+        uf_row.setSpacing(8)
+
+        self._unpacked_lbl = QLabel(t("project.unpacked_output"))
+        self._unpacked_lbl.setFont(font(13, "bold"))
+        self._unpacked_lbl.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;"
+        )
+        uf_row.addWidget(self._unpacked_lbl, 1)
+
+        self._unpacked_toggle = ToggleSwitch()
+        self._unpacked_toggle.setChecked(self.unpacked)
+        self._unpacked_toggle.stateChanged.connect(self._on_unpacked_changed)
+        uf_row.addWidget(self._unpacked_toggle)
+        inner_layout.addWidget(unpacked_frame)
+
+        steam_frame = QFrame()
+        steam_frame.setFixedHeight(44)
+        steam_frame.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['frame_bg']};
+                border-radius:8px;
+                border:1px solid {COLORS['border']};
+            }}
+        """)
+        sf_row = QHBoxLayout(steam_frame)
+        sf_row.setContentsMargins(10, 0, 10, 0)
+        self._steam_radio = QRadioButton(
+            t("project.steam_path", default="Save to Steam Mods")
+        )
+        self._steam_radio.setFont(font(13, "bold"))
+        self._steam_radio.setStyleSheet(_radio_qss())
+        self._steam_radio.setChecked(self.output_mode == "steam")
+        sf_row.addWidget(self._steam_radio)
+        inner_layout.addWidget(steam_frame)
+
+        custom_frame = QFrame()
+        custom_frame.setFixedHeight(44)
+        custom_frame.setStyleSheet(steam_frame.styleSheet())
+        cf_row = QHBoxLayout(custom_frame)
+        cf_row.setContentsMargins(10, 0, 10, 0)
+        self._custom_radio = QRadioButton(
+            t("project.custom_location", default="Custom Location")
+        )
+        self._custom_radio.setFont(font(13, "bold"))
+        self._custom_radio.setStyleSheet(_radio_qss())
+        self._custom_radio.setChecked(self.output_mode == "custom")
+        cf_row.addWidget(self._custom_radio)
+        inner_layout.addWidget(custom_frame)
+
+        self._custom_path_frame = QFrame()
+        self._custom_path_frame.setStyleSheet("background:transparent;border:none;")
+        cp_row = QHBoxLayout(self._custom_path_frame)
+        cp_row.setContentsMargins(0, 0, 0, 0)
+        cp_row.setSpacing(6)
+
+        self._custom_entry = QLineEdit()
+        self._custom_entry.setReadOnly(True)
+        self._custom_entry.setPlaceholderText(
+            t("project.select_output", default="Select output folder…")
+        )
+        self._custom_entry.setText(self.custom_output)
+        self._custom_entry.setMinimumHeight(32)
+        self._custom_entry.setFont(font(11))
+        self._custom_entry.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:6px;
+                padding:4px 8px;
+                font-size:11px;
+            }}
+        """)
+        cp_row.addWidget(self._custom_entry, 1)
+
+        browse_btn = QPushButton("📁")
+        browse_btn.setFixedSize(32, 32)
+        browse_btn.setCursor(Qt.PointingHandCursor)
+        browse_btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{COLORS['card_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:6px;
+                font-size:14px;
+            }}
+            QPushButton:hover {{
+                border-color:{COLORS['accent']};
+                background:{COLORS['card_hover']};
+            }}
+        """)
+        browse_btn.clicked.connect(self._browse_custom_output)
+        cp_row.addWidget(browse_btn)
+        inner_layout.addWidget(self._custom_path_frame)
+
+        self._output_group = QButtonGroup(self)
+        self._output_group.addButton(self._steam_radio)
+        self._output_group.addButton(self._custom_radio)
+
+        self._steam_radio.toggled.connect(self._on_output_mode_changed)
+        self._custom_radio.toggled.connect(self._on_output_mode_changed)
+        self._update_custom_path_visibility()
+
+        inner_layout.addWidget(HSeparator())
+
+        veh_lbl = QLabel(t("project.add_vehicle", default="Add Vehicle"))
+        veh_lbl.setFont(font(11, "bold"))
+        veh_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        inner_layout.addWidget(veh_lbl)
+
+        # ── Developer testing mode: Add All Vehicles button ────────────── #
+        self._add_all_btn = QPushButton("⚡  Add All Vehicles & Variants")
+        self._add_all_btn.setFont(font(12, "bold"))
+        self._add_all_btn.setFixedHeight(36)
+        self._add_all_btn.setCursor(Qt.PointingHandCursor)
+        self._add_all_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {COLORS.get('warning', '#e67e22')};
+                color: white;
+                border-radius: 8px;
+                border: none;
+                padding: 4px 10px;
+            }}
+            QPushButton:hover {{
+                background: {COLORS.get('warning_hover', '#d35400')};
+            }}
+        """)
+        self._add_all_btn.clicked.connect(self._add_all_vehicles)
+        self._add_all_btn.setVisible(state.testing_mode)
+        inner_layout.addWidget(self._add_all_btn)
+
+        self._search = QLineEdit()
+        self._search.setPlaceholderText(
+            t("common.search_vehicle", default="Search vehicles…")
+        )
+        self._search.setClearButtonEnabled(True)
+        self._search.setMinimumHeight(34)
+        self._search.setFont(font(12))
+        self._search.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:8px;
+                padding:5px 10px;
+                font-size:12px;
+            }}
+            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
+        """)
+        self._search.textChanged.connect(self._filter_vehicles)
+        inner_layout.addWidget(self._search)
+
+        self._vehicle_list = QVBoxLayout()
+        self._vehicle_list.setSpacing(4)
+        self._vehicle_list.setContentsMargins(0, 0, 0, 0)
+        inner_layout.addLayout(self._vehicle_list)
+        inner_layout.addStretch()
+
+        scroll.setWidget(inner)
+        root.addWidget(scroll)
+
+
+    def populate_vehicles(self, add_callback: Callable[[str, str, str], None]):
+        """Called by the main window to populate the sidebar vehicle list."""
+        self._populate_callback = add_callback
+        state.sidebar_vehicle_buttons.clear()
+        self._clear_vehicle_list()
+
+        gen = self._get_generator()
+        project_keys = set(gen.project_data["cars"].keys()) if gen else set()
+
+        all_vehicles = {**state.vehicle_ids, **state.added_vehicles}
+        for cid, name in sorted(all_vehicles.items(), key=lambda x: x[1].lower()):
+            if self._is_fully_in_project(cid, project_keys):
+                continue
+            variants = _get_vehicle_variants(cid)
+            if len(variants) > 1:
+                self._add_variant_expander(cid, name, variants, add_callback)
+            else:
+                self._add_vehicle_card(cid, name, add_callback)
+
+    def _get_generator(self):
+        """Walk up to main window and return the generator tab, or None."""
+        print(f"[DEBUG] populate_vehicles: rebuilding sidebar vehicle list")
+        mw = self.window()
+        if mw and hasattr(mw, "tabs"):
+            return mw.tabs.get("generator")
+        return None
+
+    def _is_fully_in_project(self, carid: str, project_keys: set) -> bool:
+        """
+        Return True only when every variant of carid is already in the project.
+        For single-body vehicles that means one key; for multi-variant vehicles
+        the user can still add remaining bodies even if one is present.
+        """
+        print(f"[DEBUG] _is_fully_in_project() called")
+        variants = _get_vehicle_variants(carid)
+        for suffix, _ in variants:
+            from gui.tabs.generator import _make_project_key
+            if _make_project_key(carid, suffix) not in project_keys:
+                return False
+        return True
+
+    def restore_vehicle(self, carid: str, variant_suffix: str = ""):
+        """
+        Add a vehicle (or a single variant) back to the sidebar after it has
+        been removed from the project.  Called by the generator tab.
+        """
+        print(f"[DEBUG] restore_vehicle() called")
+        if self._populate_callback is None:
+            return
+
+        name = state.vehicle_ids.get(carid) or state.added_vehicles.get(carid, carid)
+        variants = _get_vehicle_variants(carid)
+
+        if len(variants) > 1:
+            # Multi-variant: if an expander already exists for this carid,
+            # just un-gray the pill.  Otherwise rebuild the whole expander.
+            if carid in self._variant_expanders:
+                exp = self._variant_expanders[carid]
+                exp.setVisible(True)
+                # Re-enable the specific pill that was removed
+                if variant_suffix in exp._buttons:
+                    btn = exp._buttons[variant_suffix]
+                    btn.setEnabled(True)
+                    btn.setVisible(True)
+                    btn.setStyleSheet(exp._pill_style())
+                    exp._added.discard(variant_suffix)
+            else:
+                self._add_variant_expander(carid, name, variants, self._populate_callback)
+        else:
+            # Single-body: only add the card back if it isn't already there
+            if not any(c.carid == carid for c in self._vehicle_cards):
+                self._add_vehicle_card(carid, name, self._populate_callback)
+
+    def _insert_sorted(self, widget: QWidget, display_name: str):
+        """Insert widget into _vehicle_list at the correct alphabetical position."""
+        target = display_name.lower()
+        count  = self._vehicle_list.count()
+        insert_at = count  # default: append
+        for i in range(count):
+            item = self._vehicle_list.itemAt(i)
+            if item is None:
+                continue
+            w = item.widget()
+            if w is None:
+                continue
+            # Get the display name from whatever widget type is at this slot
+            if hasattr(w, "display_name"):
+                existing = w.display_name.lower()
+            elif isinstance(w, VehicleVariantExpander):
+                existing = w.display_name.lower()
+            else:
+                continue
+            if target < existing:
+                insert_at = i
+                break
+        self._vehicle_list.insertWidget(insert_at, widget)
+
+    def _add_variant_expander(
+        self,
+        carid:    str,
+        name:     str,
+        variants: List[Tuple[str, str]],
+        callback: Callable,
+    ):
+        """Add a VehicleVariantExpander for multi-body vehicles."""
+        print(f"[DEBUG] _insert_sorted() called")
+        is_custom = carid in state.added_vehicles
+        expander = VehicleVariantExpander(carid, name, variants, parent=self,
+                                          is_custom=is_custom)
+        expander.variant_add_requested.connect(
+            lambda c, d, v: self._on_add_vehicle(c, d, v, callback)
+        )
+        self._variant_expanders[carid] = expander
+        self._insert_sorted(expander, name)
+        fade_in(expander, 180)
+        # Header hover → default image
+        self._attach_hover_preview(expander._header, carid, "")
+        # Each pill hover → variant-specific image
+        for suffix, _label in variants:
+            if suffix in expander._buttons:
+                self._attach_hover_preview(expander._buttons[suffix], carid, suffix)
+
+    def _add_vehicle_card(self, carid: str, name: str, callback: Callable):
+        """Add a plain VehicleCard for single-body vehicles."""
+        is_custom = carid in state.added_vehicles
+        card = VehicleCard(carid, name, parent=self, is_custom=is_custom)
+        card.add_requested.connect(
+            lambda c, d: self._on_add_vehicle(c, d, "", callback)
+        )
+        self._vehicle_cards.append(card)
+        state.sidebar_vehicle_buttons.append((card, carid, name, ""))
+        self._insert_sorted(card, name)
+        fade_in(card, 180)
+        self._attach_hover_preview(card, carid, "")
+
+    def _attach_hover_preview(
+        self, widget: QWidget, carid: str, variant_suffix: str = ""
+    ) -> None:
+        mw = self.window()
+        if mw is None or not hasattr(mw, "preview_manager"):
+            return
+        img_name = f"{variant_suffix}.jpg" if variant_suffix else "default.jpg"
+        img_path = os.path.join("gui", "images", "vehicles", carid, img_name)
+        # Fall back to default.jpg if the variant image doesn't exist
+        if not os.path.exists(img_path):
+            img_path = os.path.join("gui", "images", "vehicles", carid, "default.jpg")
+        mw.preview_manager.setup_robust_hover(
+            widget, carid, get_image_path=lambda p=img_path: p
+        )
+
+    def _on_add_vehicle(self, carid: str, name: str, variant: str, callback: Callable):
+        """
+        print(f"[DEBUG] _add_vehicle_card() called")
+        Invoked when any vehicle (plain card or variant pill) is added.
+        Forwards to the main-window callback, then updates the sidebar state.
+        """
+        callback(carid, name, variant)
+
+        if carid in self._variant_expanders:
+            # Multi-variant expander: mark the specific variant as added.
+            # The expander hides itself when all variants are done.
+            self._variant_expanders[carid].mark_variant_added(variant)
+        else:
+            # Plain single-variant card: remove it entirely.
+            for card in list(self._vehicle_cards):
+                if card.carid == carid:
+                    self._vehicle_list.removeWidget(card)
+                    card.deleteLater()
+                    self._vehicle_cards.remove(card)
+                    break
+
+        state.sidebar_vehicle_buttons = [
+            item for item in state.sidebar_vehicle_buttons
+            if not (item[1] == carid and item[3] == variant)
         ]
 
-        for btn_text, view_name in menu_items:
-            is_first = (view_name == "generator")
-            btn = ctk.CTkButton(
-                self.menu_frame,
-                text=f"   {btn_text}   ",
-                width=110,
-                height=36,
-                fg_color=state.colors["accent"] if is_first else "transparent",
-                hover_color=state.colors["tab_selected_hover"] if is_first else state.colors["tab_unselected_hover"],
-                text_color=state.colors["accent_text"] if is_first else state.colors["text_secondary"],
-                corner_radius=8,
-                font=ctk.CTkFont(size=12, weight="bold" if is_first else "normal"),
-                command=lambda v=view_name: self.on_view_change(v)
+    def _clear_vehicle_list(self):
+        print(f"[DEBUG] _clear_vehicle_list() called")
+        for card in list(self._vehicle_cards):
+            card.deleteLater()
+        self._vehicle_cards.clear()
+        for exp in list(self._variant_expanders.values()):
+            exp.deleteLater()
+        self._variant_expanders.clear()
+        while self._vehicle_list.count():
+            item = self._vehicle_list.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+    def _filter_vehicles(self, text: str):
+        print(f"[DEBUG] _filter_vehicles: query={text!r}")
+        term = text.lower()
+        for card in self._vehicle_cards:
+            card.setVisible(
+                term in card.display_name.lower() or term in card.carid.lower()
             )
-            btn.pack(side="left", padx=3)
-            self.menu_buttons[view_name] = btn
+        for carid, exp in self._variant_expanders.items():
+            exp.setVisible(
+                term in exp.display_name.lower() or term in carid.lower()
+            )
 
-        self.generate_button = ctk.CTkButton(
-            self,
-            text=f"✨ {t('project.generate_mod')}",
-            command=self.on_generate,
-            height=40,
-            width=150,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            corner_radius=10,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        self.generate_button.pack(side="right", padx=25)
 
-    def refresh_ui(self):
-        """Rebuild topbar for theme/language changes"""
-        self.configure(fg_color=state.colors["topbar_bg"])
-        self.menu_buttons.clear()
-        for widget in self.winfo_children():
-            widget.destroy()
-        self._setup_ui()
+    def _add_all_vehicles(self):
+        """
+        Developer testing mode: add every known vehicle and every variant to
+        the project in one shot.  Silently skips vehicles already in the project.
+        """
+        print(f"[DEBUG] _add_all_vehicles: testing mode bulk-add triggered")
+        if self._populate_callback is None:
+            return
 
-    def update_logo(self, logo_image):
-        """Update the logo image and rebuild topbar"""
-        print(f"[DEBUG] update_logo called")
-        self.logo_image = logo_image
-        self.refresh_ui()
+        all_vehicles = {**state.vehicle_ids, **state.added_vehicles}
+        added_count = 0
+        for cid, name in sorted(all_vehicles.items(), key=lambda x: x[1].lower()):
+            variants = _get_vehicle_variants(cid)
+            for suffix, label in variants:
+                vname = f"{name} ({label})" if suffix else name
+                self._on_add_vehicle(cid, vname, suffix, self._populate_callback)
+                added_count += 1
+
+        mw = self.window()
+        if mw and hasattr(mw, "show_notification"):
+            mw.show_notification(
+                f"[Testing] Added {added_count} vehicle/variant entries to project.",
+                type="success",
+            )
+
+    def _on_output_mode_changed(self):
+        print(f"[DEBUG] _on_output_mode_changed() called")
+        self.output_mode = "steam" if self._steam_radio.isChecked() else "custom"
+        self._update_custom_path_visibility()
+
+    def _on_unpacked_changed(self, state_val: int):
+        print(f"[DEBUG] _on_unpacked_changed() called")
+        self.unpacked = (state_val == 2)
+
+    def _update_custom_path_visibility(self):
+        print(f"[DEBUG] _update_custom_path_visibility() called")
+        self._custom_path_frame.setVisible(self.output_mode == "custom")
+
+    def _browse_custom_output(self):
+        print(f"[DEBUG] _browse_custom_output: opening output folder dialog")
+        path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
+        if path:
+            self.custom_output = path
+            self._custom_entry.setText(path)
+
+
+    def get_mod_name(self) -> str:
+        return self._mod_entry.text()
+
+    def get_author(self) -> str:
+        return self._author_entry.text()
+
+    def get_output_mode(self) -> str:
+        return self.output_mode
+
+    def get_custom_output(self) -> str:
+        return self._custom_entry.text()
+
+    def get_unpacked(self) -> bool:
+        return self.unpacked
+
+
+    def refresh_ui(self, populate_callback: Optional[Callable] = None):
+        print(f"[DEBUG] refresh_ui() called")
+        if populate_callback:
+            self._populate_callback = populate_callback
+        try:
+            self._mod_name_text = self.get_mod_name()
+            self._author_text   = self.get_author()
+        except Exception:
+            pass
+        try:
+            self.unpacked = self._unpacked_toggle.isChecked()
+        except Exception:
+            pass
+
+        old = self.layout()
+        if old is not None:
+            while old.count():
+                item = old.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.hide()
+                    w.setParent(None)
+                    w.deleteLater()
+            _tmp = QWidget()
+            _tmp.setLayout(old)
+
+        self._vehicle_cards       = []
+        self._variant_expanders   = {}
+        self._build()
+        if self._populate_callback:
+            self.populate_vehicles(self._populate_callback)
+
+
+# HELPERS
+
+def _radio_qss() -> str:
+    return f"""
+        QRadioButton {{
+            color: {COLORS['text']};
+            font-size: 13px;
+            spacing: 8px;
+            background: transparent;
+        }}
+        QRadioButton::indicator {{
+            width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            border: 2px solid {COLORS['border']};
+            background: {COLORS['frame_bg']};
+        }}
+        QRadioButton::indicator:checked {{
+            border-color: {COLORS['accent']};
+            background: {COLORS['accent']};
+        }}
+    """
+
+

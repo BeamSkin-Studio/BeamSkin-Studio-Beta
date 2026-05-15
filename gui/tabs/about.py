@@ -1,86 +1,55 @@
-"""
-About Tab - Localized version
-"""
-import customtkinter as ctk
-import webbrowser
+from __future__ import annotations
+import json
+import os
 import threading
 import time
-import os
-import json
-from PIL import Image
-from gui.state import state
-from core.localization import t
+import webbrowser
+from typing import Optional
 
-print(f"[DEBUG] Loading class: AboutTab")
+from PySide6.QtCore    import Qt, Signal, QTimer
+from PySide6.QtGui     import QPixmap
+from PySide6.QtWidgets import (
+    QWidget, QFrame, QLabel, QPushButton,
+    QVBoxLayout, QHBoxLayout, QScrollArea, QSizePolicy,
+)
 
-# ---------------------------------------------------------------------------
-# Language file discovery
-# ---------------------------------------------------------------------------
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.state   import state
 
-# Adjust this path if your locale files live elsewhere (e.g. "languages", "i18n")
+try:
+    from core.localization import t
+except ImportError:
+    def t(key, **kw): return key
+
+
 _LOCALES_DIR = os.path.join("core", "localization", "languages")
 
 
 def _scan_translators() -> str:
-    """
-    Scan every *.json file in the locales directory and collect:
-        _meta.contributors  – list of contributor names
-        _meta.name          – English/fallback name of the language
-
-    The language name that is actually displayed is resolved in this order:
-        1. A "language_names" dict in the *current* locale, keyed by the
-           contributor file's _meta.flag  (e.g.  "language_names": {"SE": "Swedish", "DE": "German"})
-        2. The _meta.name field from the contributor's own file
-        3. The _meta.native_name field as a last resort
-
-    Returns a newline-separated string ready for the label, e.g.:
-        Burzt_YT - Swedish
-        Joel - German
-        Claude - English (US)
-    """
     if not os.path.isdir(_LOCALES_DIR):
-        print(f"[DEBUG] Locales directory not found: {_LOCALES_DIR}")
-        return t("about.translators_list")   # graceful fallback to static key
-
-    # ------------------------------------------------------------------
-    # Load the current locale's language_names lookup (optional feature).
-    # If a locale file contains  "language_names": {"SE": "Swedish", …}
-    # we use those translated names; otherwise we fall back to each
-    # file's own _meta.name.
-    # ------------------------------------------------------------------
+        return t("about.no_translators", default="—")
     current_lang_names: dict = {}
     try:
-        current_locale_path = _get_current_locale_path()
-        if current_locale_path and os.path.isfile(current_locale_path):
-            with open(current_locale_path, "r", encoding="utf-8") as f:
-                current_data = json.load(f)
-            current_lang_names = current_data.get("language_names", {})
-    except Exception as e:
-        print(f"[DEBUG] Could not load language_names from current locale: {e}")
+        lp = _get_current_locale_path()
+        if lp and os.path.isfile(lp):
+            with open(lp, "r", encoding="utf-8") as f:
+                current_lang_names = json.load(f).get("language_names", {})
+    except Exception:
+        pass
 
-    # ------------------------------------------------------------------
-    # Walk every JSON file and collect (contributor, language_display_name)
-    # ------------------------------------------------------------------
-    entries: list[str] = []
-    seen: set[str] = set()   # avoid duplicate "Contributor - Language" lines
-
+    entries: list = []
+    seen: set = set()
     for filename in sorted(os.listdir(_LOCALES_DIR)):
         if not filename.lower().endswith(".json"):
             continue
-
-        filepath = os.path.join(_LOCALES_DIR, filename)
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(os.path.join(_LOCALES_DIR, filename), "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception as e:
-            print(f"[DEBUG] Skipping {filename}: {e}")
+        except Exception:
             continue
-
-        meta: dict = data.get("_meta", {})
-        contributors: list = meta.get("contributors", [])
-        flag: str = meta.get("flag", "")
-
-        # Resolve display name for this language
+        meta         = data.get("_meta", {})
+        contributors = meta.get("contributors", [])
+        flag         = meta.get("flag", "")
         if flag and flag in current_lang_names:
             lang_display = current_lang_names[flag]
         elif meta.get("name"):
@@ -89,416 +58,362 @@ def _scan_translators() -> str:
             lang_display = meta["native_name"]
         else:
             lang_display = filename.replace(".json", "")
-
-        for contributor in contributors:
-            line = f"{contributor} - {lang_display}"
+        for c in contributors:
+            line = f"{c} - {lang_display}"
             if line not in seen:
                 seen.add(line)
                 entries.append(line)
-
-    if not entries:
-        # Nothing found – fall back to the static translation key
-        return t("about.translators_list")
-
-    return "\n".join(entries)
+    return "\n".join(entries) if entries else t("about.no_translators", default="—")
 
 
-def _get_current_locale_path() -> str | None:
-    """
-    Try to find the path of the currently active locale file.
-    Checks state for a stored path or language code, then searches _LOCALES_DIR.
-    """
-    # Option A: state stores the path directly
+def _get_current_locale_path() -> Optional[str]:
     for attr in ("locale_path", "language_path", "current_locale_path"):
-        path = getattr(state, attr, None)
-        if path and os.path.isfile(path):
-            return path
-
-    # Option B: state stores a language code / flag like "US", "SE", "en_us"
+        p = getattr(state, attr, None)
+        if p and os.path.isfile(p):
+            return p
+    if not os.path.isdir(_LOCALES_DIR):
+        return None
     for attr in ("language", "current_language", "locale", "lang_code"):
         code = getattr(state, attr, None)
         if code:
-            # Try exact filename match first, then partial match
-            for filename in os.listdir(_LOCALES_DIR):
-                if not filename.lower().endswith(".json"):
+            for fn in os.listdir(_LOCALES_DIR):
+                if not fn.lower().endswith(".json"):
                     continue
-                stem = os.path.splitext(filename)[0].lower()
-                if stem == code.lower() or stem.replace("_", "").replace("-", "") == code.lower().replace("_", "").replace("-", ""):
-                    return os.path.join(_LOCALES_DIR, filename)
-
+                stem = os.path.splitext(fn)[0].lower()
+                if (stem == code.lower() or
+                        stem.replace("_", "").replace("-", "") ==
+                        code.lower().replace("_", "").replace("-", "")):
+                    return os.path.join(_LOCALES_DIR, fn)
     return None
 
 
-# ---------------------------------------------------------------------------
-# Tab class
-# ---------------------------------------------------------------------------
+#  ABOUT TAB
 
-class AboutTab(ctk.CTkFrame):
-    """About tab showing app info and credits"""
+class AboutTab(QWidget):
+    """
+    About tab showing logo, credits, translators, and donation options.
 
-    def __init__(self, parent):
-        print(f"[DEBUG] __init__ called")
-        super().__init__(parent, fg_color=state.colors["app_bg"])
+    FIX — blank on return: the widget tree is built once and persisted.
+    """
 
-        self.socials_frame = None
-        self.payment_overlay = None
-        self.logo_image = self._load_logo()
-        self.paypal_logo = self._load_paypal_logo()
-        self.swish_logo = self._load_swish_logo()
-        self.patreon_logo = self._load_patreon_logo()
-        
+    def __init__(self, parent: QWidget):
+        print(f"[DEBUG] __init__() called")
+        super().__init__(parent)
+        print("[DEBUG] AboutTab __init__ called")
+        self.setStyleSheet(f"background:{COLORS['app_bg']};")
+
+        self._payment_overlay: Optional[QWidget] = None
+        self._logo_lbl:        Optional[QLabel] = None   # kept for theme-switch updates
+        self._translators_lbl: Optional[QLabel] = None
+        self._version_lbl:     Optional[QLabel] = None
+        self._credits_lbl:     Optional[QLabel] = None
+        self._dev_lbl:         Optional[QLabel] = None
+        self._trans_hdr:       Optional[QLabel] = None
+        self._donate_btn                        = None
+        self._discord_btn:     Optional[QPushButton] = None
+
         self._setup_ui()
 
-    def _load_logo(self):
-        """Load the BeamSkin Studio logo based on current theme"""
-        icon_dir = os.path.join("gui", "Icons")
-
-        if state.current_theme == "dark":
-            logo_path = os.path.join(icon_dir, "BeamSkin_Studio_White.png")
-        else:
-            logo_path = os.path.join(icon_dir, "BeamSkin_Studio_Black.png")
-
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-                logo_image = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(200, 100)
-                )
-                print(f"[DEBUG] Loaded About tab logo from: {logo_path}")
-                return logo_image
-            else:
-                print(f"[DEBUG] Logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load About tab logo: {e}")
-            return None
-
-    def _load_paypal_logo(self):
-        """Load the PayPal logo"""
-        logo_path = os.path.join("gui", "Icons", "paypal_P_logo.png")
-
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-                paypal_logo = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(30, 30)
-                )
-                print(f"[DEBUG] Loaded PayPal logo from: {logo_path}")
-                return paypal_logo
-            else:
-                print(f"[DEBUG] PayPal logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load PayPal logo: {e}")
-            return None
-
-    def _load_swish_logo(self):
-        """Load the Swish logo"""
-        logo_path = os.path.join("gui", "Icons", "Swish_logo.png")
-
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-                swish_logo = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(30, 30)
-                )
-                print(f"[DEBUG] Loaded Swish logo from: {logo_path}")
-                return swish_logo
-            else:
-                print(f"[DEBUG] Swish logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load Swish logo: {e}")
-            return None
-
-    def _load_patreon_logo(self):
-        """Load the Patreon logo"""
-        logo_path = os.path.join("gui", "Icons", "Patreon_Logo.png")
-
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-                patreon_logo = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(180, 37)
-                )
-                print(f"[DEBUG] Loaded Patreon logo from: {logo_path}")
-                return patreon_logo
-            else:
-                print(f"[DEBUG] Patreon logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load Patreon logo: {e}")
-            return None
-
-    def refresh_ui(self):
-        """Refresh all UI text with current language"""
-        # Clear existing widgets
-        for widget in self.winfo_children():
-            widget.destroy()
-        
-        # Recreate UI with new translations
-        self._setup_ui()
 
     def _setup_ui(self):
-        """Set up the About tab UI"""
-        about_frame = ctk.CTkFrame(self, fg_color=state.colors["frame_bg"])
-        about_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        print(f"[DEBUG] _setup_ui() called")
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        # Content frame for top elements
-        content_frame = ctk.CTkFrame(about_frame, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"QScrollArea {{ background:{COLORS['app_bg']};border:none; }}")
+        outer.addWidget(scroll)
 
-        if self.logo_image:
-            ctk.CTkLabel(
-                content_frame,
-                text="",
-                image=self.logo_image
-            ).pack(pady=(20, 10))
+        content_widget = QWidget()
+        content_widget.setStyleSheet(f"background:{COLORS['frame_bg']};")
+        scroll.setWidget(content_widget)
+
+        col = QVBoxLayout(content_widget)
+        col.setContentsMargins(40, 30, 40, 30)
+        col.setSpacing(10)
+        col.setAlignment(Qt.AlignHCenter)
+
+        logo_px = self._load_logo_pixmap()
+        if logo_px:
+            self._logo_lbl = QLabel()
+            self._logo_lbl.setPixmap(logo_px)
+            self._logo_lbl.setAlignment(Qt.AlignCenter)
+            self._logo_lbl.setStyleSheet("background:transparent;border:none;")
+            col.addWidget(self._logo_lbl)
         else:
-            # Fallback to text title
-            ctk.CTkLabel(
-                content_frame,
-                text=t("about.title"),
-                font=ctk.CTkFont(size=26, weight="bold"),
-                text_color=state.colors["text"]
-            ).pack(pady=(10, 5))
+            self._logo_lbl = None
+            title_lbl = QLabel(t("about.title", default="BeamSkin Studio"))
+            title_lbl.setFont(font(26, "bold"))
+            title_lbl.setAlignment(Qt.AlignCenter)
+            title_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+            col.addWidget(title_lbl)
 
-        ctk.CTkLabel(
-            content_frame,
-            text=t("about.credits"),
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(pady=(50, 5))
+        col.addSpacing(30)
 
-        ctk.CTkLabel(
-            content_frame,
-            text=t("about.developer"),
-            font=ctk.CTkFont(size=19, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(pady=(10, 0))
+        self._credits_lbl = QLabel(t("about.credits", default="Credits"))
+        self._credits_lbl.setFont(font(22, "bold"))
+        self._credits_lbl.setAlignment(Qt.AlignCenter)
+        self._credits_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        col.addWidget(self._credits_lbl)
 
-        self.socials_frame = ctk.CTkFrame(content_frame, fg_color="transparent", height=0)
-        self.socials_frame.pack_forget()
+        self._dev_lbl = QLabel(t("about.developer", default="Developer"))
+        self._dev_lbl.setFont(font(19, "bold"))
+        self._dev_lbl.setAlignment(Qt.AlignCenter)
+        self._dev_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        col.addWidget(self._dev_lbl)
 
-        ctk.CTkButton(
-            content_frame,
-            text="@Burzt_YT",
-            font=ctk.CTkFont(size=17, weight="bold"),
-            command=self._toggle_socials,
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"],
-            text_color=state.colors["text"]
-        ).pack(pady=(2, 0))
+        dev_btn = self._card_button("@Burzt_YT", 140, font_size=17)
+        dev_btn.clicked.connect(lambda: webbrowser.open("https://linktr.ee/burzt_yt"))
+        col.addWidget(dev_btn, alignment=Qt.AlignCenter)
 
-        ctk.CTkButton(
-            self.socials_frame,
-            text="Linktree",
-            width=120,
-            font=ctk.CTkFont(size=15),
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            command=self._open_linktree
-        ).pack(pady=5)
+        col.addSpacing(16)
 
-        # Translators section — built automatically from all locale files
-        ctk.CTkLabel(
-            content_frame,
-            text=t("about.translators"),
-            font=ctk.CTkFont(size=19, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(pady=(20, 5))
+        self._trans_hdr = QLabel(t("about.translators", default="Translators"))
+        self._trans_hdr.setFont(font(19, "bold"))
+        self._trans_hdr.setAlignment(Qt.AlignCenter)
+        self._trans_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        col.addWidget(self._trans_hdr)
 
-        ctk.CTkLabel(
-            content_frame,
-            text=_scan_translators(),
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color=state.colors["text"],
-            justify="center"
-        ).pack(pady=(0, 10))
+        self._translators_lbl = QLabel(_scan_translators())
+        self._translators_lbl.setFont(font(16, "bold"))
+        self._translators_lbl.setAlignment(Qt.AlignCenter)
+        self._translators_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        col.addWidget(self._translators_lbl)
 
-        # Version at bottom
-        ctk.CTkLabel(
-            about_frame,
-            text=t("about.version", version=state.current_version),
-            font=ctk.CTkFont(size=14),
-            text_color=state.colors["text"]
-        ).pack(side="bottom", pady=(0, 10))
+        col.addStretch(1)
 
-        # Donate button at bottom
-        donate_btn = ctk.CTkButton(
-            about_frame,
-            text=t("about.donate"),
-            width=140,
-            height=40,
-            font=ctk.CTkFont(size=25, weight="bold"),
-            fg_color="#0070BA",
-            hover_color="#005EA6",
-            text_color="white",
-            command=self._show_payment_options
+        self._donate_btn = QPushButton(t("about.donate", default="💙 Donate"))
+        self._donate_btn.setFont(font(22, "bold"))
+        self._donate_btn.setFixedSize(200, 50)
+        self._donate_btn.setCursor(Qt.PointingHandCursor)
+        self._donate_btn.setStyleSheet("""
+            QPushButton {
+                background:#0070BA;
+                color:white;
+                border-radius:10px;
+                border:none;
+            }
+            QPushButton:hover { background:#005EA6; }
+        """)
+        self._donate_btn.clicked.connect(self._show_payment_options)
+        col.addWidget(self._donate_btn, alignment=Qt.AlignCenter)
+
+        self._discord_btn = QPushButton("  Join our Discord")
+        self._discord_btn.setFont(font(16, "bold"))
+        self._discord_btn.setFixedSize(220, 46)
+        self._discord_btn.setCursor(Qt.PointingHandCursor)
+        self._discord_btn.setStyleSheet("""
+            QPushButton {
+                background: #5865F2;
+                color: white;
+                border-radius: 10px;
+                border: none;
+                padding-left: 8px;
+            }
+            QPushButton:hover { background: #4752C4; }
+        """)
+        # Discord icon sits inside the button to the left of the text
+        discord_icon = QLabel("", self._discord_btn)
+        discord_icon.setPixmap(self._load_discord_icon())
+        discord_icon.setFixedSize(24, 24)
+        discord_icon.setStyleSheet("background:transparent;border:none;")
+        discord_icon.setAttribute(Qt.WA_TransparentForMouseEvents)
+        discord_icon.move(14, 11)
+        self._discord_btn.clicked.connect(self._open_discord)
+        col.addWidget(self._discord_btn, alignment=Qt.AlignCenter)
+
+        col.addSpacing(10)
+
+        version_str = getattr(state, "current_version", "")
+        self._version_lbl = QLabel(
+            t("about.version", version=version_str, default=f"Version {version_str}")
         )
-        donate_btn.pack(side="bottom", pady=(10, 10))
+        self._version_lbl.setFont(font(14))
+        self._version_lbl.setAlignment(Qt.AlignCenter)
+        self._version_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        col.addWidget(self._version_lbl)
+
+
+    def _load_logo_pixmap(self) -> Optional[QPixmap]:
+        print(f"[DEBUG] _load_logo_pixmap() called")
+        icon_dir = os.path.join("gui", "Icons")
+        suffix   = "White" if state.theme_mode == "dark" else "Black"
+        path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
+        if os.path.exists(path):
+            # Logo is 2:1 (width × height). Scale to a 400×200 bounding box so
+            # the rendered pixmap is 400×200 rather than the old undersized 200×100.
+            return QPixmap(path).scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return None
+
+
+    def _accent_button(self, text: str, width: int = 120) -> QPushButton:
+        print(f"[DEBUG] _accent_button() called")
+        btn = QPushButton(text)
+        btn.setFont(font(15))
+        btn.setFixedHeight(40)
+        btn.setFixedWidth(width)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{COLORS['accent']};
+                color:{COLORS['accent_text']};
+                border-radius:8px;
+                border:none;
+            }}
+            QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
+        """)
+        return btn
+
+    def _card_button(self, text: str, width: int = 140, font_size: int = 13) -> QPushButton:
+        print(f"[DEBUG] _card_button() called")
+        btn = QPushButton(text)
+        btn.setFont(font(font_size, "bold"))
+        btn.setFixedHeight(40)
+        btn.setFixedWidth(width)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{COLORS['card_bg']};
+                color:{COLORS['text']};
+                border-radius:8px;
+                border:1px solid {COLORS['border']};
+            }}
+            QPushButton:hover {{ background:{COLORS.get('card_hover', COLORS['card_bg'])}; }}
+        """)
+        return btn
+
 
     def _show_payment_options(self):
-        """Show payment options overlay"""
-        if self.payment_overlay is not None:
-            return  # Already showing
-        
-        # Create semi-transparent background overlay
-        self.payment_overlay = ctk.CTkFrame(
-            self,
-            fg_color=("gray80", "gray20"),
-            bg_color="transparent"
-        )
-        self.payment_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
-        
-        # Bind click on overlay background to close
-        self.payment_overlay.bind("<Button-1>", lambda e: self._close_payment_options())
-        
-        # Create centered dialog frame
-        dialog = ctk.CTkFrame(
-            self.payment_overlay,
-            fg_color=state.colors["frame_bg"],
-            border_width=2,
-            border_color=state.colors["accent"]
-        )
-        dialog.place(relx=0.5, rely=0.5, anchor="center")
-        
-        # Prevent clicks on dialog from closing overlay
-        dialog.bind("<Button-1>", lambda e: "break")
-        
-        # Title
-        ctk.CTkLabel(
-            dialog,
-            text=t("about.select_payment_method"),
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(pady=(20, 15), padx=40)
-        
-        # PayPal button
-        ctk.CTkButton(
-            dialog,
-            text="PayPal",
-            width=200,
-            height=45,
-            font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="#0070BA",
-            hover_color="#005EA6",
-            text_color="white",
-            image=self.paypal_logo if self.paypal_logo else None,
-            compound="left",
-            command=self._open_paypal
-        ).pack(pady=8, padx=40)
-        
-        # Swish button
-        ctk.CTkButton(
-            dialog,
-            text="Swish",
-            width=200,
-            height=45,
-            font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="#7BDC3D",
-            hover_color="#6BC935",
-            text_color="white",
-            image=self.swish_logo if self.swish_logo else None,
-            compound="left",
-            command=self._open_swish
-        ).pack(pady=8, padx=40)
+        print(f"[DEBUG] _show_payment_options: showing donation overlay")
+        if self._payment_overlay is not None:
+            return
 
-        # Divider label for monthly support section
-        ctk.CTkLabel(
-            dialog,
-            text=t("about.monthly"),
-            font=ctk.CTkFont(size=12),
-            text_color=state.colors["text"]
-        ).pack(pady=(10, 4), padx=40)
+        overlay = QWidget(self)
+        overlay.setStyleSheet(
+            f"background:rgba(13,15,20,0.85);"
+        )
+        overlay.setAttribute(Qt.WA_StyledBackground, True)
+        overlay.setGeometry(self.rect())
+        overlay.raise_()
+        overlay.show()
+        self._payment_overlay = overlay
 
-        # Patreon button
-        ctk.CTkButton(
-            dialog,
-            text="",
-            width=200,
-            height=45,
-            font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="#F96854",
-            hover_color="#E05A48",
-            text_color="white",
-            image=self.patreon_logo if self.patreon_logo else None,
-            compound="left",
-            command=self._open_patreon
-        ).pack(pady=(0, 8), padx=40)
-        
-        # Close button
-        ctk.CTkButton(
-            dialog,
-            text=t("about.cancel") if hasattr(t("about.cancel"), '__call__') else "Cancel",
-            width=200,
-            height=35,
-            font=ctk.CTkFont(size=14),
-            fg_color=state.colors["card_bg"],
-            hover_color=state.colors["card_hover"],
-            text_color=state.colors["text"],
-            command=self._close_payment_options
-        ).pack(pady=(5, 20), padx=40)
+        # Center dialog
+        dialog = QFrame(overlay)
+        dialog.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['frame_bg']};
+                border-radius:14px;
+                border:2px solid {COLORS['accent']};
+            }}
+        """)
+        d_col = QVBoxLayout(dialog)
+        d_col.setContentsMargins(40, 24, 40, 24)
+        d_col.setSpacing(10)
+
+        ttl = QLabel(t("about.select_payment_method", default="Choose a payment method"))
+        ttl.setFont(font(18, "bold"))
+        ttl.setAlignment(Qt.AlignCenter)
+        ttl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        d_col.addWidget(ttl)
+
+        def _pay_btn(text, bg, hover_bg, callback):
+            b = QPushButton(text)
+            b.setFont(font(15, "bold"))
+            b.setFixedSize(200, 45)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setStyleSheet(f"""
+                QPushButton {{ background:{bg};color:white;border-radius:8px;border:none; }}
+                QPushButton:hover {{ background:{hover_bg}; }}
+            """)
+            b.clicked.connect(callback)
+            d_col.addWidget(b, alignment=Qt.AlignCenter)
+
+        _pay_btn("💳 PayPal",  "#0070BA", "#005EA6", self._open_paypal)
+        _pay_btn("💚 Swish",   "#7BDC3D", "#6BC935", self._open_swish)
+
+        monthly_lbl = QLabel(t("about.monthly", default="Monthly support:"))
+        monthly_lbl.setFont(font(12))
+        monthly_lbl.setAlignment(Qt.AlignCenter)
+        monthly_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        d_col.addWidget(monthly_lbl)
+
+        _pay_btn("🎨 Patreon", "#F96854", "#E05A48", self._open_patreon)
+
+        cancel_btn = self._card_button(t("about.cancel", default="Cancel"), width=200)
+        cancel_btn.clicked.connect(self._close_payment_options)
+        d_col.addWidget(cancel_btn, alignment=Qt.AlignCenter)
+
+        dialog.show()
+        dialog.adjustSize()
+        dialog.move(
+            (overlay.width()  - dialog.width())  // 2,
+            (overlay.height() - dialog.height()) // 2,
+        )
+
+        # close when clicking the dim overlay (but not the dialog)
+        def _maybe_close(event):
+            if not dialog.geometry().contains(event.pos()):
+                self._close_payment_options()
+        overlay.mousePressEvent = _maybe_close
 
     def _close_payment_options(self):
-        """Close payment options overlay"""
-        if self.payment_overlay is not None:
-            self.payment_overlay.destroy()
-            self.payment_overlay = None
+        print(f"[DEBUG] _close_payment_options: closing donation overlay")
+        if self._payment_overlay:
+            self._payment_overlay.deleteLater()
+            self._payment_overlay = None
+
+    def resizeEvent(self, event):
+        print(f"[DEBUG] resizeEvent() called")
+        super().resizeEvent(event)
+        if self._payment_overlay:
+            self._payment_overlay.setGeometry(self.rect())
+
+    def _load_discord_icon(self) -> QPixmap:
+        """Return the Discord logo from the Icons folder."""
+        path = os.path.join("gui", "Icons", "discord_logo_white.png")
+        if os.path.exists(path):
+            return QPixmap(path).scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return QPixmap()  # empty fallback — no icon rather than a fake 'D'
+
+    def _open_discord(self):
+        webbrowser.open("https://discord.gg/mbr3YxZzrr")
 
     def _open_paypal(self):
-        """Open PayPal donation URL and close overlay"""
         webbrowser.open("https://www.paypal.com/paypalme/thedriveryt")
         self._close_payment_options()
 
     def _open_swish(self):
-        """Open Swish donation URL and close overlay"""
         webbrowser.open("https://imgur.com/a/lI2y6tj")
         self._close_payment_options()
 
     def _open_patreon(self):
-        """Open Patreon page URL and close overlay"""
         webbrowser.open("https://www.patreon.com/BURZT_YT")
         self._close_payment_options()
 
-    def _toggle_socials(self):
-        """Toggle the socials frame with smooth animation"""
-        target_height = 45
 
-        if self.socials_frame.winfo_ismapped():
-            # Collapse
-            def collapse():
-                self.socials_frame.pack_propagate(False)
-                for i in range(self.socials_frame.winfo_height(), -1, -5):
-                    self.socials_frame.configure(height=max(0, i))
-                    time.sleep(0.01)
-                self.socials_frame.pack_forget()
+    def refresh_ui(self):
+        """Update translatable strings without rebuilding the widget tree."""
+        print(f"[DEBUG] _load_discord_icon() called")
+        if self._logo_lbl is not None:
+            new_px = self._load_logo_pixmap()
+            if new_px:
+                self._logo_lbl.setPixmap(new_px)
+        if self._credits_lbl:
+            self._credits_lbl.setText(t("about.credits", default="Credits"))
+        if self._dev_lbl:
+            self._dev_lbl.setText(t("about.developer", default="Developer"))
+        if self._trans_hdr:
+            self._trans_hdr.setText(t("about.translators", default="Translators"))
+        if self._translators_lbl:
+            self._translators_lbl.setText(_scan_translators())
+        if self._donate_btn:
+            self._donate_btn.setText(t("about.donate", default="💙 Donate"))
+        if self._version_lbl:
+            version_str = getattr(state, "current_version", "")
+            self._version_lbl.setText(
+                t("about.version", version=version_str, default=f"Version {version_str}")
+            )
 
-            threading.Thread(target=collapse, daemon=True).start()
-        else:
-            # Expand
-            self.socials_frame.configure(height=0)
-            self.socials_frame.pack(fill="x", pady=(2, 10))
-            self.socials_frame.pack_propagate(False)
 
-            def expand():
-                for i in range(0, target_height + 2, 5):
-                    self.socials_frame.configure(height=i)
-                    time.sleep(0.01)
-                self.socials_frame.pack_propagate(True)
-
-            threading.Thread(target=expand, daemon=True).start()
-
-    def _open_linktree(self):
-        """Open Linktree URL and collapse socials"""
-        webbrowser.open("https://linktr.ee/burzt_yt")
-        self._toggle_socials()

@@ -1,499 +1,299 @@
-"""
-Dialog Components - Reusable dialog windows and notifications
-"""
-import customtkinter as ctk
+from __future__ import annotations
+from typing import Callable, Optional
+
+from PySide6.QtCore    import Qt, QTimer
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QWidget,
+    QCheckBox, QPushButton, QScrollArea, QSizePolicy,
+)
+
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.widgets import AnimButton, GhostButton, Toast
 from gui.icon_helper import set_window_icon
-import webbrowser
-import threading
-from gui.state import state
-from gui.components.setup_wizard import show_setup_wizard
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kwargs): return kwargs.get('default', key)
+    print("[DEBUG] dialogs.py: localization imported successfully")
+except ImportError as e:
+    print(f"[DEBUG] dialogs.py: localization import failed ({e}), using fallback")
+    def t(key, **kw): return kw.get('default', key)
 
 
+### Startup sequence
 
+def run_startup_sequence(
+    parent: QWidget,
+    show_offline_dialog_fn: Optional[Callable] = None,
+) -> None:
+    print(f"[DEBUG] run_startup_sequence: called, parent={parent}, offline_fn={show_offline_dialog_fn}")
 
+    def _step0_wip():
+        print("[DEBUG] run_startup_sequence: _step0_wip starting")
+        try:
+            show_wip_warning(parent)
+            print("[DEBUG] run_startup_sequence: _step0_wip completed")
+        except Exception as e:
+            print(f"[ERROR] show_wip_warning raised: {e}")
+        print("[DEBUG] run_startup_sequence: scheduling _step1_update_check in 100ms")
+        QTimer.singleShot(100, _step1_update_check)
 
-
-def run_startup_sequence(app, show_offline_dialog_fn=None, on_complete=None):
-    def _step3_offline():
-        """Show server offline dialog, then call on_complete."""
-        import utils.connection as connection
-
-        def _do():
-            if not connection.is_online and show_offline_dialog_fn:
-                print("[STARTUP] Server offline — showing offline dialog")
-                show_offline_dialog_fn()
-            else:
-                print("[STARTUP] Server online — skipping offline dialog")
-            if on_complete:
-                on_complete()
-
-        # Wait until the connection check has finished (poll every 150 ms, up to 10 s)
-        _poll_offline(app, connection, _do, attempts=0)
-
-    def _poll_offline(app, connection, callback, attempts):
-        if connection.check_complete or attempts >= 67:
-            app.after(0, callback)
-        else:
-            app.after(150, lambda: _poll_offline(app, connection, callback, attempts + 1))
-
-    def _step2_updates():
-        """Run update check; when done (dialog closed or no update), go to step 3."""
-        print("[STARTUP] Checking for updates…")
+    def _step1_update_check():
+        print("[DEBUG] run_startup_sequence: _step1_update_check starting")
         try:
             from core.updater import check_for_updates
-            # check_for_updates now accepts on_done so step 3 fires after dialog closes
-            threading.Thread(
-                target=check_for_updates,
-                kwargs={"on_done": lambda: app.after(0, _step3_offline)},
-                daemon=True,
-            ).start()
+            print("[DEBUG] run_startup_sequence: check_for_updates imported, calling now")
+            check_for_updates(on_done=_step2_changelog)
+            print("[DEBUG] run_startup_sequence: check_for_updates dispatched")
         except Exception as e:
-            print(f"[STARTUP] Update check error: {e}")
-            app.after(0, _step3_offline)
+            print(f"[ERROR] check_for_updates raised: {e}")
+            print("[DEBUG] run_startup_sequence: falling through to _step2_changelog after updater error")
+            QTimer.singleShot(100, _step2_changelog)
 
-    def _step1b_changelog():
-        """Show changelog for this version (once per version), then move to step 2."""
-        print("[STARTUP] Checking changelog…")
+    def _step2_changelog():
+        print("[DEBUG] run_startup_sequence: _step2_changelog starting")
         try:
-            from core.updater import CURRENT_VERSION
             from gui.components.changelog_dialog import show_changelog_if_needed
-            show_changelog_if_needed(app, CURRENT_VERSION)  # blocks via wait_window
+            from core.updater import CURRENT_VERSION
+            print(f"[DEBUG] run_startup_sequence: CURRENT_VERSION={CURRENT_VERSION}")
+            show_changelog_if_needed(parent, CURRENT_VERSION)
+            print("[DEBUG] run_startup_sequence: show_changelog_if_needed completed")
         except Exception as e:
-            print(f"[STARTUP] Changelog error: {e}")
-        print("[STARTUP] Changelog step done — proceeding to update check")
-        app.after(0, _step2_updates)
+            print(f"[ERROR] show_changelog_if_needed raised: {e}")
+        print("[DEBUG] run_startup_sequence: scheduling _step3_offline in 100ms")
+        QTimer.singleShot(100, _step3_offline)
 
-    def _step1_wip():
-        """Show WIP warning (blocks until closed), then move to step 1b."""
-        print("[STARTUP] Showing WIP warning…")
-        show_wip_warning(app)          # blocks via wait_window
-        print("[STARTUP] WIP warning closed — proceeding to changelog")
-        app.after(0, _step1b_changelog)
+    def _step3_offline():
+        print("[DEBUG] run_startup_sequence: _step3_offline starting")
+        try:
+            from utils import connection as _conn
+            is_online = _conn.is_online
+            print(f"[DEBUG] run_startup_sequence: connection.is_online={is_online}")
+            if not is_online:
+                print("[DEBUG] run_startup_sequence: offline detected, calling show_offline_dialog_fn")
+                if show_offline_dialog_fn:
+                    show_offline_dialog_fn()
+                else:
+                    print("[DEBUG] run_startup_sequence: no offline_dialog_fn provided, skipping")
+            else:
+                print("[DEBUG] run_startup_sequence: online, skipping offline dialog")
+        except Exception as e:
+            print(f"[DEBUG] run_startup_sequence: offline check skipped: {e}")
 
-    # Kick off the chain
-    app.after(0, _step1_wip)
+    print("[DEBUG] run_startup_sequence: scheduling _step0_wip in 200ms")
+    QTimer.singleShot(200, _step0_wip)
 
 
+### Toast notification shim
 
-def show_notification(app, message, type="info", duration=3000):
+def show_notification(
+    parent: QWidget,
+    message: str,
+    type: str = "info",
+    duration: int = 3000,
+) -> None:
+    print(f"[DEBUG] show_notification: message={message!r}, type={type}, duration={duration}")
+    print(f"[DEBUG] show_notification: parent={parent}, has centralWidget={hasattr(parent, 'centralWidget')}")
 
-    print(f"[DEBUG] show_notification called")
-    
-    if not app:
-        print(f"[WARNING] Could not show notification (no app window): {message}")
-        print(f"[{type.upper()}] {message}")
+    cw = (parent.centralWidget() or parent
+          if hasattr(parent, "centralWidget") else parent)
+    print(f"[DEBUG] show_notification: resolved container widget={cw}")
+
+    toast = Toast(cw, message, kind=type, duration=duration)
+    print(f"[DEBUG] show_notification: Toast created, size={toast.width()}x{toast.height()}")
+
+    x = cw.width()  - toast.width()  - 20
+    y = cw.height() - toast.height() - 20
+    print(f"[DEBUG] show_notification: positioning toast at ({x}, {y}), container size={cw.width()}x{cw.height()}")
+    toast.move(x, y)
+    toast.show()
+    toast.raise_()
+    print("[DEBUG] show_notification: toast shown and raised")
+
+
+### WIP warning dialog
+
+def show_wip_warning(parent: QWidget) -> None:
+    print("\n[DEBUG] ========== WIP WARNING CHECK ==========")
+
+    try:
+        from gui.state import state
+        first_launch = state.app_settings.get("first_launch", True)
+        print(f"[DEBUG] show_wip_warning: app_settings loaded, first_launch={first_launch}")
+    except Exception as e:
+        first_launch = True
+        print(f"[DEBUG] show_wip_warning: could not load state ({e}), defaulting first_launch=True")
+
+    if not first_launch:
+        print("[DEBUG] show_wip_warning: not first launch — skipping")
+        print("[DEBUG] ========== WIP WARNING SKIPPED ==========\n")
         return
 
-    if not hasattr(app, 'notification_frame'):
-        app.notification_frame = ctk.CTkFrame(app, fg_color="transparent")
+    print("[DEBUG] show_wip_warning: first launch confirmed — building dialog")
 
-    for child in app.notification_frame.winfo_children():
-        child.destroy()
+    ### Dialog shell
+    dlg = QDialog(parent)
+    dlg.setWindowTitle(t("wip.wip_warning_title", default="Welcome to BeamSkin Studio"))
+    dlg.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+    dlg.setModal(True)
+    dlg.setFixedWidth(560)
+    dlg.setStyleSheet(f"background: {COLORS['frame_bg']};")
+    print(f"[DEBUG] show_wip_warning: dialog created, width=560, modal=True")
 
-    icons = {
-        "success": "✅",
-        "error": "❌",
-        "warning": "⚠",
-        "info": "ℹ"
-    }
+    root = QVBoxLayout(dlg)
+    root.setContentsMargins(24, 24, 24, 24)
+    root.setSpacing(16)
 
-    colors_map = {
-        "success": {"bg": state.colors["success"], "text": state.colors["accent_text"]},
-        "error": {"bg": state.colors["error"], "text": "white"},
-        "warning": {"bg": state.colors["warning"], "text": state.colors["accent_text"]},
-        "info": {"bg": state.colors["accent"], "text": state.colors["accent_text"]}
-    }
+    ### Icon + title
+    icon_lbl = QLabel("⚠️")
+    icon_lbl.setFont(font(42))
+    icon_lbl.setAlignment(Qt.AlignCenter)
+    icon_lbl.setStyleSheet("background: transparent; border: none;")
+    root.addWidget(icon_lbl)
 
-    color_scheme = colors_map.get(type, colors_map["info"])
-    icon = icons.get(type, "ℹ")
+    title_text = t("wip.wip_warning_title", default="Work-In-Progress Software")
+    print(f"[DEBUG] show_wip_warning: title text={title_text!r}")
+    title_lbl = QLabel(title_text)
+    title_lbl.setFont(font(18, "bold"))
+    title_lbl.setAlignment(Qt.AlignCenter)
+    title_lbl.setStyleSheet(f"color: {COLORS['text']}; background: transparent; border: none;")
+    root.addWidget(title_lbl)
 
-    # Cap width: short messages stay compact, long ones wrap within MAX_WIDTH.
-    MAX_WIDTH   = 560   # px — notification never wider than this
-    ICON_SPACE  = 60    # px reserved for the icon column + padding
-    CHAR_WIDTH  = 8     # rough px per character at font size 13
-    TEXT_AREA   = MAX_WIDTH - ICON_SPACE - 30  # usable text width
+    ### Scrollable message card
+    card = QFrame()
+    card.setStyleSheet(f"""
+        QFrame {{
+            background: {COLORS['card_bg']};
+            border-radius: 12px;
+            border: 1px solid {COLORS['border']};
+        }}
+    """)
+    card_lay = QVBoxLayout(card)
+    card_lay.setContentsMargins(20, 16, 20, 16)
 
-    # Decide wraplength: only wrap when the text is actually long
-    single_line_px = len(message) * CHAR_WIDTH
-    if single_line_px <= TEXT_AREA:
-        # Fits on one line — no wrapping needed, shrink the box to content
-        notification_width = max(300, ICON_SPACE + single_line_px + 30)
-        wrap = 0  # 0 = no wrapping
-    else:
-        # Too long for one line — pin to MAX_WIDTH and let text wrap
-        notification_width = MAX_WIDTH
-        wrap = TEXT_AREA
+    scroll = QScrollArea()
+    scroll.setWidget(card)
+    scroll.setWidgetResizable(True)
+    scroll.setFixedHeight(300)
+    scroll.setStyleSheet("""
+        QScrollArea { border: none; background: transparent; }
+        QScrollBar:vertical {
+            background: transparent; width: 6px; margin: 0;
+        }
+        QScrollBar::handle:vertical {
+            background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 20px;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+    """)
 
-    notification_content = ctk.CTkFrame(
-        app.notification_frame,
-        fg_color=color_scheme["bg"],
-        corner_radius=12,
-        width=notification_width,
+    msg_text = t("wip.wip_warning_message", default=(
+        "Welcome to BeamSkin Studio!\n"
+        "This application is currently in active development.\n"
+        "While I strive to provide a stable experience, some features may not work.\n\n"
+        "Please note:\n"
+        "  • Some features may be incomplete\n"
+        "  • Occasional bugs or unexpected behaviour may occur\n"
+        "  • Updates and improvements are being made regularly\n\n"
+        "Your feedback helps improve the software!\n"
+        "If you encounter any issues, please report them on the GitHub page.\n"
+        "Bug reports and feature suggestions are valuable for making\n"
+        "BeamSkin Studio better!\n\n"
+        "I appreciate your understanding and support as I continue\n"
+        "to enhance BeamSkin Studio."
+    ))
+    print(f"[DEBUG] show_wip_warning: message text length={len(msg_text)} chars")
+    msg_lbl = QLabel(msg_text)
+    msg_lbl.setFont(font(13))
+    msg_lbl.setWordWrap(True)
+    msg_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+    msg_lbl.setStyleSheet(
+        f"color: {COLORS['text']}; background: transparent; border: none; line-height: 1.5;"
     )
-    # Do NOT call pack_propagate(False) — let the frame grow vertically to
-    # fit wrapped text instead of clipping it.
-    notification_content.pack(padx=0, pady=10)
+    card_lay.addWidget(msg_lbl)
+    root.addWidget(scroll)
 
-    ctk.CTkLabel(
-        notification_content,
-        text=icon,
-        font=ctk.CTkFont(size=20, weight="bold"),
-        text_color=color_scheme["text"],
-        width=40
-    ).pack(side="left", anchor="n", padx=(15, 5), pady=12)
+    ### Don't show again checkbox
+    chk_text = t("wip.wip_dont_show", default="Don't show this message again")
+    print(f"[DEBUG] show_wip_warning: checkbox label={chk_text!r}")
+    chk = QCheckBox(chk_text)
+    chk.setFont(font(12))
+    chk.setStyleSheet(f"""
+        QCheckBox {{
+            color: {COLORS['text_secondary']};
+            background: transparent;
+            spacing: 8px;
+        }}
+        QCheckBox::indicator {{
+            width: 16px; height: 16px;
+            border: 1px solid {COLORS['border']};
+            border-radius: 4px;
+            background: {COLORS['frame_bg']};
+        }}
+        QCheckBox::indicator:checked {{
+            background: {COLORS['accent']};
+            border-color: {COLORS['accent']};
+        }}
+    """)
+    root.addWidget(chk, alignment=Qt.AlignCenter)
 
-    ctk.CTkLabel(
-        notification_content,
-        text=message,
-        font=ctk.CTkFont(size=13, weight="bold"),
-        text_color=color_scheme["text"],
-        anchor="w",
-        justify="left",
-        wraplength=wrap if wrap else 0,
-    ).pack(side="left", fill="x", expand=True, padx=(5, 15), pady=12)
+    ### I Understand button
+    ok_btn = QPushButton(t("wip.wip_understand", default="I Understand"))
+    ok_btn.setFont(font(13, "bold"))
+    ok_btn.setFixedHeight(44)
+    ok_btn.setFixedWidth(200)
+    ok_btn.setCursor(Qt.PointingHandCursor)
+    ok_btn.setStyleSheet(f"""
+        QPushButton {{
+            background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                stop:0 {COLORS['accent']},
+                stop:1 {COLORS.get('accent_hover', COLORS['accent'])});
+            color: white;
+            border: none;
+            border-radius: 10px;
+        }}
+        QPushButton:hover {{
+            background: {COLORS.get('accent_hover', COLORS['accent'])};
+        }}
+        QPushButton:pressed {{
+            background: {COLORS.get('accent_dim', COLORS['accent'])};
+        }}
+    """)
 
-    app.notification_frame.place(relx=0.5, y=60, anchor="n")
-    app.notification_frame.lift()
-
-    if duration > 0:
-        app.after(duration, lambda: app.notification_frame.place_forget())
-
-def show_confirmation_dialog(parent, title: str, message: str) -> bool:
-
-    print(f"[DEBUG] show_confirmation_dialog called")
-    """
-    Show a custom confirmation dialog that matches the app theme
-
-    Args:
-        parent: Parent window
-        title: Dialog title
-        message: Dialog message
-
-    Returns:
-        True if user clicked Yes, False if clicked No
-    """
-    result = {"confirmed": False}
-
-    dialog = ctk.CTkToplevel(parent)
-    dialog.title(title)
-    dialog.geometry("500x250")
-    dialog.resizable(False, False)
-    dialog.transient(parent)
-    dialog.grab_set()
-    set_window_icon(dialog)
-
-    dialog.update_idletasks()
-    width = dialog.winfo_width()
-    height = dialog.winfo_height()
-    x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-    y = (dialog.winfo_screenheight() // 2) - (height // 2)
-    dialog.geometry(f"{width}x{height}+{x}+{y}")
-
-    dialog.configure(fg_color=state.colors["frame_bg"])
-
-    content_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-    content_frame.pack(fill="both", expand=True, padx=30, pady=30)
-
-    ctk.CTkLabel(
-        content_frame,
-        text="⚠️",
-        font=ctk.CTkFont(size=48)
-    ).pack(pady=(0, 15))
-
-    ctk.CTkLabel(
-        content_frame,
-        text=title,
-        font=ctk.CTkFont(size=18, weight="bold"),
-        text_color=state.colors["text"]
-    ).pack(pady=(0, 10))
-
-    ctk.CTkLabel(
-        content_frame,
-        text=message,
-        font=ctk.CTkFont(size=13),
-        text_color=state.colors["text"],
-        wraplength=400,
-        justify="center"
-    ).pack(pady=(0, 25))
-
-    button_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-    button_frame.pack(fill="x")
-
-    def on_yes():
-
-        print(f"[DEBUG] on_yes called")
-        result["confirmed"] = True
-        dialog.destroy()
-
-    def on_no():
-
-        print(f"[DEBUG] on_no called")
-        result["confirmed"] = False
-        dialog.destroy()
-
-    yes_btn = ctk.CTkButton(
-        button_frame,
-        text="Yes, Clear Project",
-        command=on_yes,
-        width=180,
-        height=40,
-        fg_color=state.colors["error"],
-        hover_color=state.colors["error_hover"],
-        text_color="white",
-        corner_radius=8,
-        font=ctk.CTkFont(size=13, weight="bold")
-    )
-    yes_btn.pack(side="left", expand=True, padx=(0, 5))
-
-    no_btn = ctk.CTkButton(
-        button_frame,
-        text="Cancel",
-        command=on_no,
-        width=180,
-        height=40,
-        fg_color=state.colors["card_bg"],
-        hover_color=state.colors["card_hover"],
-        text_color=state.colors["text"],
-        corner_radius=8,
-        font=ctk.CTkFont(size=13)
-    )
-    no_btn.pack(side="right", expand=True, padx=(5, 0))
-
-    parent.wait_window(dialog)
-
-    return result["confirmed"]
-
-def show_update_dialog(app, new_version):
-
-    print(f"[DEBUG] show_update_dialog called")
-    """Show integrated update notification window"""
-    print(f"\n[DEBUG] ========== UPDATE PROMPT ==========")
-    print(f"[DEBUG] Showing update dialog for version: {new_version}")
-
-    from core.updater import CURRENT_VERSION
-
-    update_window = ctk.CTkToplevel(app)
-    update_window.title(t("dialogs.update_available", default="Update Available"))
-    update_window.geometry("500x350")
-    update_window.resizable(False, False)
-    update_window.transient(app)
-    update_window.grab_set()
-    set_window_icon(update_window)
-
-    update_window.update_idletasks()
-    width = update_window.winfo_width()
-    height = update_window.winfo_height()
-    x = (update_window.winfo_screenwidth() // 2) - (width // 2)
-    y = (update_window.winfo_screenheight() // 2) - (height // 2)
-    update_window.geometry(f"{width}x{height}+{x}+{y}")
-
-    main_frame = ctk.CTkFrame(update_window, fg_color=state.colors["frame_bg"])
-    main_frame.pack(fill="both", expand=True, padx=15, pady=15)
-
-    title_label = ctk.CTkLabel(
-        main_frame,
-        text="🎉 " + t("dialogs.update_available", default="Update Available!"),
-        font=ctk.CTkFont(size=20, weight="bold"),
-        text_color=state.colors["accent"]
-    )
-    title_label.pack(pady=(5, 15))
-
-    info_frame = ctk.CTkFrame(main_frame, fg_color=state.colors["card_bg"], corner_radius=10)
-    info_frame.pack(fill="x", padx=10, pady=10)
-
-    current_label = ctk.CTkLabel(
-        info_frame,
-        text=t("dialogs.current_version", version=CURRENT_VERSION, default=f"Current Version: {CURRENT_VERSION}"),
-        font=ctk.CTkFont(size=13),
-        text_color=state.colors["text"]
-    )
-    current_label.pack(pady=(10, 5))
-
-    arrow_label = ctk.CTkLabel(
-        info_frame,
-        text="↓",
-        font=ctk.CTkFont(size=16, weight="bold"),
-        text_color=state.colors["accent"]
-    )
-    arrow_label.pack(pady=2)
-
-    new_label = ctk.CTkLabel(
-        info_frame,
-        text=t("dialogs.new_version", version=new_version, default=f"New Version: {new_version}"),
-        font=ctk.CTkFont(size=13, weight="bold"),
-        text_color=state.colors["accent"]
-    )
-    new_label.pack(pady=(5, 10))
-
-    message_label = ctk.CTkLabel(
-        main_frame,
-        text=t("dialogs.update_message", default="Would you like to open the GitHub page to download it?"),
-        font=ctk.CTkFont(size=12),
-        text_color=state.colors["text"]
-    )
-    message_label.pack(pady=(10, 15))
-
-    button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-    button_frame.pack(fill="x", pady=(5, 10), padx=10)
-
-    def download_update():
-
-        print(f"[DEBUG] download_update called")
-        print(f"[DEBUG] User chose to download update")
-        print(f"[DEBUG] Opening GitHub page...")
-        webbrowser.open("https://github.com/johanssonserlanderkevin-sys/BeamSkin-Studio")
-        print(f"[DEBUG] GitHub page opened")
-        update_window.destroy()
-
-    def skip_update():
-
-        print(f"[DEBUG] skip_update called")
-        print(f"[DEBUG] User declined update")
-        update_window.destroy()
-
-    download_btn = ctk.CTkButton(
-        button_frame,
-        text=t("dialogs.download_update", default="Download Update"),
-        command=download_update,
-        fg_color=state.colors["accent"],
-        hover_color=state.colors["accent_hover"],
-        text_color=state.colors["accent_text"],
-        height=45,
-        corner_radius=8,
-        font=ctk.CTkFont(size=14, weight="bold")
-    )
-    download_btn.pack(side="left", expand=True, fill="x", padx=(0, 5))
-
-    later_btn = ctk.CTkButton(
-        button_frame,
-        text=t("dialogs.maybe_later", default="Maybe Later"),
-        command=skip_update,
-        fg_color=state.colors["card_bg"],
-        hover_color=state.colors["card_hover"],
-        text_color=state.colors["text"],
-        height=45,
-        corner_radius=8,
-        font=ctk.CTkFont(size=14)
-    )
-    later_btn.pack(side="right", expand=True, fill="x", padx=(5, 0))
-
-    print(f"[DEBUG] Update window displayed")
-    print(f"[DEBUG] ========== UPDATE PROMPT COMPLETE ==========\n")
-
-def show_wip_warning(app):
-
-    print(f"[DEBUG] show_wip_warning called")
-    """Show Work-In-Progress warning dialog on first launch"""
-    print(f"\n[DEBUG] ========== WIP WARNING CHECK ==========")
-    print(f"[DEBUG] first_launch setting: {state.app_settings.get('first_launch', True)}")
-
-    if state.app_settings.get("first_launch", True):
-        print(f"[DEBUG] First launch detected - showing WIP warning dialog")
-        dialog = ctk.CTkToplevel(app)
-        dialog.title(t("dialogs.wip_warning_title", default="Welcome to BeamSkin Studio"))
-        dialog.geometry("550x700")
-        dialog.transient(app)
-        dialog.grab_set()
-        set_window_icon(dialog)
-        print(f"[DEBUG] Dialog created")
-
-        dialog.update_idletasks()
-        dialog_x = (dialog.winfo_screenwidth() // 2) - (550 // 2)
-        dialog_y = (dialog.winfo_screenheight() // 2) - (700 // 2)
-        dialog.geometry(f"550x700+{dialog_x}+{dialog_y}")
-        print(f"[DEBUG] Dialog centered at ({dialog_x}, {dialog_y})")
-
-        dialog.configure(fg_color=state.colors["frame_bg"])
-
-        main_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        title_frame.pack(pady=(0, 20))
-
-        ctk.CTkLabel(
-            title_frame,
-            text="⚠️",
-            font=ctk.CTkFont(size=48),
-            text_color=state.colors["text"]
-        ).pack()
-
-        ctk.CTkLabel(
-            title_frame,
-            text=t("wip.wip_warning_title", default="Work-In-Progress Software"),
-            font=ctk.CTkFont(size=20, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(pady=(10, 0))
-
-        message_frame = ctk.CTkFrame(main_frame, fg_color=state.colors["card_bg"], corner_radius=12)
-        message_frame.pack(fill="both", expand=True, pady=(0, 20))
-
-        ctk.CTkLabel(
-            message_frame,
-            text=t("wip.wip_warning_message", default=(
-                "Welcome to BeamSkin Studio!\n"
-                "This application is currently in active development.\n"
-                "While I strive to provide a stable experience, some features may not work\n\n"
-                "Please note:\n"
-                "Some features may be incomplete\n"
-                "Occasional bugs or unexpected behavior may occur\n"
-                "Updates and improvements are being made\n\n"
-                "Your feedback helps me improve the software!\n"
-                "If you encounter any issues, please report them on my GitHub page. "
-                "Your bug reports and feature suggestions are valuable to making "
-                "BeamSkin Studio better!\n\n"
-                " I appreciate your understanding and support as I continue "
-                "to enhance BeamSkin Studio."
-            )),
-            font=ctk.CTkFont(size=18),
-            text_color=state.colors["text"],
-            justify="center",
-            wraplength=480
-        ).pack(padx=20, pady=20, fill="both", expand=True)
-
-        dont_show_var = ctk.BooleanVar(value=False)
-        checkbox = ctk.CTkCheckBox(
-            main_frame,
-            text=t("wip.wip_dont_show", default="Don't show this message again"),
-            variable=dont_show_var,
-            font=ctk.CTkFont(size=12),
-            text_color=state.colors["text"]
-        )
-        checkbox.pack(pady=(0, 10))
-
-        def on_ok():
-
-            print(f"[DEBUG] on_ok called")
-            print(f"[DEBUG] User clicked 'I Understand'")
-            print(f"[DEBUG] Don't show again checkbox: {dont_show_var.get()}")
-            if dont_show_var.get():
+    def _on_ok():
+        print("[DEBUG] show_wip_warning: user clicked 'I Understand'")
+        print(f"[DEBUG] show_wip_warning: dont_show_again checked={chk.isChecked()}")
+        if chk.isChecked():
+            try:
+                from gui.state import state
                 from core.settings import save_settings
+                print("[DEBUG] show_wip_warning: saving first_launch=False to settings")
                 state.app_settings["first_launch"] = False
                 save_settings()
-                print("[DEBUG] First launch warning disabled and settings saved")
-            dialog.destroy()
-            print(f"[DEBUG] Dialog closed")
+                print("[DEBUG] show_wip_warning: first_launch=False saved successfully")
+            except Exception as e:
+                print(f"[DEBUG] show_wip_warning: could not save setting: {e}")
+        else:
+            print("[DEBUG] show_wip_warning: dont_show_again not checked, first_launch unchanged")
+        print("[DEBUG] show_wip_warning: accepting dialog")
+        dlg.accept()
 
-        ctk.CTkButton(
-            main_frame,
-            text=t("wip.wip_understand", default="I Understand"),
-            command=on_ok,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            font=ctk.CTkFont(size=14, weight="bold"),
-            height=40,
-            width=200
-        ).pack()
+    ok_btn.clicked.connect(_on_ok)
+    root.addWidget(ok_btn, alignment=Qt.AlignCenter)
 
-        print(f"[DEBUG] Waiting for user to close dialog...")
-        app.wait_window(dialog)
-        print(f"[DEBUG] ========== WIP WARNING COMPLETE ==========\n")
+    dlg.adjustSize()
+    set_window_icon(dlg)
+    print(f"[DEBUG] show_wip_warning: dialog adjusted size={dlg.width()}x{dlg.height()}")
+
+    ### Centre on parent
+    if parent and parent.isVisible():
+        pg = parent.geometry()
+        x = pg.x() + (pg.width()  - dlg.width())  // 2
+        y = pg.y() + (pg.height() - dlg.height()) // 2
+        print(f"[DEBUG] show_wip_warning: centering on parent geometry={pg}, dialog pos=({x},{y})")
+        dlg.move(x, y)
     else:
-        print(f"[DEBUG] Not first launch - skipping WIP warning")
-        print(f"[DEBUG] ========== WIP WARNING SKIPPED ==========\n")
+        print(f"[DEBUG] show_wip_warning: parent not visible or None, skipping centering")
+
+    print("[DEBUG] show_wip_warning: executing dialog — blocking until user responds")
+    result = dlg.exec()
+    print(f"[DEBUG] show_wip_warning: dialog closed, result={result}")
+    print("[DEBUG] ========== WIP WARNING COMPLETE ==========\n")

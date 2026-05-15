@@ -1,346 +1,362 @@
-"""
-How To Tab - Professional Documentation Interface
-"""
-import customtkinter as ctk
-from typing import Dict, Tuple, List
-from gui.state import state
-from core.localization import t
+from __future__ import annotations
+from typing import List, Tuple, Optional
 
-class HowToTab(ctk.CTkFrame):
-    """Professional documentation tab with comprehensive BeamSkin Studio guide"""
+from PySide6.QtCore    import Qt, QTimer
+from PySide6.QtGui     import QTextCursor
+from PySide6.QtWidgets import (
+    QWidget, QFrame, QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QHBoxLayout, QScrollArea, QTextEdit, QSizePolicy,
+    QApplication,
+)
 
-    def __init__(self, parent: ctk.CTk):
-        super().__init__(parent, fg_color=state.colors["app_bg"])
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.widgets import AnimButton, GhostButton, SectionHeader, HSeparator
+from gui.state   import state
 
-        self.content_textbox: ctk.CTkTextbox = None
-        self.search_entry: ctk.CTkEntry = None
-        self.chapter_buttons: List[Tuple[ctk.CTkButton, str]] = []
-        self.current_chapter: str = "all"
+try:
+    from core.localization import t
+except ImportError:
+    def t(key, **kw): return key
 
+
+class HowToTab(QWidget):
+    """Documentation tab with chapter nav, search, and animated transitions."""
+
+    def __init__(self, parent: QWidget):
+        print(f"[DEBUG] __init__() called")
+        super().__init__(parent)
+        self.setStyleSheet(f"background-color:{COLORS['app_bg']};")
+        self._chapter_buttons: List[Tuple[QPushButton, str]] = []
+        self._view_all_btn:    Optional[QPushButton]         = None
+        self._content:         Optional[QTextEdit]           = None
+        self._search:          Optional[QLineEdit]           = None
         self._setup_ui()
-        self.load_all_chapters()  # Load content on startup
-        
-    def _get_chapters(self):
-        """Get chapters with translated titles and content"""
+        # 50 ms gives Qt time to finish laying out the widget before we set
+        # the scroll position — 0 ms fires before the first paint and the
+        # viewport reset gets ignored.
+        QTimer.singleShot(50, self.load_all_chapters)
+
+
+    def _get_chapters(self) -> dict:
         return {
             "getting_started": {
                 "icon": "🚀",
-                "title": t("howto.chapter_getting_started"),
-                "content": t("howto_content.getting_started_content")
+                "title":   t("howto.chapter_getting_started"),
+                "content": t("howto_content.getting_started_content"),
             },
             "skin_creation": {
                 "icon": "🎨",
-                "title": t("howto.chapter_skin_creation"),
-                "content": t("howto_content.skin_creation_content")
+                "title":   t("howto.chapter_skin_creation"),
+                "content": t("howto_content.skin_creation_content"),
             },
             "project": {
                 "icon": "⚙️",
-                "title": t("howto.chapter_project"),
-                "content": t("howto_content.project_content")
+                "title":   t("howto.chapter_project"),
+                "content": t("howto_content.project_content"),
             },
             "car_list": {
                 "icon": "🚗",
-                "title": t("howto.chapter_car_list"),
-                "content": t("howto_content.car_list_content")
+                "title":   t("howto.chapter_car_list"),
+                "content": t("howto_content.car_list_content"),
             },
             "add_vehicle": {
                 "icon": "➕",
-                "title": t("howto.chapter_add_vehicle"),
-                "content": t("howto_content.add_vehicle_content")
+                "title":   t("howto.chapter_add_vehicle"),
+                "content": t("howto_content.add_vehicle_content"),
             },
             "troubleshooting": {
                 "icon": "🔍",
-                "title": t("howto.chapter_troubleshooting"),
-                "content": t("howto_content.troubleshooting_content")
+                "title":   t("howto.chapter_troubleshooting"),
+                "content": t("howto_content.troubleshooting_content"),
             },
             "advanced": {
                 "icon": "⚡",
-                "title": t("howto.chapter_advanced"),
-                "content": t("howto_content.advanced_content")
+                "title":   t("howto.chapter_advanced"),
+                "content": t("howto_content.advanced_content"),
             },
             "faq": {
                 "icon": "❓",
-                "title": t("howto.chapter_faq"),
-                "content": t("howto_content.faq_content")
-            }
+                "title":   t("howto.chapter_faq"),
+                "content": t("howto_content.faq_content"),
+            },
         }
 
-    def refresh_ui(self):
-        """Refresh all UI text with current language"""
-        # Clear existing widgets
-        for widget in self.winfo_children():
-            widget.destroy()
-        
-        # Clear stale widget references
-        self.chapter_buttons.clear()
-        self.content_textbox = None
-        self.search_entry = None
-        self.view_all_btn = None
-        
-        # Recreate UI with new translations
-        self._setup_ui()
-        self.load_all_chapters()
 
     def _setup_ui(self):
-        """Set up the modern How-To tab UI"""
+        print(f"[DEBUG] _setup_ui() called")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=15, pady=15)
+        hdr = QFrame()
+        hdr.setFixedHeight(80)
+        hdr.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['frame_bg']};
+                border-radius:12px;
+                border:1px solid {COLORS['border']};
+            }}
+        """)
+        hdr_row = QHBoxLayout(hdr)
+        hdr_row.setContentsMargins(20, 0, 20, 0)
 
-        header_frame = ctk.CTkFrame(
-            main_container,
-            fg_color=state.colors["frame_bg"],
-            corner_radius=12,
-            height=80
+        text_col = QVBoxLayout()
+        text_col.setSpacing(3)
+        self._page_title_lbl = QLabel(t("howto.page_title"))
+        self._page_title_lbl.setFont(font(22, "bold"))
+        self._page_title_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        text_col.addWidget(self._page_title_lbl)
+
+        self._page_sub_lbl = QLabel(t("howto.page_subtitle"))
+        self._page_sub_lbl.setFont(font(12))
+        self._page_sub_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        header_frame.pack(fill="x", pady=(0, 15))
-        header_frame.pack_propagate(False)
+        text_col.addWidget(self._page_sub_lbl)
+        hdr_row.addLayout(text_col, 1)
 
-        title_container = ctk.CTkFrame(header_frame, fg_color="transparent")
-        title_container.pack(side="left", padx=20, pady=15)
+        # search
+        search_row = QHBoxLayout()
+        search_row.setSpacing(8)
+        si = QLabel("🔍")
+        si.setFont(font(16))
+        si.setStyleSheet("background:transparent;border:none;")
+        search_row.addWidget(si)
 
-        ctk.CTkLabel(
-            title_container,
-            text=t("howto.page_title"),
-            font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(anchor="w")
+        self._search = QLineEdit()
+        self._search.setPlaceholderText(t("howto.search_placeholder"))
+        self._search.setFixedWidth(240)
+        self._search.setFixedHeight(34)
+        self._search.setFont(font(12))
+        self._search.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['card_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:8px;
+                padding:5px 10px;
+            }}
+            QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
+        """)
+        self._search.returnPressed.connect(self._search_content)
+        search_row.addWidget(self._search)
+        hdr_row.addLayout(search_row)
+        root.addWidget(hdr)
 
-        ctk.CTkLabel(
-            title_container,
-            text=t("howto.page_subtitle"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(anchor="w", pady=(5, 0))
+        nav_scroll = QScrollArea()
+        nav_scroll.setFixedHeight(60)
+        nav_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        nav_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        nav_scroll.setWidgetResizable(True)
+        nav_scroll.setStyleSheet(f"""
+            QScrollArea {{ background:{COLORS['frame_bg']};
+                           border-radius:12px;
+                           border:1px solid {COLORS['border']}; }}
+            QScrollArea > QWidget > QWidget {{ background:{COLORS['frame_bg']}; }}
+        """)
 
-        search_container = ctk.CTkFrame(header_frame, fg_color="transparent")
-        search_container.pack(side="right", padx=20, pady=15)
+        nav_inner = QWidget()
+        nav_inner.setStyleSheet(f"background:{COLORS['frame_bg']};")
+        nav_row = QHBoxLayout(nav_inner)
+        nav_row.setContentsMargins(12, 0, 12, 0)
+        nav_row.setSpacing(4)
 
-        ctk.CTkLabel(
-            search_container,
-            text="🔍",
-            font=ctk.CTkFont(size=18),
-            text_color=state.colors["text_secondary"]
-        ).pack(side="left", padx=(0, 8))
-
-        self.search_entry = ctk.CTkEntry(
-            search_container,
-            placeholder_text=t("howto.search_placeholder"),
-            width=250,
-            height=35,
-            font=ctk.CTkFont(size=13),
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"]
+        self._view_all_btn = self._nav_btn(
+            f"📖  {t('howto.view_all')}", active=True
         )
-        self.search_entry.pack(side="left")
-        self.search_entry.bind("<Return>", lambda e: self._search_content())
+        self._view_all_btn.clicked.connect(self.load_all_chapters)
+        nav_row.addWidget(self._view_all_btn)
 
-        nav_frame = ctk.CTkFrame(
-            main_container,
-            fg_color=state.colors["frame_bg"],
-            corner_radius=12
-        )
-        nav_frame.pack(fill="x", pady=(0, 15))
-
-        self.view_all_btn = ctk.CTkButton(
-            nav_frame,
-            text=t("howto.view_all"),
-            command=self.load_all_chapters,
-            width=130,
-            height=40,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            corner_radius=8
-        )
-        self.view_all_btn.pack(side="left", padx=10, pady=10)
-
-        chapters_container = ctk.CTkFrame(nav_frame, fg_color="transparent")
-        chapters_container.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=10)
-
-        chapters = self._get_chapters()
-        for chapter_key, chapter_data in chapters.items():
-            btn = ctk.CTkButton(
-                chapters_container,
-                text=f"{chapter_data['icon']} {chapter_data['title']}",
-                command=lambda k=chapter_key: self.load_chapter(k),
-                width=145,
-                height=40,
-                fg_color=state.colors["card_bg"],
-                hover_color=state.colors["card_hover"],
-                text_color=state.colors["text"],
-                font=ctk.CTkFont(size=12, weight="bold"),
-                corner_radius=8
+        self._chapter_buttons = []
+        for key, data in self._get_chapters().items():
+            btn = self._nav_btn(f"{data['icon']} {data['title']}")
+            btn.clicked.connect(
+                lambda checked=False, k=key: self.load_chapter(k)
             )
-            btn.pack(side="left", padx=3)
-            self.chapter_buttons.append((btn, chapter_key))
+            nav_row.addWidget(btn)
+            self._chapter_buttons.append((btn, key))
 
-        content_frame = ctk.CTkFrame(
-            main_container,
-            fg_color=state.colors["frame_bg"],
-            corner_radius=12
-        )
-        content_frame.pack(fill="both", expand=True)
+        nav_row.addStretch()
+        nav_scroll.setWidget(nav_inner)
+        root.addWidget(nav_scroll)
 
-        self.content_textbox = ctk.CTkTextbox(
-            content_frame,
-            font=ctk.CTkFont(size=14),
-            fg_color=state.colors["frame_bg"],
-            text_color=state.colors["text"],
-            wrap="word",
-            activate_scrollbars=True
-        )
-        self.content_textbox.pack(fill="both", expand=True, padx=15, pady=15)
+        content_frame = QFrame()
+        content_frame.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['frame_bg']};
+                border-radius:12px;
+                border:1px solid {COLORS['border']};
+            }}
+        """)
+        cf_layout = QVBoxLayout(content_frame)
+        cf_layout.setContentsMargins(16, 12, 16, 12)
 
-    def _search_content(self):
-        """Search through documentation content"""
-        # Safety check: widgets may be destroyed during UI refresh
-        if not self.search_entry or not self.content_textbox or not self.view_all_btn:
-            return
-        
-        search_term = self.search_entry.get().lower().strip()
+        self._content = QTextEdit()
+        self._content.setReadOnly(True)
+        self._content.setFont(font(13))
+        self._content.setStyleSheet(f"""
+            QTextEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:none;
+                font-size:13px;
+                line-height:1.6;
+            }}
+        """)
+        cf_layout.addWidget(self._content)
+        root.addWidget(content_frame, 1)
 
-        if not search_term:
-            self.load_all_chapters()
-            return
 
-        chapters = self._get_chapters()
-        results = []
-        for chapter_key, chapter_data in chapters.items():
-            content = chapter_data['content'].lower()
-            if search_term in content:
-                results.append((chapter_key, chapter_data))
+    def _nav_btn(self, text: str, active: bool = False) -> QPushButton:
+        print(f"[DEBUG] _nav_btn() called")
+        btn = QPushButton(text)
+        btn.setFont(font(12, "bold" if active else "normal"))
+        btn.setFixedHeight(38)
+        btn.setCursor(Qt.PointingHandCursor)
+        self._style_nav_btn(btn, active)
+        return btn
 
-        self.content_textbox.configure(state="normal")
-        self.content_textbox.delete("0.0", "end")
-
-        if results:
-            self.content_textbox.insert("0.0", t("howto.search_results", term=search_term) + "\n")
-            self.content_textbox.insert("end", "=" * 60 + "\n\n")
-
-            for chapter_key, chapter_data in results:
-                self.content_textbox.insert("end", f"{chapter_data['icon']} {chapter_data['title']}\n")
-                self.content_textbox.insert("end", "-" * 60 + "\n")
-                self.content_textbox.insert("end", chapter_data['content'])
-                self.content_textbox.insert("end", "\n\n")
+    def _style_nav_btn(self, btn: QPushButton, active: bool):
+        if active:
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background:{COLORS['accent']};
+                    color:{COLORS['accent_text']};
+                    border-radius:8px;border:none;
+                    padding:6px 14px;font-size:12px;font-weight:bold;
+                }}
+                QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
+            """)
         else:
-            self.content_textbox.insert("0.0", t("howto.no_results", term=search_term) + "\n\n")
-            self.content_textbox.insert("end", t("howto.try_different"))
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background:{COLORS['card_bg']};color:{COLORS['text']};
+                    border-radius:8px;border:1px solid {COLORS['border']};
+                    padding:6px 14px;font-size:12px;
+                }}
+                QPushButton:hover {{
+                    background:{COLORS['card_hover']};
+                    border-color:{COLORS['accent']};
+                }}
+            """)
 
-        self.content_textbox.configure(state="disabled")
 
-        if self.view_all_btn and self.view_all_btn.winfo_exists():
-            self.view_all_btn.configure(
-                fg_color=state.colors["card_bg"],
-                hover_color=state.colors["tab_unselected_hover"],
-                text_color=state.colors["text"]
-            )
+    def _set_text_scroll_top(self, text: str):
+        """
+        Set content and guarantee the viewport starts at the top.
 
-        self._reset_button_colors()
+        processEvents() flushes Qt's pending layout pass synchronously so our
+        setValue(0) is always the last thing to touch the scrollbar.
+
+        fade_in() is intentionally NOT called on self._content or its direct
+        parent — applying QGraphicsOpacityEffect to either causes Qt to
+        re-render the QTextEdit through an offscreen pixmap, resetting the
+        viewport scroll after we set it to 0.
+        """
+        self._content.setPlainText(text)
+        QApplication.processEvents()
+        self._content.moveCursor(QTextCursor.Start)
+        self._content.verticalScrollBar().setValue(0)
+
 
     def load_chapter(self, chapter_key: str):
-        """Load a specific chapter"""
-        # Safety check: widgets may be destroyed during UI refresh
-        if not self.content_textbox or not self.view_all_btn or not self.chapter_buttons:
-            return
-        
+        print(f"[DEBUG] load_chapter: {chapter_key!r}")
         chapters = self._get_chapters()
         if chapter_key not in chapters:
             return
+        data = chapters[chapter_key]
+        self._set_text_scroll_top(
+            f"{data['icon']} {data['title']}\n"
+            + "═" * 60 + "\n\n"
+            + data["content"]
+        )
 
-        chapter_data = chapters[chapter_key]
-        self.current_chapter = chapter_key
+        self._style_nav_btn(self._view_all_btn, False)
+        for btn, key in self._chapter_buttons:
+            self._style_nav_btn(btn, key == chapter_key)
 
-        self.content_textbox.configure(state="normal")
-        self.content_textbox.delete("0.0", "end")
-
-        self.content_textbox.insert("0.0", f"{chapter_data['icon']} {chapter_data['title']}\n")
-        self.content_textbox.insert("end", "=" * 60 + "\n\n")
-
-        self.content_textbox.insert("end", chapter_data['content'])
-
-        self.content_textbox.configure(state="disabled")
-
-        if self.view_all_btn and self.view_all_btn.winfo_exists():
-            self.view_all_btn.configure(
-                fg_color=state.colors["card_bg"],
-                hover_color=state.colors["tab_unselected_hover"],
-                text_color=state.colors["text"]
-            )
-
-        for btn, key in self.chapter_buttons:
-            if not btn.winfo_exists():
-                continue
-            if key == chapter_key:
-                btn.configure(
-                    fg_color=state.colors["accent"],
-                    hover_color=state.colors["tab_selected_hover"],
-                    text_color=state.colors["accent_text"]
-                )
-            else:
-                btn.configure(
-                    fg_color=state.colors["card_bg"],
-                    hover_color=state.colors["tab_unselected_hover"],
-                    text_color=state.colors["text"]
-                )
-
-        print(f"[DEBUG] Loaded chapter: {chapter_data['title']}")
+        print(f"[DEBUG] Loaded chapter: {data['title']}")
 
     def load_all_chapters(self):
-        """Load all chapters in sequence"""
-        # Safety check: widgets may be destroyed during UI refresh
-        if not self.content_textbox or not self.view_all_btn or not self.chapter_buttons:
-            return
-        
-        self.current_chapter = "all"
-
-        self.content_textbox.configure(state="normal")
-        self.content_textbox.delete("0.0", "end")
-
-        intro_text = t("howto.welcome_title") + "\n\n"
-        intro_text += t("howto.welcome_intro") + "\n\n"
-        intro_text += t("howto.quick_nav_title") + "\n"
-        intro_text += t("howto.quick_nav_chapters") + "\n"
-        intro_text += t("howto.quick_nav_search") + "\n"
-        intro_text += t("howto.quick_nav_walkthrough") + "\n\n"
-        intro_text += t("howto.lets_start") + "\n\n"
-
-        self.content_textbox.insert("0.0", intro_text)
-        self.content_textbox.insert("end", "=" * 60 + "\n\n")
-
+        print(f"[DEBUG] load_all_chapters: rendering full doc view")
         chapters = self._get_chapters()
-        for chapter_key, chapter_data in chapters.items():
-            self.content_textbox.insert("end", f"{chapter_data['icon']} {chapter_data['title']}\n")
-            self.content_textbox.insert("end", "-" * 60 + "\n")
-            self.content_textbox.insert("end", chapter_data['content'])
-            self.content_textbox.insert("end", "\n\n")
 
-        self.content_textbox.configure(state="disabled")
+        # Build the same intro block as the original ctk version
+        intro = (
+            t("howto.welcome_title")         + "\n\n"
+            + t("howto.welcome_intro")       + "\n\n"
+        )
+        # Optional quick-nav lines (graceful fallback if keys don't exist)
+        for key in ("howto.quick_nav_title", "howto.quick_nav_chapters",
+                    "howto.quick_nav_search", "howto.quick_nav_walkthrough"):
+            line = t(key)
+            if line != key:          # key was actually translated
+                intro += line + "\n"
+        lets = t("howto.lets_start")
+        if lets != "howto.lets_start":
+            intro += "\n" + lets + "\n"
+        intro += "\n" + "═" * 60 + "\n\n"
 
-        if self.view_all_btn and self.view_all_btn.winfo_exists():
-            self.view_all_btn.configure(
-                fg_color=state.colors["accent"],
-                hover_color=state.colors["tab_selected_hover"],
-                text_color=state.colors["accent_text"]
+        parts = [intro]
+        for data in chapters.values():
+            parts.append(
+                f"{data['icon']} {data['title']}\n"
+                + "─" * 60 + "\n"
+                + data["content"]
+                + "\n\n"
             )
+        self._set_text_scroll_top("".join(parts))
 
-        self._reset_button_colors()
+        self._style_nav_btn(self._view_all_btn, True)
+        for btn, _ in self._chapter_buttons:
+            self._style_nav_btn(btn, False)
 
         print("[DEBUG] Loaded all chapters")
 
-    def _reset_button_colors(self):
-        """Reset all chapter buttons to default colors"""
-        # Safety check: widgets may be destroyed during UI refresh
-        if not self.chapter_buttons:
+    def _search_content(self):
+        print(f"[DEBUG] _search_content: query={self._search.text()!r}")
+        term = self._search.text().lower().strip()
+        if not term:
+            self.load_all_chapters()
             return
-        
-        for btn, _ in self.chapter_buttons:
-            if btn.winfo_exists():
-                btn.configure(
-                    fg_color=state.colors["card_bg"],
-                    hover_color=state.colors["tab_unselected_hover"],
-                    text_color=state.colors["text"]
-                )
+        chapters = self._get_chapters()
+        results = [
+            (k, d) for k, d in chapters.items()
+            if term in d["content"].lower() or term in d["title"].lower()
+        ]
+        if results:
+            text = f"Search results for: '{term}'\n" + "═" * 60 + "\n\n"
+            for _, data in results:
+                text += (f"{data['icon']} {data['title']}\n"
+                         f"─────\n{data['content']}\n\n")
+        else:
+            text = (f"No results found for '{term}'.\n\n"
+                    f"Try a different keyword.")
+        self._set_text_scroll_top(text)
+
+
+    def refresh_ui(self):
+        """
+        Refresh translations without rebuilding the widget tree.
+        Only the text content is reloaded, preserving the layout.
+        """
+        print(f"[DEBUG] refresh_ui() called")
+        self._page_title_lbl.setText(t("howto.page_title"))
+        self._page_sub_lbl.setText(t("howto.page_subtitle"))
+        if self._search:
+            self._search.setPlaceholderText(t("howto.search_placeholder"))
+        chapters = self._get_chapters()
+        # Re-label the view-all button
+        if self._view_all_btn:
+            self._view_all_btn.setText(f"📖  {t('howto.view_all')}")
+        # Re-label each chapter button
+        for btn, key in self._chapter_buttons:
+            if key in chapters:
+                data = chapters[key]
+                btn.setText(f"{data['icon']} {data['title']}")
+
+        # Reload content with new locale strings (guard against not-yet-shown)
+        if self._content is not None:
+            self.load_all_chapters()
+
+

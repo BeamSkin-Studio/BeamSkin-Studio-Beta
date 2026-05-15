@@ -1,415 +1,326 @@
-"""
-Settings Tab - Application settings and configuration
-Cross-platform path configuration with Linux support
-"""
-import customtkinter as ctk
-from tkinter import filedialog
-import os
-import platform
-from gui.state import state
-from core.localization import t
-from core.settings import (
-    set_beamng_paths,
-    get_beamng_install_path,
-    get_mods_folder_path,
-    save_settings
+from __future__ import annotations
+import os, platform
+from typing import Callable, Optional
+
+from PySide6.QtCore    import Qt
+from PySide6.QtWidgets import (
+    QWidget, QFrame, QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QHBoxLayout, QFileDialog,
 )
-from utils.config_helper import get_beamng_default_install_paths, get_beamng_mods_default_paths
 
-class PathConfigurationSection:
+from gui.theme   import COLORS, font, drop_shadow
+from gui.widgets import AnimButton, GhostButton, HSeparator, SectionHeader
+from gui.state   import state
 
-    def __init__(self, parent, notification_callback=None):
-        
+try:
+    from core.localization import t
+except ImportError:
+    def t(key, **kw): return key
+
+try:
+    from core.settings import (
+        set_beamng_paths, get_beamng_install_path,
+        get_mods_folder_path, save_settings,
+    )
+except ImportError:
+    def set_beamng_paths(**kw): pass
+    def get_beamng_install_path(): return ""
+    def get_mods_folder_path(): return ""
+    def save_settings(): pass
+
+try:
+    from utils.config_helper import (
+        get_beamng_default_install_paths,
+        get_beamng_mods_default_paths,
+    )
+except ImportError:
+    def get_beamng_default_install_paths(): return []
+    def get_beamng_mods_default_paths():    return []
+
+
+class PathConfigurationSection(QFrame):
+    """Embeddable widget for the settings tab."""
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        notification_callback: Optional[Callable] = None,
+    ):
+        super().__init__(parent)
         self.notification_callback = notification_callback
         self.system = platform.system()
-
-        self.frame = ctk.CTkFrame(parent, fg_color=state.colors["card_bg"], corner_radius=12)
-
-        header_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
-        header_frame.pack(fill="x", padx=20, pady=(20, 15))
-
-        ctk.CTkLabel(
-            header_frame,
-            text=t("settings.beamng_paths"),
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(side="left")
-
-        platform_emoji = {
-            "Windows": "🪟",
-            "Linux": "🐧",
-            "Darwin": "🍎"
-        }.get(self.system, "💻")
-
-        ctk.CTkLabel(
-            header_frame,
-            text=f"{platform_emoji} {self.system}",
-            font=ctk.CTkFont(size=12),
-            text_color=state.colors["text_secondary"],
-            anchor="e"
-        ).pack(side="right", padx=(10, 0))
-
-        ctk.CTkLabel(
-            self.frame,
-            text=t("settings.beamng_paths_desc"),
-            font=ctk.CTkFont(size=16),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(fill="x", padx=20, pady=(0, 20))
-
-        self._create_beamng_path_config()
-
-        self._create_mods_path_config()
-
+        self._build()
         self._load_current_paths()
 
-    def _create_beamng_path_config(self):
-        config_frame = ctk.CTkFrame(self.frame, fg_color=state.colors["frame_bg"], corner_radius=8)
-        config_frame.pack(fill="x", padx=20, pady=(0, 15))
+    def _build(self):
+        print(f"[DEBUG] _build() called")
+        # Use an object-name selector so the rule targets ONLY this frame and
+        # does not cascade down to every nested QFrame child inside it.
+        self.setObjectName("pathConfigSection")
+        self.setStyleSheet(f"""
+            #pathConfigSection {{
+                background-color: {COLORS['card_bg']};
+                border-radius: 12px;
+                border: none;
+            }}
+        """)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(16)
 
-        label_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        label_frame.pack(fill="x", padx=15, pady=(15, 10))
+        # header
+        hdr_row = QHBoxLayout()
+        self._hdr_lbl = QLabel(t("settings.beamng_paths"))
+        self._hdr_lbl.setFont(font(17, "bold"))
+        self._hdr_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        hdr_row.addWidget(self._hdr_lbl, 1)
 
-        ctk.CTkLabel(
-            label_frame,
-            text=t("settings.beamng_install"),
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            config_frame,
-            text=t("settings.beamng_uvpath_desc"),
-            font=ctk.CTkFont(size=14),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(0, 10))
-
-        path_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        path_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-        self.beamng_entry = ctk.CTkEntry(
-            path_frame,
-            placeholder_text="beamng_uvpath_desc",
-            font=ctk.CTkFont(size=12),
-            height=35,
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"]
+        platform_emoji = {"Windows": "🪟", "Linux": "🐧", "Darwin": "🍎"}.get(
+            self.system, "💻"
         )
-        self.beamng_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-
-        btn_frame = ctk.CTkFrame(path_frame, fg_color="transparent")
-        btn_frame.pack(side="right")
-
-        ctk.CTkButton(
-            btn_frame,
-            text=t("common.browse"),
-            command=self._browse_beamng,
-            width=80,
-            height=35,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            font=ctk.CTkFont(size=12, weight="bold")
-        ).pack(side="left", padx=(0, 5))
-
-        self.beamng_status = ctk.CTkLabel(
-            config_frame,
-            text="",
-            font=ctk.CTkFont(size=11),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
+        plat_lbl = QLabel(f"{platform_emoji} {self.system}")
+        plat_lbl.setFont(font(12))
+        plat_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        self.beamng_status.pack(fill="x", padx=15, pady=(0, 10))
+        hdr_row.addWidget(plat_lbl)
+        root.addLayout(hdr_row)
 
-    def _create_mods_path_config(self):
-
-        config_frame = ctk.CTkFrame(self.frame, fg_color=state.colors["frame_bg"], corner_radius=8)
-        config_frame.pack(fill="x", padx=20, pady=(0, 20))
-
-        label_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        label_frame.pack(fill="x", padx=15, pady=(15, 10))
-
-        ctk.CTkLabel(
-            label_frame,
-            text=t("settings.beamng_modpath"),
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            config_frame,
-            text=t("settings.beamng_modpath_desc"),
-            font=ctk.CTkFont(size=14),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(fill="x", padx=15, pady=(0, 10))
-
-        path_frame = ctk.CTkFrame(config_frame, fg_color="transparent")
-        path_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-        self.mods_entry = ctk.CTkEntry(
-            path_frame,
-            placeholder_text="No path set",
-            font=ctk.CTkFont(size=12),
-            height=35,
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"]
+        self._desc_lbl = QLabel(t("settings.beamng_paths_desc"))
+        self._desc_lbl.setFont(font(13))
+        self._desc_lbl.setWordWrap(True)
+        self._desc_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        self.mods_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        root.addWidget(self._desc_lbl)
+        root.addWidget(HSeparator())
 
-        btn_frame = ctk.CTkFrame(path_frame, fg_color="transparent")
-        btn_frame.pack(side="right")
+        # BeamNG install path
+        root.addWidget(self._path_row(
+            label=t("settings.beamng_install"),
+            desc=t("settings.beamng_uvpath_desc"),
+            attr_name="beamng",
+            browse_cb=self._browse_beamng,
+        ))
 
-        ctk.CTkButton(
-            btn_frame,
-            text=t("common.browse"),
-            command=self._browse_mods,
-            width=80,
-            height=35,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            font=ctk.CTkFont(size=12, weight="bold")
-        ).pack(side="left", padx=(0, 5))
+        # Mods folder path
+        root.addWidget(self._path_row(
+            label=t("settings.beamng_modpath"),
+            desc=t("settings.beamng_modpath_desc"),
+            attr_name="mods",
+            browse_cb=self._browse_mods,
+        ))
 
-        self.mods_status = ctk.CTkLabel(
-            config_frame,
-            text="",
-            font=ctk.CTkFont(size=11),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
+    def _path_row(
+        self,
+        label: str,
+        desc:  str,
+        attr_name: str,
+        browse_cb: Callable,
+    ) -> QFrame:
+        """Build a single path input row."""
+        row_frame = QFrame()
+        row_frame.setObjectName("pathRow")
+        # Scoped to #pathRow so the rule does not bleed into nested children.
+        row_frame.setStyleSheet(f"""
+            #pathRow {{
+                background-color: {COLORS['frame_bg']};
+                border-radius: 10px;
+                border: none;
+            }}
+        """)
+        inner = QVBoxLayout(row_frame)
+        inner.setContentsMargins(16, 14, 16, 14)
+        inner.setSpacing(8)
+
+        lbl = QLabel(label)
+        lbl.setFont(font(13, "bold"))
+        lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        inner.addWidget(lbl)
+
+        d_lbl = QLabel(desc)
+        d_lbl.setFont(font(12))
+        d_lbl.setWordWrap(True)
+        d_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        inner.addWidget(d_lbl)
+
+        entry_row = QHBoxLayout()
+        entry_row.setSpacing(8)
+
+        entry = QLineEdit()
+        entry.setMinimumHeight(34)
+        entry.setFont(font(12))
+        entry.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['card_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:7px;
+                padding:4px 10px;
+                font-size:12px;
+            }}
+            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
+        """)
+        entry_row.addWidget(entry, 1)
+
+        btn = AnimButton(
+            t("common.browse"),
+            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
+            font_size=12, bold=True, padding="6px 14px",
         )
-        self.mods_status.pack(fill="x", padx=15, pady=(0, 10))
+        btn.setFixedHeight(34)
+        btn.clicked.connect(browse_cb)
+        entry_row.addWidget(btn)
+        inner.addLayout(entry_row)
+
+        status = QLabel("")
+        status.setFont(font(11))
+        status.setStyleSheet("background:transparent;border:none;")
+        inner.addWidget(status)
+
+        # stash refs — label/desc/browse button stored for refresh_ui()
+        setattr(self, f"_{attr_name}_entry",      entry)
+        setattr(self, f"_{attr_name}_status",     status)
+        setattr(self, f"_{attr_name}_row_label",  lbl)
+        setattr(self, f"_{attr_name}_row_desc",   d_lbl)
+        setattr(self, f"_{attr_name}_browse_btn", btn)
+        return row_frame
+
+
+    def refresh_ui(self):
+        print(f"[DEBUG] PathConfigurationSection.refresh_ui: updating labels and reloading paths")
+        """Update all translatable strings in-place (called on language change)."""
+        self._hdr_lbl.setText(t("settings.beamng_paths"))
+        self._desc_lbl.setText(t("settings.beamng_paths_desc"))
+
+        self._beamng_row_label.setText(t("settings.beamng_install"))
+        self._beamng_row_desc.setText(t("settings.beamng_uvpath_desc"))
+        self._beamng_browse_btn.setText(t("common.browse"))
+
+        self._mods_row_label.setText(t("settings.beamng_modpath"))
+        self._mods_row_desc.setText(t("settings.beamng_modpath_desc"))
+        self._mods_browse_btn.setText(t("common.browse"))
+
+        # Reload saved path values — they may have been set by the setup
+        # wizard after this widget was first initialised.
+        self._load_current_paths()
+
 
     def _load_current_paths(self):
-        beamng_path = get_beamng_install_path()
-        mods_path = get_mods_folder_path()
-
-        if beamng_path:
-            self.beamng_entry.delete(0, "end")
-            self.beamng_entry.insert(0, beamng_path)
-            self._validate_beamng_path(beamng_path, show_success=False)
-
-        if mods_path:
-            self.mods_entry.delete(0, "end")
-            self.mods_entry.insert(0, mods_path)
-            self._validate_mods_path(mods_path, show_success=False)
+        bp = get_beamng_install_path()
+        mp = get_mods_folder_path()
+        if bp:
+            self._beamng_entry.setText(bp)
+            self._validate_beamng(bp, show_success=False)
+        if mp:
+            self._mods_entry.setText(mp)
+            self._validate_mods(mp, show_success=False)
 
     def reload_paths(self):
-        print("[DEBUG] PathConfigurationSection.reload_paths called")
+        print(f"[DEBUG] PathConfigurationSection.reload_paths: refreshing path entries")
         self._load_current_paths()
 
+
     def _browse_beamng(self):
-        print("[DEBUG] PathConfiguration._browse_beamng called")
-
-        initial_dir = get_beamng_install_path()
-
-        if not initial_dir or not os.path.exists(initial_dir):
-
-            default_paths = get_beamng_default_install_paths()
-            if default_paths:
-                initial_dir = default_paths[0]
-            else:
-                initial_dir = os.path.expanduser("~")
-
-        print(f"[DEBUG] Initial directory: {initial_dir}")
-        print(f"[DEBUG] Platform: {self.system}")
-
-        path = filedialog.askdirectory(
-            title="Select BeamNG.drive Installation Folder",
-            initialdir=initial_dir
+        print(f"[DEBUG] _browse_beamng: opening BeamNG install folder dialog")
+        init = get_beamng_install_path() or ""
+        if not init or not os.path.exists(init):
+            defaults = get_beamng_default_install_paths()
+            init = defaults[0] if defaults else os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(
+            self, t("settings.beamng_browse_title"), init
         )
-
-        print(f"[DEBUG] User selected path: {path}")
-
-        if path:
-            print(f"[DEBUG] Validating path...")
-            if self._validate_beamng_path(path):
-                print(f"[DEBUG] Path valid, saving...")
-                self.beamng_entry.delete(0, "end")
-                self.beamng_entry.insert(0, path)
-                set_beamng_paths(beamng_install=path)
-
-                if self.notification_callback:
-                    self.notification_callback(
-                        "BeamNG.drive installation path updated successfully",
-                        type="success"
-                    )
-                print(f"[DEBUG] Path saved successfully")
-            else:
-                print(f"[DEBUG] Path validation failed")
-        else:
-            print("[DEBUG] User cancelled dialog")
+        if path and self._validate_beamng(path):
+            self._beamng_entry.setText(path)
+            set_beamng_paths(beamng_install=path)
+            if self.notification_callback:
+                self.notification_callback(
+                    t("settings.beamng_path_updated"), type="success"
+                )
 
     def _browse_mods(self):
-        print("[DEBUG] PathConfiguration._browse_mods called")
-
-        initial_dir = get_mods_folder_path()
-
-        if not initial_dir or not os.path.exists(initial_dir):
-
-            default_paths = get_beamng_mods_default_paths()
-            if default_paths:
-                initial_dir = default_paths[0]
+        print(f"[DEBUG] _browse_mods: opening mods folder dialog")
+        init = get_mods_folder_path() or ""
+        if not init or not os.path.exists(init):
+            if self.system == "Windows":
+                beamng_current = os.path.join(
+                    os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local")),
+                    "BeamNG", "BeamNG.drive", "current",
+                )
+                desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+                if os.path.exists(beamng_current):
+                    init = beamng_current
+                elif os.path.exists(desktop):
+                    init = desktop
+                else:
+                    init = os.path.expanduser("~")
             else:
-                initial_dir = os.path.expanduser("~")
-
-        print(f"[DEBUG] Initial mods directory: {initial_dir}")
-
-        path = filedialog.askdirectory(
-            title="Select BeamNG Mods Folder",
-            initialdir=initial_dir
+                defaults = get_beamng_mods_default_paths()
+                init = defaults[0] if defaults else os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(
+            self, t("settings.mods_browse_title"), init
         )
+        if path and self._validate_mods(path):
+            self._mods_entry.setText(path)
+            set_beamng_paths(mods_folder=path)
+            if self.notification_callback:
+                self.notification_callback(
+                    t("settings.mods_path_updated"), type="success"
+                )
 
-        print(f"[DEBUG] User selected mods path: {path}")
 
-        if path:
-            if self._validate_mods_path(path):
-                self.mods_entry.delete(0, "end")
-                self.mods_entry.insert(0, path)
-                set_beamng_paths(mods_folder=path)
+    def _status(self, attr: str, text: str, ok: bool):
+        color = COLORS["success"] if ok else COLORS["error"]
+        lbl: QLabel = getattr(self, f"_{attr}_status")
+        lbl.setText(text)
+        lbl.setStyleSheet(f"color:{color};background:transparent;")
 
-                if self.notification_callback:
-                    self.notification_callback(
-                        "Mods folder path updated successfully",
-                        type="success"
-                    )
-                print(f"[DEBUG] Mods path saved successfully")
-
-    def _clear_beamng(self):
-        """Clear BeamNG installation path"""
-        self.beamng_entry.delete(0, "end")
-        self.beamng_status.configure(text="")
-        set_beamng_paths(beamng_install="")
-
-        if self.notification_callback:
-            self.notification_callback(
-                "BeamNG.drive installation path cleared",
-                type="info"
-            )
-
-    def _clear_mods(self):
-        """Clear mods folder path"""
-        self.mods_entry.delete(0, "end")
-        self.mods_status.configure(text="")
-        set_beamng_paths(mods_folder="")
-
-        if self.notification_callback:
-            self.notification_callback(
-                "Mods folder path cleared",
-                type="info"
-            )
-
-    def _validate_beamng_path(self, path: str, show_success: bool = True) -> bool:
-        """Validate BeamNG.drive installation path - Cross-platform"""
+    def _validate_beamng(self, path: str, show_success: bool = True) -> bool:
+        print(f"[DEBUG] _validate_beamng: validating path")
         if not os.path.exists(path):
-            self.beamng_status.configure(
-                text="✗ Path does not exist",
-                text_color=state.colors["error"]
-            )
+            self._status("beamng", t("settings.path_not_exist"), False)
             return False
-
-        if self.system == "Windows":
-
-            exe_path_64 = os.path.join(path, "Bin64", "BeamNG.drive.x64.exe")
-            exe_path = os.path.join(path, "Bin64", "BeamNG.drive.exe")
-            has_exe = os.path.exists(exe_path_64) or os.path.exists(exe_path)
-
-        elif self.system == "Linux":
-
-            exe_path = os.path.join(path, "BeamNG.drive.x64")
-            exe_path_alt = os.path.join(path, "Bin64", "BeamNG.drive.x64")
-            exe_path_alt2 = os.path.join(path, "BeamNG")
-            has_exe = (os.path.exists(exe_path) or
-                      os.path.exists(exe_path_alt) or
-                      os.path.exists(exe_path_alt2))
-
-        elif self.system == "Darwin":
-
-            if path.endswith(".app"):
-                has_exe = os.path.isdir(path)
-            else:
-                exe_path = os.path.join(path, "BeamNG.drive")
-                exe_path_alt = os.path.join(path, "Bin64", "BeamNG.drive")
-                has_exe = os.path.exists(exe_path) or os.path.exists(exe_path_alt)
-
+        sys = self.system
+        if sys == "Windows":
+            ok = (os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.x64.exe"))
+                  or os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.exe")))
+        elif sys == "Linux":
+            ok = any(
+                os.path.exists(os.path.join(path, p))
+                for p in ["BeamNG.drive.x64", "Bin64/BeamNG.drive.x64", "BeamNG"]
+            )
+        elif sys == "Darwin":
+            ok = path.endswith(".app") or os.path.exists(os.path.join(path, "BeamNG.drive"))
         else:
-
-            has_exe = True
-
-        content_path = os.path.join(path, "content")
-        has_content = os.path.exists(content_path) and os.path.isdir(content_path)
-
-        if not has_exe or not has_content:
-            self.beamng_status.configure(
-                text="✗ Invalid BeamNG.drive installation",
-                text_color=state.colors["error"]
-            )
+            ok = True
+        content_ok = os.path.isdir(os.path.join(path, "content"))
+        if not ok or not content_ok:
+            self._status("beamng", t("settings.invalid_beamng_install"), False)
             return False
-
         if show_success:
-            self.beamng_status.configure(
-                text="✓ Valid BeamNG.drive installation",
-                text_color=state.colors["success"]
-            )
+            self._status("beamng", t("settings.valid_beamng_install"), True)
         else:
-            self.beamng_status.configure(text="")
-
+            self._beamng_status.setText("")
         return True
 
-    def _validate_mods_path(self, path: str, show_success: bool = True) -> bool:
-        """Validate mods folder path - accepts any existing directory named 'mods'"""
-        if not path or not path.strip():
-            self.mods_status.configure(
-                text="✗ No path provided",
-                text_color=state.colors["error"]
-            )
+    def _validate_mods(self, path: str, show_success: bool = True) -> bool:
+        print(f"[DEBUG] _validate_mods: validating mods folder")
+        if not path or not os.path.exists(path) or not os.path.isdir(path):
+            self._status("mods", t("settings.path_not_exist_or_dir"), False)
             return False
-            
-        if not os.path.exists(path):
-            self.mods_status.configure(
-                text="✗ Path does not exist",
-                text_color=state.colors["error"]
-            )
+        name = os.path.basename(path).lower()
+        if name != "mods":
+            self._status("mods", t("settings.mods_must_end_with_mods"), False)
             return False
-
-        if not os.path.isdir(path):
-            self.mods_status.configure(
-                text="✗ Path is not a directory",
-                text_color=state.colors["error"]
-            )
-            return False
-
-        # Check if the folder is named "mods" or is clearly a mods folder
-        folder_name = os.path.basename(path).lower()
-        if folder_name != "mods":
-            # Allow it anyway but show a warning
-            if show_success:
-                self.mods_status.configure(
-                    text="⚠ Valid directory (not named 'mods', but accepted)",
-                    text_color=state.colors["warning"]
-                )
-            else:
-                self.mods_status.configure(text="")
+        if show_success:
+            self._status("mods", t("settings.valid_mods_folder"), True)
         else:
-            if show_success:
-                self.mods_status.configure(
-                    text="✓ Valid mods folder",
-                    text_color=state.colors["success"]
-                )
-            else:
-                self.mods_status.configure(text="")
-
+            self._mods_status.setText("")
         return True
 
-    def pack(self, **kwargs):
-        """Pack the section frame"""
-        self.frame.pack(**kwargs)
+
+    def pack(self, **_):
+        self.show()
 
     def pack_forget(self):
-        """Hide the section frame"""
-        self.frame.pack_forget()
+        self.hide()

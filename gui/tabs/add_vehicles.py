@@ -1,799 +1,1681 @@
-"""
-Add Vehicles Tab - Custom Vehicle Management
-"""
-import customtkinter as ctk
-from tkinter import filedialog
-from typing import Callable, Optional
-import os
-import json
-import sys
+from __future__ import annotations
 
-from gui.state import state
-from core.localization import t
+import os
+import shutil
+from typing import Optional, List
+
+from PySide6.QtCore    import Qt, Signal, QTimer, QThread
+from PySide6.QtWidgets import (
+    QWidget, QFrame, QLabel, QPushButton, QLineEdit, QCheckBox,
+    QVBoxLayout, QHBoxLayout, QScrollArea, QTabWidget,
+    QFileDialog, QSizePolicy, QApplication,
+)
+
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.widgets import AnimButton, GhostButton, Card, HSeparator, Toast
+from gui.state   import state
 
 try:
-    from gui import confirmation_dialog
+    from core.localization import t
 except ImportError:
-    try:
-        import gui.confirmation_dialog as confirmation_dialog
-    except ImportError:
-        print("[WARNING] confirmation_dialog module not found, will use fallback dialogs")
-        confirmation_dialog = None
+    def t(key, **kw): return key
 
-def load_added_vehicles_at_startup():
+try:
+    from core.add_vehicles import (
+        process_custom_vehicle,
+        delete_custom_vehicle,
+        process_custom_variant,
+        delete_custom_variant,
+    )
+    from utils.file_ops import (
+        load_added_vehicles_json,
+        load_added_variants_json,
+    )
+    _BACKEND_OK = True
+except ImportError as _e:
+    print(f"[WARNING] add_vehicles tab: backend import failed: {_e}")
+    _BACKEND_OK = False
 
-    print(f"[DEBUG] load_added_vehicles_at_startup called")
-    """Load added_vehicles.json at application startup
+try:
+    from core.mod_scanner import scan_mod, DiscoveredVehicle, DiscoveredVariant
+    _SCANNER_OK = True
+except ImportError:
+    _SCANNER_OK = False
 
-    This should be called from state.py or main_window.py during initialization
-    to ensure custom vehicles are loaded from disk on app launch.
+try:
+    from core.settings import get_mods_folder_path as _get_mods_folder_path
+except ImportError:
+    def _get_mods_folder_path(): return ""
+
+
+def _mods_start_dir() -> str:
+    """Return the configured mods folder if it exists, else an empty string."""
+    p = _get_mods_folder_path()
+    return p if p and os.path.isdir(p) else ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UV-map copy helper (used by smart import)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _copy_uv_maps_to_images(carid: str, uv_map_paths: list) -> None:
     """
-    try:
-        vehicles_folder = "vehicles"
-        json_path = os.path.join(vehicles_folder, "added_vehicles.json")
+    Copy UV-layout images found during mod scanning into the vehicle's local
+    image folder (``gui/images/vehicles/{carid}/``) so that CarListTab can
+    offer a "Get UV Map" button for custom-added vehicles without requiring
+    BeamNG to be installed.
 
-        if not os.path.exists(json_path):
-            print(f"[DEBUG] No added_vehicles.json found at startup - will create on first save")
+    Files are only written if they do not already exist at the destination,
+    so repeated imports are safe.
+    """
+    if not uv_map_paths:
+        return
+    # add_vehicles.py lives at  gui/tabs/add_vehicles.py
+    # → two levels up is the gui/ package root
+    _gui_dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dest_dir  = os.path.join(_gui_dir, "images", "vehicles", carid)
+    os.makedirs(dest_dir, exist_ok=True)
+    for src in uv_map_paths:
+        try:
+            dest = os.path.join(dest_dir, os.path.basename(src))
+            if not os.path.exists(dest):
+                shutil.copy2(src, dest)
+                print(f"[add_vehicles] Copied UV map: {os.path.basename(src)} → {dest_dir}")
+        except Exception as e:
+            print(f"[WARNING] _copy_uv_maps_to_images: could not copy {src}: {e}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Small helpers / shared widgets
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _mk_action_btn(text: str, color_key: str = "accent") -> QPushButton:
+    btn = QPushButton(text)
+    btn.setFont(font(12, "bold"))
+    btn.setFixedHeight(36)
+    btn.setCursor(Qt.PointingHandCursor)
+    bg   = COLORS[color_key]
+    bg_h = COLORS.get(f"{color_key}_hover", bg)
+    bg_d = COLORS.get(f"{color_key}_dim",   bg)
+    tc   = COLORS.get("accent_text", "#ffffff")
+    btn.setStyleSheet(f"""
+        QPushButton {{
+            background:{bg}; color:{tc};
+            border:none; border-radius:8px; padding:4px 16px;
+        }}
+        QPushButton:hover   {{ background:{bg_h}; }}
+        QPushButton:pressed {{ background:{bg_d}; }}
+        QPushButton:disabled {{
+            background:{COLORS['border']};
+            color:{COLORS['text_muted']};
+        }}
+    """)
+    return btn
+
+
+class _FilePicker(QWidget):
+    """Label + read-only entry + Browse button."""
+
+    def __init__(self, label: str, placeholder: str = "", parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background:transparent;")
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(4)
+
+        self._lbl = QLabel(label)
+        self._lbl.setFont(font(11, "bold"))
+        self._lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        col.addWidget(self._lbl)
+
+        row = QHBoxLayout()
+        self.entry = QLineEdit()
+        self.entry.setPlaceholderText(placeholder)
+        self.entry.setReadOnly(True)
+        self.entry.setFixedHeight(34)
+        self.entry.setFont(font(12))
+        self.entry.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:none;
+                border-radius:7px;
+                padding:4px 8px;
+            }}
+            QLineEdit:read-only {{ color:{COLORS['text_secondary']}; }}
+        """)
+        row.addWidget(self.entry)
+
+        self.btn = QPushButton(t("add_vehicles.browse_btn", default="Browse"))
+        self.btn.setFont(font(11, "bold"))
+        self.btn.setFixedSize(90, 34)
+        self.btn.setCursor(Qt.PointingHandCursor)
+        self.btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{COLORS['accent']};
+                color:{COLORS['accent_text']};
+                border:none; border-radius:7px;
+            }}
+            QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
+            QPushButton:pressed {{ background:{COLORS['accent_dim']}; }}
+        """)
+        row.addWidget(self.btn)
+        col.addLayout(row)
+
+    def set_label(self, text: str):       self._lbl.setText(text)
+    def set_placeholder(self, text: str): self.entry.setPlaceholderText(text)
+    def retranslate_browse_btn(self):     self.btn.setText(t("add_vehicles.browse_btn", default="Browse"))
+    def path(self) -> str:                return self.entry.text()
+    def set_path(self, p: str):           self.entry.setText(p)
+    def clear(self):                      self.entry.clear()
+
+
+class _EntryField(QWidget):
+    """Label + editable QLineEdit."""
+
+    def __init__(self, label: str, placeholder: str = "", parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background:transparent;")
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(4)
+
+        self._lbl = QLabel(label)
+        self._lbl.setFont(font(11, "bold"))
+        self._lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        col.addWidget(self._lbl)
+
+        self.entry = QLineEdit()
+        self.entry.setPlaceholderText(placeholder)
+        self.entry.setFixedHeight(34)
+        self.entry.setFont(font(13))
+        self.entry.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:none;
+                border-radius:7px;
+                padding:4px 8px;
+                selection-background-color:{COLORS['accent']};
+            }}
+        """)
+        col.addWidget(self.entry)
+
+    def set_label(self, text: str):       self._lbl.setText(text)
+    def set_placeholder(self, text: str): self.entry.setPlaceholderText(text)
+    def text(self) -> str:                return self.entry.text().strip()
+    def clear(self):                      self.entry.clear()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Discovered vehicle row
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _DiscoveredVehicleRow(QFrame):
+    """
+    One row inside the smart-import results list representing a discovered vehicle.
+    Shows: [checkbox] [carid badge] [editable display name] [file status] [warnings]
+    """
+
+    def __init__(self, vehicle: DiscoveredVehicle, parent=None):
+        super().__init__(parent)
+        self.vehicle = vehicle
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:8px;
+            }}
+        """)
+        self.setFixedHeight(52)
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 6, 10, 6)
+        row.setSpacing(10)
+
+        # Checkbox
+        self._chk = QCheckBox()
+        self._chk.setChecked(vehicle.ready)
+        self._chk.setEnabled(vehicle.ready)
+        self._chk.setStyleSheet(f"""
+            QCheckBox::indicator {{
+                width:18px; height:18px;
+                border-radius:4px;
+                border:2px solid {COLORS['border']};
+                background:{COLORS['frame_bg']};
+            }}
+            QCheckBox::indicator:checked {{
+                background:{COLORS['accent']};
+                border-color:{COLORS['accent']};
+            }}
+        """)
+        row.addWidget(self._chk)
+
+        # carid badge
+        carid_lbl = QLabel(vehicle.carid)
+        carid_lbl.setFont(font(10, "bold"))
+        carid_lbl.setStyleSheet(f"""
+            color:{COLORS['accent']};
+            background:{COLORS['frame_bg']};
+            border:none;
+            border-radius:5px;
+            padding:2px 7px;
+        """)
+        carid_lbl.setFixedWidth(110)
+        carid_lbl.setAlignment(Qt.AlignCenter)
+        row.addWidget(carid_lbl)
+
+        # Display name (editable)
+        self._name_edit = QLineEdit(vehicle.display_name)
+        self._name_edit.setFont(font(12))
+        self._name_edit.setFixedHeight(30)
+        self._name_edit.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:none;
+                border-radius:6px;
+                padding:2px 8px;
+            }}
+        """)
+        row.addWidget(self._name_edit, 1)
+
+        # File status chips
+        status_row = QHBoxLayout()
+        status_row.setSpacing(4)
+
+        def _chip(text: str, ok: bool) -> QLabel:
+            lbl = QLabel(text)
+            lbl.setFont(font(10, "bold"))
+            clr = COLORS.get("success", "#4ade80") if ok else COLORS.get("error", "#f87171")
+            dim = COLORS.get("success_dim", "#166534") if ok else COLORS.get("error_dim", "#7f1d1d")
+            lbl.setStyleSheet(f"""
+                color:{clr};
+                background:{dim};
+                border:none;
+                border-radius:4px;
+                padding:1px 6px;
+            """)
+            return lbl
+
+        status_row.addWidget(_chip("JSON",  bool(vehicle.json_path)))
+        status_row.addWidget(_chip("JBEAM", bool(vehicle.jbeam_path)))
+        status_row.addWidget(_chip("IMG",   bool(vehicle.image_path)))
+        row.addLayout(status_row)
+
+        # Warning icon if not ready
+        if not vehicle.ready:
+            warn_lbl = QLabel("⚠")
+            warn_lbl.setFont(font(14))
+            warn_lbl.setStyleSheet(f"color:{COLORS.get('warning', '#facc15')};background:transparent;")
+            warn_lbl.setToolTip("\n".join(vehicle.warnings))
+            row.addWidget(warn_lbl)
+
+    @property
+    def is_checked(self) -> bool:
+        return self._chk.isChecked()
+
+    @property
+    def display_name(self) -> str:
+        return self._name_edit.text().strip() or self.vehicle.display_name
+
+
+class _DiscoveredVariantRow(QFrame):
+    """One row for a discovered body variant."""
+
+    def __init__(self, variant: DiscoveredVariant, parent=None):
+        super().__init__(parent)
+        self.variant = variant
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:8px;
+            }}
+        """)
+        self.setFixedHeight(52)
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 6, 10, 6)
+        row.setSpacing(10)
+
+        self._chk = QCheckBox()
+        self._chk.setChecked(variant.ready)
+        self._chk.setEnabled(variant.ready)
+        self._chk.setStyleSheet(f"""
+            QCheckBox::indicator {{
+                width:18px; height:18px;
+                border-radius:4px;
+                border:2px solid {COLORS['border']};
+                background:{COLORS['frame_bg']};
+            }}
+            QCheckBox::indicator:checked {{
+                background:{COLORS['accent']};
+                border-color:{COLORS['accent']};
+            }}
+        """)
+        row.addWidget(self._chk)
+
+        # "carid + suffix" badge
+        badge_lbl = QLabel(f"{variant.carid}  +  {variant.suffix}")
+        badge_lbl.setFont(font(10, "bold"))
+        badge_lbl.setStyleSheet(f"""
+            color:{COLORS['accent']};
+            background:{COLORS['frame_bg']};
+            border:none;
+            border-radius:5px;
+            padding:2px 7px;
+        """)
+        badge_lbl.setFixedWidth(160)
+        badge_lbl.setAlignment(Qt.AlignCenter)
+        row.addWidget(badge_lbl)
+
+        # Display name (editable)
+        self._name_edit = QLineEdit(variant.display_name)
+        self._name_edit.setFont(font(12))
+        self._name_edit.setFixedHeight(30)
+        self._name_edit.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:none;
+                border-radius:6px;
+                padding:2px 8px;
+            }}
+        """)
+        row.addWidget(self._name_edit, 1)
+
+        # Folder preview
+        folder_lbl = QLabel(f"SKINNAME_{variant.suffix}/")
+        folder_lbl.setFont(font(10))
+        folder_lbl.setStyleSheet(
+            f"color:{COLORS['text_muted']};background:transparent;border:none;"
+        )
+        row.addWidget(folder_lbl)
+
+        # File status
+        def _chip(text: str, ok: bool) -> QLabel:
+            lbl = QLabel(text)
+            lbl.setFont(font(10, "bold"))
+            clr = COLORS.get("success", "#4ade80") if ok else COLORS.get("error", "#f87171")
+            dim = COLORS.get("success_dim", "#166534") if ok else COLORS.get("error_dim", "#7f1d1d")
+            lbl.setStyleSheet(f"color:{clr};background:{dim};border:none;border-radius:4px;padding:1px 6px;")
+            return lbl
+
+        status_row = QHBoxLayout()
+        status_row.setSpacing(4)
+        status_row.addWidget(_chip("JSON",  bool(variant.json_path)))
+        status_row.addWidget(_chip("JBEAM", bool(variant.jbeam_path)))
+        row.addLayout(status_row)
+
+        if not variant.ready:
+            warn_lbl = QLabel("⚠")
+            warn_lbl.setFont(font(14))
+            warn_lbl.setStyleSheet(
+                f"color:{COLORS.get('warning','#facc15')};background:transparent;"
+            )
+            warn_lbl.setToolTip("\n".join(variant.warnings))
+            row.addWidget(warn_lbl)
+
+    @property
+    def is_checked(self) -> bool:
+        return self._chk.isChecked()
+
+    @property
+    def display_name(self) -> str:
+        return self._name_edit.text().strip() or self.variant.display_name
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Smart Import Card  (shared base logic for vehicles + variants)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Background scan worker
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _ScanWorker(QThread):
+    """Runs scan_mod on a background thread so the UI stays responsive."""
+
+    finished = Signal(list, list, object)   # vehicles, variants, temp_dir
+    failed   = Signal(str)                  # error message
+
+    def __init__(self, path: str, known_carids, parent=None):
+        super().__init__(parent)
+        self._path        = path
+        self._known       = known_carids
+
+    def run(self):
+        try:
+            vehicles, variants, tmp = scan_mod(self._path, known_carids=self._known)
+            self.finished.emit(vehicles, variants, tmp)
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
+class _SmartImportCard(QFrame):
+    """
+    Card with two browse buttons (Folder / ZIP), a scan status label, and a
+    scrollable list of discovered items.  Sub-classed for Vehicles and Variants.
+    """
+
+    # Signal emitted after a successful add; used to refresh the parent list.
+    items_added = Signal()
+
+    def __init__(self, notify_fn, mode: str = "vehicles", parent=None):
+        """
+        mode : "vehicles"  → scans for new vehicles
+               "variants"  → scans for variants of existing vehicles
+        """
+        super().__init__(parent)
+        self._notify   = notify_fn
+        self._mode     = mode          # "vehicles" or "variants"
+        self._temp_dir: Optional[str] = None
+        self._rows:     list = []      # _DiscoveredVehicleRow | _DiscoveredVariantRow
+        self._worker:   Optional[_ScanWorker] = None
+
+        # Animated dots timer for the "Scanning…" label
+        self._dot_timer = QTimer(self)
+        self._dot_timer.setInterval(400)
+        self._dot_timer.timeout.connect(self._tick_dots)
+        self._dot_count = 0
+
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:12px;
+            }}
+        """)
+        drop_shadow(self)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 18, 20, 18)
+        root.setSpacing(12)
+
+        # ── Header ──────────────────────────────────────────────────────────
+        title_text = (
+            t("add_vehicles.smart_import_title_vehicles", default="🔍  Auto-Import Vehicles from Mod")
+            if mode == "vehicles"
+            else t("add_vehicles.smart_import_title_variants", default="🔍  Auto-Import Variants from Mod")
+        )
+        self._title_lbl = QLabel(title_text)
+        self._title_lbl.setFont(font(15, "bold"))
+        self._title_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        root.addWidget(self._title_lbl)
+
+        sub_text = (
+            t("add_vehicles.smart_import_subtitle_vehicles",
+              default="Select a mod folder or ZIP — BeamSkin Studio will find the vehicles automatically.")
+            if mode == "vehicles"
+            else t("add_vehicles.smart_import_subtitle_variants",
+                   default="Select a mod folder or ZIP — BeamSkin Studio will detect body variants automatically.")
+        )
+        self._sub_lbl = QLabel(sub_text)
+        self._sub_lbl.setFont(font(11))
+        self._sub_lbl.setWordWrap(True)
+        self._sub_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        root.addWidget(self._sub_lbl)
+
+        # ── Browse buttons ───────────────────────────────────────────────────
+        browse_row = QHBoxLayout()
+        browse_row.setSpacing(8)
+
+        self._btn_folder = _mk_action_btn(t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"))
+        self._btn_folder.setFixedHeight(38)
+        self._btn_folder.clicked.connect(self._browse_folder)
+        browse_row.addWidget(self._btn_folder)
+
+        self._btn_zip = _mk_action_btn(t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"))
+        self._btn_zip.setFixedHeight(38)
+        self._btn_zip.clicked.connect(self._browse_zip)
+        browse_row.addWidget(self._btn_zip)
+
+        browse_row.addStretch()
+        root.addLayout(browse_row)
+
+        # ── Path display ─────────────────────────────────────────────────────
+        self._path_lbl = QLabel("")
+        self._path_lbl.setFont(font(10))
+        self._path_lbl.setWordWrap(True)
+        self._path_lbl.setStyleSheet(
+            f"color:{COLORS['text_muted']};background:transparent;"
+        )
+        self._path_lbl.setVisible(False)
+        root.addWidget(self._path_lbl)
+
+        # ── Scan status ──────────────────────────────────────────────────────
+        self._status_lbl = QLabel("")
+        self._status_lbl.setFont(font(11))
+        self._status_lbl.setWordWrap(True)
+        self._status_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        self._status_lbl.setVisible(False)
+        root.addWidget(self._status_lbl)
+
+        # ── Discovered list ──────────────────────────────────────────────────
+        self._list_frame = QFrame()
+        self._list_frame.setStyleSheet("background:transparent;")
+        self._list_col   = QVBoxLayout(self._list_frame)
+        self._list_col.setContentsMargins(0, 0, 0, 0)
+        self._list_col.setSpacing(6)
+        self._list_frame.setVisible(False)
+        root.addWidget(self._list_frame)
+
+        # ── Bottom actions ───────────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        self._select_all_btn = GhostButton(t("add_vehicles.select_all_btn", default="Select All"))
+        self._select_all_btn.setFixedHeight(34)
+        self._select_all_btn.clicked.connect(self._select_all)
+        self._select_all_btn.setVisible(False)
+        btn_row.addWidget(self._select_all_btn)
+
+        btn_row.addStretch()
+
+        self._add_btn = _mk_action_btn(t("add_vehicles.add_checked_btn", default="Add Checked"))
+        self._add_btn.setFixedHeight(38)
+        self._add_btn.clicked.connect(self._on_add_checked)
+        self._add_btn.setVisible(False)
+        btn_row.addWidget(self._add_btn)
+
+        root.addLayout(btn_row)
+
+    # ── Browse ───────────────────────────────────────────────────────────────
+
+    def _browse_folder(self):
+        path = QFileDialog.getExistingDirectory(
+            self, t("add_vehicles.browse_folder_dialog", default="Select Mod Folder"),
+            _mods_start_dir(),
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
+        )
+        if path:
+            self._run_scan(path)
+
+    def _browse_zip(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, t("add_vehicles.browse_zip_dialog", default="Select Mod ZIP"), _mods_start_dir(),
+            "ZIP Archives (*.zip);;All Files (*)",
+        )
+        if path:
+            self._run_scan(path)
+
+    # ── Scan ─────────────────────────────────────────────────────────────────
+
+    def _run_scan(self, path: str):
+        if not _SCANNER_OK:
+            self._notify(t("add_vehicles.scanner_unavailable", default="Mod scanner not available."), "error")
             return
 
-        print(f"[DEBUG] Loading added_vehicles from: {json_path}")
+        # Clean up any previous temp extraction / worker
+        self._cleanup_temp()
+        if self._worker and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait(500)
 
-        with open(json_path, 'r', encoding='utf-8') as f:
-            loaded_vehicles = json.load(f)
+        # ── Known carids for variant detection ───────────────────────────────
+        known: Optional[set] = None
+        if self._mode == "variants":
+            try:
+                from core.config import VEHICLE_IDS
+                known = set(VEHICLE_IDS.keys())
+                if _BACKEND_OK:
+                    known |= set(load_added_vehicles_json().keys())
+            except Exception:
+                known = set()
 
-        print(f"[DEBUG] Found {len(loaded_vehicles)} custom vehicles in file")
+        # ── Show loading state ────────────────────────────────────────────────
+        self._path_lbl.setText(f"📂 {path}")
+        self._path_lbl.setVisible(True)
+        self._set_scanning(True)
 
-        state.added_vehicles.clear()
-        state.added_vehicles.update(loaded_vehicles)
+        # Clear old rows
+        for row in self._rows:
+            row.setParent(None)
+            row.deleteLater()
+        self._rows.clear()
+        self._list_frame.setVisible(False)
+        self._add_btn.setVisible(False)
+        self._select_all_btn.setVisible(False)
 
-        print(f"[DEBUG] Startup: Loaded {len(state.added_vehicles)} custom vehicles")
+        # ── Launch background worker ──────────────────────────────────────────
+        self._worker = _ScanWorker(path, known, parent=self)
+        self._worker.finished.connect(
+            lambda veh, var, tmp, p=path: self._on_scan_finished(veh, var, tmp, p)
+        )
+        self._worker.failed.connect(self._on_scan_failed)
+        self._worker.start()
 
-    except Exception as e:
-        print(f"[ERROR] Failed to load added_vehicles.json at startup: {e}")
-        import traceback
-        traceback.print_exc()
+    def _set_scanning(self, active: bool):
+        """Show/hide the animated scanning label and disable/enable browse buttons."""
+        self._btn_folder.setEnabled(not active)
+        self._btn_zip.setEnabled(not active)
+        if active:
+            self._dot_count = 0
+            self._status_lbl.setText(t("add_vehicles.scanning", default="🔍  Scanning"))
+            self._status_lbl.setStyleSheet(
+                f"color:{COLORS['accent']};background:transparent;"
+            )
+            self._status_lbl.setVisible(True)
+            self._dot_timer.start()
+        else:
+            self._dot_timer.stop()
+            self._status_lbl.setStyleSheet(
+                f"color:{COLORS['text_secondary']};background:transparent;"
+            )
 
-print(f"[DEBUG] Loading class: AddVehiclesTab")
+    def _tick_dots(self):
+        """Animate trailing dots on the scanning label."""
+        self._dot_count = (self._dot_count + 1) % 4
+        self._status_lbl.setText(t("add_vehicles.scanning", default="🔍  Scanning") + "." * self._dot_count)
 
-class AddVehiclesTab(ctk.CTkFrame):
-    """Complete Add Vehicles tab for custom vehicle management"""
+    def _on_scan_finished(self, vehicles, variants, tmp, path: str):
+        self._set_scanning(False)
+        self._temp_dir = tmp
 
-    def __init__(self, parent: ctk.CTk, notification_callback: Callable[[str, str, int], None] = None,
-                 refresh_callbacks: dict = None):
+        items     = vehicles if self._mode == "vehicles" else variants
+        mod_label = os.path.basename(path)
 
-        print(f"[DEBUG] __init__ called")
-        super().__init__(parent, fg_color=state.colors["app_bg"])
+        if not items:
+            status = (
+                t("add_vehicles.no_vehicles_found", mod=mod_label,
+                  default=f"No vehicles found in \"{mod_label}\".")
+                if self._mode == "vehicles"
+                else t("add_vehicles.no_variants_found", mod=mod_label,
+                       default=f"No variants found in \"{mod_label}\".")
+            )
+            self._status_lbl.setText(status)
+            self._status_lbl.setVisible(True)
+            return
 
-        self.show_notification = notification_callback or self._fallback_notification
+        # ── Build rows ────────────────────────────────────────────────────────
+        count = len(items)
+        ready = sum(1 for i in items if i.ready)
+        self._status_lbl.setText(
+            t("add_vehicles.found_items", count=count, mod=mod_label, ready=ready,
+              default=f"Found {count} item(s) in \"{mod_label}\" ({ready} ready to import).")
+        )
+        self._status_lbl.setVisible(True)
+        self._list_frame.setVisible(True)
+        self._add_btn.setVisible(True)
+        self._select_all_btn.setVisible(count > 1)
+        self._add_btn.setText(
+            t("add_vehicles.add_checked_count_btn", count=ready, default=f"Add Checked ({ready})")
+        )
 
-        self.refresh_callbacks = refresh_callbacks or {}
+        for item in items:
+            if self._mode == "vehicles":
+                row = _DiscoveredVehicleRow(item, self._list_frame)
+            else:
+                row = _DiscoveredVariantRow(item, self._list_frame)
+            self._list_col.addWidget(row)
+            self._rows.append(row)
+            fade_in(row, 120)
 
-        self.carid_var = ctk.StringVar()
-        self.carname_var = ctk.StringVar()
-        self.json_path_var = ctk.StringVar()
-        self.jbeam_path_var = ctk.StringVar()
-        self.image_path_var = ctk.StringVar()
+    def _on_scan_failed(self, error: str):
+        self._set_scanning(False)
+        self._notify(t("add_vehicles.scan_failed", error=error, default=f"Scan failed: {error}"), "error")
 
-        self.dev_search_var = ctk.StringVar()
-        self.dev_search_placeholder = t("common.search_vehicle")
+    # ── Actions ──────────────────────────────────────────────────────────────
 
-        self.dev_status_label: Optional[ctk.CTkLabel] = None
-        self.dev_progress_bar: Optional[ctk.CTkProgressBar] = None
-        self.dev_list_scroll: Optional[ctk.CTkScrollableFrame] = None
+    def _select_all(self):
+        for row in self._rows:
+            if row.vehicle.ready if hasattr(row, 'vehicle') else row.variant.ready:
+                row._chk.setChecked(True)
 
-        self.parent = parent
+    def _on_add_checked(self):
+        checked = [r for r in self._rows if r.is_checked]
+        if not checked:
+            self._notify(t("add_vehicles.no_items_selected", default="No items selected."), "warning")
+            return
 
-        self._setup_ui()
-    def refresh_ui(self):
-        """Refresh all UI text with current language"""
-        # Clear existing widgets
-        for widget in self.winfo_children():
-            widget.destroy()
-        
-        # Recreate UI with new translations
-        self._setup_ui()
+        added   = 0
+        skipped = 0
 
-        self.refresh_developer_list()
+        for row in checked:
+            ok = self._add_one(row)
+            if ok:
+                added += 1
+            else:
+                skipped += 1
 
-    def _fallback_notification(self, message: str, type: str = "info", duration: int = 3000):
-        """Fallback notification"""
-        print(f"[{type.upper()}] {message}")
+        if added:
+            self._notify(
+                t("add_vehicles.imported_success", count=added,
+                  default=f"Imported {added} item(s) successfully."),
+                "success",
+            )
+            self.items_added.emit()
+            # Clear results after successful import
+            self._clear_results()
+        if skipped:
+            self._notify(
+                t("add_vehicles.import_failed_count", count=skipped,
+                  default=f"{skipped} item(s) could not be imported."),
+                "error",
+            )
 
-    def _show_confirmation_dialog(self, title: str, message: str, danger: bool = False) -> bool:
-        """Show confirmation dialog with fallback to tkinter messagebox"""
-        if confirmation_dialog:
+    def _add_one(self, row) -> bool:
+        if not _BACKEND_OK:
+            return False
+        try:
+            if self._mode == "vehicles":
+                v  = row.vehicle
+                ok = process_custom_vehicle(
+                    carid      = v.carid,
+                    carname    = row.display_name,
+                    json_path  = v.json_path,
+                    jbeam_path = v.jbeam_path,
+                    image_path = v.image_path,
+                )
+                # Copy any UV-layout images found during scanning so that
+                # CarListTab can show the "Get UV Map" button offline.
+                if ok:
+                    _copy_uv_maps_to_images(v.carid, getattr(v, "uv_map_paths", []))
+                return ok
+            else:
+                v  = row.variant
+                ok = process_custom_variant(
+                    carid          = v.carid,
+                    variant_suffix = v.suffix,
+                    json_path      = v.json_path,
+                    jbeam_path     = v.jbeam_path,
+                    image_path     = v.image_path,
+                )
+                # Copy any UV-layout images so CarListTab can offer
+                # "Get UV Map" for the parent vehicle without BeamNG installed.
+                if ok:
+                    _copy_uv_maps_to_images(v.carid, getattr(v, "uv_map_paths", []))
+                return ok
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] _add_one failed: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            return False
 
-            return confirmation_dialog.askyesno(
-                parent=self.parent,
-                title=title,
-                message=message,
-                colors=state.colors,
-                icon="🗑️" if danger else "❓",
-                danger=danger
+    def _clear_results(self):
+        for row in self._rows:
+            row.setParent(None)
+            row.deleteLater()
+        self._rows.clear()
+        self._list_frame.setVisible(False)
+        self._add_btn.setVisible(False)
+        self._select_all_btn.setVisible(False)
+        self._status_lbl.setVisible(False)
+        self._path_lbl.setVisible(False)
+        self._cleanup_temp()
+
+    def _cleanup_temp(self):
+        if self._temp_dir and os.path.isdir(self._temp_dir):
+            try:
+                shutil.rmtree(self._temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        self._temp_dir = None
+
+    def __del__(self):
+        self._cleanup_temp()
+
+    # ── Translations ─────────────────────────────────────────────────────────
+
+    def retranslate_ui(self):
+        """Update all translatable strings without rebuilding the widget tree."""
+        if self._mode == "vehicles":
+            self._title_lbl.setText(
+                t("add_vehicles.smart_import_title_vehicles",
+                  default="🔍  Auto-Import Vehicles from Mod")
+            )
+            self._sub_lbl.setText(
+                t("add_vehicles.smart_import_subtitle_vehicles",
+                  default="Select a mod folder or ZIP — BeamSkin Studio will find the vehicles automatically.")
             )
         else:
+            self._title_lbl.setText(
+                t("add_vehicles.smart_import_title_variants",
+                  default="🔍  Auto-Import Variants from Mod")
+            )
+            self._sub_lbl.setText(
+                t("add_vehicles.smart_import_subtitle_variants",
+                  default="Select a mod folder or ZIP — BeamSkin Studio will detect body variants automatically.")
+            )
+        self._btn_folder.setText(t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"))
+        self._btn_zip.setText(t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"))
+        self._select_all_btn.setText(t("add_vehicles.select_all_btn", default="Select All"))
+        # Only retranslate the "Add Checked" button if it doesn't show a
+        # live count (i.e. no scan results are currently displayed).
+        if not self._rows:
+            self._add_btn.setText(t("add_vehicles.add_checked_btn", default="Add Checked"))
 
-            from tkinter import messagebox
-            return messagebox.askyesno(title, message)
 
-    def _save_added_vehicles_to_file(self):
-        """Save added_vehicles to JSON file in vehicles folder
+# ─────────────────────────────────────────────────────────────────────────────
+# Existing-vehicle list cards
+# ─────────────────────────────────────────────────────────────────────────────
 
-        This is the CRITICAL FIX - we need to explicitly save to the JSON file,
-        not rely on save_settings() which may not be working correctly.
-        """
-        try:
-            vehicles_folder = "vehicles"
-            os.makedirs(vehicles_folder, exist_ok=True)
+class _VehicleListCard(QFrame):
+    """A row showing a custom vehicle with a Delete button."""
 
-            json_path = os.path.join(vehicles_folder, "added_vehicles.json")
+    delete_requested = Signal(str)   # carid
 
-            print(f"[DEBUG] Saving added_vehicles to: {json_path}")
-            print(f"[DEBUG] Current added_vehicles: {state.added_vehicles}")
+    def __init__(self, carid: str, carname: str, parent=None):
+        super().__init__(parent)
+        self.carid   = carid
+        self.carname = carname
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:8px;
+            }}
+        """)
+        self.setFixedHeight(46)
 
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(state.added_vehicles, f, indent=2)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(12, 0, 8, 0)
+        row.setSpacing(8)
 
-            print(f"[DEBUG] Successfully saved {len(state.added_vehicles)} vehicles to {json_path}")
-
-            if os.path.exists(json_path):
-                file_size = os.path.getsize(json_path)
-                print(f"[DEBUG] File exists, size: {file_size} bytes")
-
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    verified_data = json.load(f)
-                    print(f"[DEBUG] Verified: File contains {len(verified_data)} vehicles")
-            else:
-                print(f"[ERROR] File was not created at {json_path}")
-
-            return True
-
-        except Exception as e:
-            print(f"[ERROR] Failed to save added_vehicles.json: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-    def _reload_added_vehicles_from_file(self):
-        """Reload added_vehicles from JSON file into state
-
-        CRITICAL FIX: After saving, we need to reload the data into state
-        so that other tabs can see the new vehicles.
-        Also updates vehicle_ids in state so all lookups work correctly.
-        """
-        try:
-            vehicles_folder = "vehicles"
-            json_path = os.path.join(vehicles_folder, "added_vehicles.json")
-
-            if not os.path.exists(json_path):
-                print(f"[DEBUG] No added_vehicles.json file found at {json_path}")
-                return False
-
-            print(f"[DEBUG] Reloading added_vehicles from: {json_path}")
-
-            with open(json_path, 'r', encoding='utf-8') as f:
-                loaded_vehicles = json.load(f)
-
-            print(f"[DEBUG] Loaded {len(loaded_vehicles)} vehicles from file")
-
-            state.added_vehicles.clear()
-            state.added_vehicles.update(loaded_vehicles)
-
-            print(f"[DEBUG] State updated with {len(state.added_vehicles)} custom vehicles")
-            print(f"[DEBUG] Current state.added_vehicles: {state.added_vehicles}")
-
-            return True
-
-        except Exception as e:
-            print(f"[ERROR] Failed to reload added_vehicles.json: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-    def _refresh_all_tabs(self):
-        """Refresh vehicle lists in all tabs after adding/removing a vehicle
-
-        This uses the integrated refresh system from our vehicle management updates.
-        Uses multiple fallback methods to find the main window.
-        """
-        print(f"[DEBUG] _refresh_all_tabs called")
-        print(f"[DEBUG] Current state.added_vehicles: {state.added_vehicles}")
-
-        main_window = None
-
-        try:
-
-            print(f"[DEBUG] Trying method 1: self.master.master")
-            if hasattr(self.master, 'master'):
-                potential_main = self.master.master
-                if hasattr(potential_main, 'tabs'):
-                    main_window = potential_main
-                    print(f"[DEBUG] ✓ Found main window via self.master.master")
-
-            if not main_window:
-                print(f"[DEBUG] Trying method 2: searching widget tree")
-                widget = self.master
-                for level in range(6):
-                    if hasattr(widget, 'tabs'):
-                        main_window = widget
-                        print(f"[DEBUG] ✓ Found main window at level {level} in widget tree")
-                        break
-                    if hasattr(widget, 'master'):
-                        widget = widget.master
-                    else:
-                        break
-
-            if not main_window:
-                print(f"[DEBUG] Trying method 3: winfo_toplevel()")
-                try:
-                    root = self.winfo_toplevel()
-                    if hasattr(root, 'tabs'):
-                        main_window = root
-                        print(f"[DEBUG] ✓ Found main window via winfo_toplevel()")
-                except:
-                    pass
-
-            if not main_window:
-                print(f"[DEBUG] Trying method 4: searching root children")
-                try:
-                    root = self.winfo_toplevel()
-                    for child in root.winfo_children():
-                        if hasattr(child, 'tabs'):
-                            main_window = child
-                            print(f"[DEBUG] ✓ Found main window in root children")
-                            break
-                except:
-                    pass
-
-            if not main_window:
-                print(f"[ERROR] Could not find main window with tabs attribute")
-                print(f"[DEBUG] self.master = {self.master}")
-                print(f"[DEBUG] self.master type = {type(self.master)}")
-                if hasattr(self.master, 'master'):
-                    print(f"[DEBUG] self.master.master = {self.master.master}")
-                    print(f"[DEBUG] self.master.master type = {type(self.master.master)}")
-                return
-
-            print(f"[DEBUG] Main window found: {type(main_window)}")
-            print(f"[DEBUG] Available tabs: {list(main_window.tabs.keys())}")
-
-            generator_tab = main_window.tabs.get('generator')
-            if generator_tab:
-                print(f"[DEBUG] Generator tab found: {type(generator_tab)}")
-                if hasattr(generator_tab, 'refresh_vehicle_list'):
-                    print(f"[DEBUG] Calling generator_tab.refresh_vehicle_list()...")
-                    generator_tab.refresh_vehicle_list()
-                    print(f"[DEBUG] ✓ Generator tab refreshed")
-                else:
-                    print(f"[WARNING] Generator tab missing refresh_vehicle_list method")
-                    print(f"[DEBUG] Generator tab methods: {[m for m in dir(generator_tab) if 'refresh' in m.lower()]}")
-            else:
-                print(f"[WARNING] Generator tab not found in tabs dict")
-
-            carlist_tab = main_window.tabs.get('carlist')
-            if carlist_tab:
-                print(f"[DEBUG] Car list tab found: {type(carlist_tab)}")
-                if hasattr(carlist_tab, 'refresh_vehicle_list'):
-                    print(f"[DEBUG] Calling carlist_tab.refresh_vehicle_list()...")
-                    carlist_tab.refresh_vehicle_list()
-                    print(f"[DEBUG] ✓ Car list tab refreshed")
-                else:
-                    print(f"[WARNING] Car list tab missing refresh_vehicle_list method")
-            else:
-                print(f"[WARNING] Car list tab not found in tabs dict")
-
-            if hasattr(main_window, 'sidebar'):
-                print(f"[DEBUG] Sidebar found, refreshing...")
-                try:
-
-                    if hasattr(state, 'sidebar_vehicle_buttons'):
-                        print(f"[DEBUG] Clearing {len(state.sidebar_vehicle_buttons)} existing sidebar buttons...")
-
-                        for btn_frame, car_id, car_name, add_btn_frame in state.sidebar_vehicle_buttons:
-                            try:
-                                btn_frame.destroy()
-                            except:
-                                pass
-
-                        state.sidebar_vehicle_buttons.clear()
-                        print(f"[DEBUG] Sidebar state cleared")
-
-                    if hasattr(main_window.sidebar, 'populate_vehicles'):
-                        print(f"[DEBUG] Calling sidebar.populate_vehicles()...")
-
-                        if hasattr(main_window, '_add_vehicle_to_project_from_sidebar'):
-                            main_window.sidebar.populate_vehicles(main_window._add_vehicle_to_project_from_sidebar)
-                            print(f"[DEBUG] ✓ Sidebar refreshed")
-                        else:
-                            print(f"[WARNING] Main window missing _add_vehicle_to_project_from_sidebar")
-                    else:
-                        print(f"[WARNING] Sidebar missing populate_vehicles method")
-                except Exception as e:
-                    print(f"[ERROR] Failed to refresh sidebar: {e}")
-                    import traceback
-                    traceback.print_exc()
-            else:
-                print(f"[WARNING] Main window has no sidebar attribute")
-
-            print(f"[DEBUG] _refresh_all_tabs completed")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to refresh tabs: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def _setup_ui(self):
-        """Set up the developer tab UI"""
-
-        # Refresh the placeholder text for the current language
-        self.dev_search_placeholder = t("common.search_vehicle")
-
-        warning_banner = ctk.CTkFrame(
-            self,
-            fg_color=state.colors["warning"],
-            corner_radius=10,
-            height=50
+        name_lbl = QLabel(
+            f"<b>{carname}</b>  "
+            f"<span style='color:{COLORS['text_secondary']}'>{carid}</span>"
         )
-        warning_banner.pack(fill="x", padx=10, pady=(10, 5))
-        warning_banner.pack_propagate(False)
+        name_lbl.setFont(font(12))
+        name_lbl.setStyleSheet(
+            "background:transparent;border:none;color:" + COLORS['text'] + ";"
+        )
+        row.addWidget(name_lbl, 1)
 
-        warning_content = ctk.CTkFrame(warning_banner, fg_color="transparent")
-        warning_content.pack(expand=True, fill="both", padx=15, pady=0)
+        self._del_btn = _mk_action_btn(t("add_vehicles.delete_btn", default="Delete"), "error")
+        self._del_btn.setFixedWidth(75)
+        self._del_btn.clicked.connect(lambda: self.delete_requested.emit(self.carid))
+        row.addWidget(self._del_btn)
 
-        ctk.CTkLabel(
-            warning_content,
-            text=t("add_vehicles.wip"),
-            font=ctk.CTkFont(size=15, weight="bold"),
-            text_color=state.colors["accent_text"],
-            justify="left"
-        ).pack(expand=True)
+    def retranslate_ui(self):
+        self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
 
-        ctk.CTkLabel(
-            self,
-            text=t("add_vehicles.title"),
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(anchor="w", padx=10, pady=(10, 5))
 
-        input_frame = ctk.CTkFrame(self, fg_color=state.colors["frame_bg"], corner_radius=12)
-        input_frame.pack(fill="x", padx=10, pady=(0, 10))
+class _VariantListCard(QFrame):
+    """A row showing a custom variant with a Delete button."""
 
-        ctk.CTkLabel(
-            input_frame,
-            text=t("add_vehicles.car_id"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text"]
-        ).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 5))
+    delete_requested = Signal(str, str)   # carid, suffix
 
-        ctk.CTkEntry(
-            input_frame,
-            textvariable=self.carid_var,
-            placeholder_text=t("add_vehicles.car_id_placeholder"),
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"]
-        ).grid(row=0, column=1, sticky="ew", padx=10, pady=(10, 5))
+    def __init__(self, carid: str, suffix: str, parent=None):
+        super().__init__(parent)
+        self.carid  = carid
+        self.suffix = suffix
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:8px;
+            }}
+        """)
+        self.setFixedHeight(46)
 
-        ctk.CTkLabel(
-            input_frame,
-            text=t("add_vehicles.car_name"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text"]
-        ).grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(12, 0, 8, 0)
+        row.setSpacing(8)
 
-        ctk.CTkEntry(
-            input_frame,
-            textvariable=self.carname_var,
-            placeholder_text="e.g., My Custom Car",
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"]
-        ).grid(row=1, column=1, sticky="ew", padx=10, pady=5)
+        label = QLabel(
+            f"<b>{carid}</b>  "
+            f"<span style='color:{COLORS['accent']}'>+ {suffix}</span>"
+        )
+        label.setFont(font(12))
+        label.setStyleSheet(
+            "background:transparent;border:none;color:" + COLORS['text'] + ";"
+        )
+        row.addWidget(label, 1)
 
-        ctk.CTkLabel(
-            input_frame,
-            text=t("add_vehicles.json_file"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text"]
-        ).grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        folder_lbl = QLabel(f"SKINNAME{suffix.upper()}")
+        folder_lbl.setFont(font(10))
+        folder_lbl.setStyleSheet(
+            f"color:{COLORS['text_muted']};background:transparent;border:none;"
+        )
+        row.addWidget(folder_lbl)
 
-        json_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        json_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
-        json_frame.grid_columnconfigure(0, weight=1)
+        self._del_btn = _mk_action_btn(t("add_vehicles.delete_btn", default="Delete"), "error")
+        self._del_btn.setFixedWidth(75)
+        self._del_btn.clicked.connect(
+            lambda: self.delete_requested.emit(self.carid, self.suffix)
+        )
+        row.addWidget(self._del_btn)
 
-        ctk.CTkEntry(
-            json_frame,
-            textvariable=self.json_path_var,
-            placeholder_text="Select info_<carid>.json file",
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"],
-            state="readonly"
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
+    def retranslate_ui(self):
+        self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
 
-        ctk.CTkButton(
-            json_frame,
-            text=t("common.browse"),
-            width=80,
-            command=self._browse_json,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"]
-        ).grid(row=0, column=1)
 
-        ctk.CTkLabel(
-            input_frame,
-            text=t("add_vehicles.jbeam_file"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text"]
-        ).grid(row=3, column=0, sticky="w", padx=10, pady=5)
+# ─────────────────────────────────────────────────────────────────────────────
+# Manual entry section (collapsible)
+# ─────────────────────────────────────────────────────────────────────────────
 
-        jbeam_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        jbeam_frame.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
-        jbeam_frame.grid_columnconfigure(0, weight=1)
+class _ManualEntryCard(QFrame):
+    """Collapsible card wrapping the original manual file-picker form."""
 
-        ctk.CTkEntry(
-            jbeam_frame,
-            textvariable=self.jbeam_path_var,
-            placeholder_text="Select <carid>.jbeam file",
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"],
-            state="readonly"
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
+    submitted = Signal(str, str, str, str, str)   # carid, carname, json, jbeam, img
 
-        ctk.CTkButton(
-            jbeam_frame,
-            text=t("common.browse"),
-            width=80,
-            command=self._browse_jbeam,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"]
-        ).grid(row=0, column=1)
+    def __init__(self, mode: str = "vehicle", parent=None):
+        """mode : "vehicle" or "variant" """
+        super().__init__(parent)
+        self._mode     = mode
+        self._expanded = False
 
-        ctk.CTkLabel(
-            input_frame,
-            text=t("add_vehicles.image"),
-            font=ctk.CTkFont(size=13),
-            text_color=state.colors["text"]
-        ).grid(row=4, column=0, sticky="w", padx=10, pady=5)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background:{COLORS['card_bg']};
+                border:none;
+                border-radius:12px;
+            }}
+        """)
+        drop_shadow(self)
 
-        image_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        image_frame.grid(row=4, column=1, sticky="ew", padx=10, pady=5)
-        image_frame.grid_columnconfigure(0, weight=1)
+        self._root_col = QVBoxLayout(self)
+        self._root_col.setContentsMargins(20, 14, 20, 14)
+        self._root_col.setSpacing(10)
 
-        ctk.CTkEntry(
-            image_frame,
-            textvariable=self.image_path_var,
-            placeholder_text="Select vehicle image (optional)",
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            text_color=state.colors["text"],
-            state="readonly"
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        # ── Toggle header ────────────────────────────────────────────────────
+        toggle_row = QHBoxLayout()
+        _plain_label = (
+            t("add_vehicles.manual_entry_text", default="Manual Entry")
+            if mode == "vehicle"
+            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
+        )
+        self._toggle_lbl = QLabel(f"＋  {_plain_label}")
+        self._toggle_lbl.setFont(font(13, "bold"))
+        self._toggle_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;"
+        )
+        toggle_row.addWidget(self._toggle_lbl)
+        toggle_row.addStretch()
 
-        ctk.CTkButton(
-            image_frame,
-            text=t("common.browse"),
-            width=80,
-            command=self._browse_image,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"]
-        ).grid(row=0, column=1)
+        self._toggle_btn = QPushButton(t("add_vehicles.expand", default="Expand"))
+        self._toggle_btn.setFont(font(11))
+        self._toggle_btn.setFixedHeight(28)
+        self._toggle_btn.setCursor(Qt.PointingHandCursor)
+        self._toggle_btn.setStyleSheet(f"""
+            QPushButton {{
+                background:transparent;
+                color:{COLORS['accent']};
+                border:none;
+            }}
+            QPushButton:hover {{ color:{COLORS['accent_hover']}; }}
+        """)
+        self._toggle_btn.clicked.connect(self._toggle)
+        toggle_row.addWidget(self._toggle_btn)
+        self._root_col.addLayout(toggle_row)
 
-        input_frame.grid_columnconfigure(1, weight=1)
+        # ── Collapsible body ─────────────────────────────────────────────────
+        self._body = QWidget()
+        self._body.setStyleSheet("background:transparent;")
+        body_col = QVBoxLayout(self._body)
+        body_col.setContentsMargins(0, 4, 0, 0)
+        body_col.setSpacing(10)
+        self._body.setVisible(False)
 
-        ctk.CTkButton(
-            input_frame,
-            text=t("add_vehicles.add_vehicle"),
-            command=self.add_vehicle,
-            fg_color=state.colors["accent"],
-            hover_color=state.colors["accent_hover"],
-            text_color=state.colors["accent_text"],
-            height=40,
-            font=ctk.CTkFont(size=14, weight="bold")
-        ).grid(row=5, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 10))
+        if mode == "vehicle":
+            id_row = QHBoxLayout()
+            self._carid_field   = _EntryField(
+                t("add_vehicles.vehicle_id_label", default="Vehicle ID"),
+                t("add_vehicles.vehicle_id_placeholder", default="e.g. pickup"),
+            )
+            self._carname_field = _EntryField(
+                t("add_vehicles.display_name_label", default="Display Name"),
+                t("add_vehicles.display_name_placeholder", default="e.g. Pickup Truck"),
+            )
+            id_row.addWidget(self._carid_field)
+            id_row.addWidget(self._carname_field)
+            body_col.addLayout(id_row)
+        else:
+            id_row = QHBoxLayout()
+            self._carid_field  = _EntryField(
+                t("add_vehicles.vehicle_id_label", default="Vehicle ID"),
+                t("add_vehicles.vehicle_id_placeholder", default="e.g. pickup"),
+            )
+            self._suffix_field = _EntryField(
+                t("add_vehicles.variants_suffix_label", default="Variant Suffix"),
+                t("add_vehicles.variants_suffix_placeholder", default="e.g. ambulance"),
+            )
+            id_row.addWidget(self._carid_field)
+            id_row.addWidget(self._suffix_field)
+            body_col.addLayout(id_row)
 
-        status_container = ctk.CTkFrame(self, fg_color="transparent", height=60)
-        status_container.pack(fill="x", padx=10, pady=(5, 0))
-        status_container.pack_propagate(False)
+            # Live preview
+            self._preview_lbl = QLabel("")
+            self._preview_lbl.setFont(font(11))
+            self._preview_lbl.setStyleSheet(
+                f"color:{COLORS['text_muted']};background:transparent;"
+            )
+            body_col.addWidget(self._preview_lbl)
+            self._carid_field.entry.textChanged.connect(self._update_preview)
+            self._suffix_field.entry.textChanged.connect(self._update_preview)
 
-        self.dev_status_label = ctk.CTkLabel(
-            status_container,
-            text="",
-            font=ctk.CTkFont(size=12),
-            text_color=state.colors["text"]
+        self._json_picker  = _FilePicker(
+            t("add_vehicles.vehicles_json_label",  default="Skin Materials JSON"),
+            t("common.nofile_selected", default="No file selected"),
+        )
+        self._jbeam_picker = _FilePicker(
+            t("add_vehicles.vehicles_jbeam_label", default="Skin JBEAM"),
+            t("common.nofile_selected", default="No file selected"),
+        )
+        self._img_picker   = _FilePicker(
+            t("add_vehicles.image_label", default="Preview Image (optional)"),
+            t("common.nofile_selected", default="No file selected"),
+        )
+        self._json_picker.btn.clicked.connect(
+            lambda: self._browse_file(self._json_picker, "JSON Files (*.json);;All Files (*)")
+        )
+        self._jbeam_picker.btn.clicked.connect(
+            lambda: self._browse_file(self._jbeam_picker, "JBEAM Files (*.jbeam);;All Files (*)")
+        )
+        self._img_picker.btn.clicked.connect(
+            lambda: self._browse_file(self._img_picker, "Images (*.jpg *.jpeg);;All Files (*)")
+        )
+        body_col.addWidget(self._json_picker)
+        body_col.addWidget(self._jbeam_picker)
+        body_col.addWidget(self._img_picker)
+
+        # UV map picker — vehicle mode only (variants share the parent vehicle's UV map)
+        if mode == "vehicle":
+            self._uv_picker = _FilePicker(
+                t("add_vehicles.uv_map_label", default="UV Map (optional)"),
+                t("common.nofile_selected", default="No file selected"),
+            )
+            self._uv_picker.btn.clicked.connect(
+                lambda: self._browse_file(
+                    self._uv_picker,
+                    "UV Map Images (*.png *.dds *.jpg *.jpeg);;All Files (*)",
+                )
+            )
+            body_col.addWidget(self._uv_picker)
+        else:
+            self._uv_picker = None
+
+        label = (
+            t("add_vehicles.vehicles_add_btn", default="Add Vehicle")
+            if mode == "vehicle"
+            else t("add_vehicles.variants_add_btn", default="Add Variant")
+        )
+        self._add_btn = _mk_action_btn(label)
+        self._add_btn.setFixedHeight(40)
+        self._add_btn.clicked.connect(self._on_submit)
+        body_col.addWidget(self._add_btn)
+
+        self._root_col.addWidget(self._body)
+
+    # ── Collapse / Expand ────────────────────────────────────────────────────
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        self._body.setVisible(self._expanded)
+        self._toggle_btn.setText(
+            t("add_vehicles.collapse", default="Collapse") if self._expanded
+            else t("add_vehicles.expand", default="Expand")
+        )
+        sym = "－" if self._expanded else "＋"
+        plain = (
+            t("add_vehicles.manual_entry_text", default="Manual Entry")
+            if self._mode == "vehicle"
+            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
+        )
+        self._toggle_lbl.setText(f"{sym}  {plain}")
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _browse_file(self, picker: _FilePicker, file_filter: str):
+        path, _ = QFileDialog.getOpenFileName(
+            self, t("add_vehicles.dialog_select_file", default="Select File"),
+            _mods_start_dir(), file_filter,
+        )
+        if path:
+            picker.set_path(path)
+
+    def _update_preview(self):
+        if self._mode != "variant":
+            return
+        carid  = self._carid_field.text()
+        suffix = self._suffix_field.text().upper()
+        if carid or suffix:
+            folder = f"vehicles/{carid}/SKINNAME_{suffix}/"
+            self._preview_lbl.setText(f"→ {folder}")
+        else:
+            self._preview_lbl.setText("")
+
+    def _on_submit(self):
+        carid  = self._carid_field.text()
+        json_  = self._json_picker.path()
+        jbeam_ = self._jbeam_picker.path()
+        img_   = self._img_picker.path()
+
+        if self._mode == "vehicle":
+            carname = self._carname_field.text()
+            self.submitted.emit(carid, carname, json_, jbeam_, img_)
+        else:
+            suffix = self._suffix_field.text().lower()
+            self.submitted.emit(carid, suffix, json_, jbeam_, img_, )
+
+    def clear_fields(self):
+        self._carid_field.clear()
+        if self._mode == "vehicle":
+            self._carname_field.clear()
+        else:
+            self._suffix_field.clear()
+        self._json_picker.clear()
+        self._jbeam_picker.clear()
+        self._img_picker.clear()
+        if self._uv_picker is not None:
+            self._uv_picker.clear()
+
+    def retranslate_ui(self):
+        # Re-translate the toggle header and expand/collapse button.
+        sym = "－" if self._expanded else "＋"
+        plain = (
+            t("add_vehicles.manual_entry_text", default="Manual Entry")
+            if self._mode == "vehicle"
+            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
+        )
+        self._toggle_lbl.setText(f"{sym}  {plain}")
+        self._toggle_btn.setText(
+            t("add_vehicles.collapse", default="Collapse") if self._expanded
+            else t("add_vehicles.expand", default="Expand")
         )
 
-        self.dev_progress_bar = ctk.CTkProgressBar(
-            status_container,
-            progress_color=state.colors["accent"]
-        )
+        self._carid_field.set_label(t("add_vehicles.vehicle_id_label", default="Vehicle ID"))
+        self._carid_field.set_placeholder(t("add_vehicles.vehicle_id_placeholder", default="e.g. pickup"))
+        self._json_picker.set_label(t("add_vehicles.vehicles_json_label",  default="Skin Materials JSON"))
+        self._json_picker.set_placeholder(t("common.nofile_selected", default="No file selected"))
+        self._json_picker.retranslate_browse_btn()
+        self._jbeam_picker.set_label(t("add_vehicles.vehicles_jbeam_label", default="Skin JBEAM"))
+        self._jbeam_picker.set_placeholder(t("common.nofile_selected", default="No file selected"))
+        self._jbeam_picker.retranslate_browse_btn()
+        self._img_picker.set_label(t("add_vehicles.image_label", default="Preview Image (optional)"))
+        self._img_picker.set_placeholder(t("common.nofile_selected", default="No file selected"))
+        self._img_picker.retranslate_browse_btn()
+        if self._uv_picker is not None:
+            self._uv_picker.set_label(t("add_vehicles.uv_map_label", default="UV Map (optional)"))
+            self._uv_picker.set_placeholder(t("common.nofile_selected", default="No file selected"))
+            self._uv_picker.retranslate_browse_btn()
+        if self._mode == "vehicle":
+            self._carname_field.set_label(t("add_vehicles.display_name_label", default="Display Name"))
+            self._carname_field.set_placeholder(t("add_vehicles.display_name_placeholder", default="e.g. Pickup Truck"))
+            self._add_btn.setText(t("add_vehicles.vehicles_add_btn", default="Add Vehicle"))
+        else:
+            self._suffix_field.set_label(t("add_vehicles.variants_suffix_label", default="Variant Suffix"))
+            self._suffix_field.set_placeholder(t("add_vehicles.variants_suffix_placeholder", default="e.g. ambulance"))
+            self._add_btn.setText(t("add_vehicles.variants_add_btn", default="Add Variant"))
 
-        list_header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        list_header_frame.pack(fill="x", padx=10, pady=(10, 5))
 
-        ctk.CTkLabel(
-            list_header_frame,
-            text=t("add_vehicles.vehicles_added"),
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color=state.colors["text"]
-        ).pack(side="left")
+# ─────────────────────────────────────────────────────────────────────────────
+# Vehicles sub-tab
+# ─────────────────────────────────────────────────────────────────────────────
 
-        self.dev_search_entry = ctk.CTkEntry(
-            list_header_frame,
-            textvariable=self.dev_search_var,
-            width=300,
-            height=34,
-            fg_color=state.colors["card_bg"],
-            border_color=state.colors["border"],
-            border_width=1,
-            text_color=state.colors["text"],
-            corner_radius=6
-        )
-        self.dev_search_entry.place(relx=0.5, rely=0.5, anchor="center")
+class _VehiclesTab(QWidget):
+    vehicle_added   = Signal()
+    vehicle_deleted = Signal()
 
-        self.dev_search_var.set(self.dev_search_placeholder)
-        self.dev_search_entry.configure(text_color="#888888")
+    def __init__(self, notify_fn, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"background:{COLORS['app_bg']};")
+        self._notify = notify_fn
+        self._cards: List[_VehicleListCard] = []
 
-        self.dev_search_entry.bind("<FocusIn>", self._on_dev_search_focus_in)
-        self.dev_search_entry.bind("<FocusOut>", self._on_dev_search_focus_out)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{background:transparent;border:none;}")
 
-        # Wrap trace callback to handle widget destruction gracefully
-        def safe_refresh(*args):
+        inner = QWidget()
+        inner.setStyleSheet(f"background:{COLORS['app_bg']};")
+        col = QVBoxLayout(inner)
+        col.setContentsMargins(20, 20, 20, 20)
+        col.setSpacing(16)
+
+        # ── Smart import card ────────────────────────────────────────────────
+        self._smart_card = _SmartImportCard(notify_fn, mode="vehicles", parent=inner)
+        self._smart_card.items_added.connect(self._on_items_added)
+        col.addWidget(self._smart_card)
+
+        # ── Manual entry card (collapsible) ──────────────────────────────────
+        self._manual_card = _ManualEntryCard(mode="vehicle", parent=inner)
+        self._manual_card.submitted.connect(self._on_manual_submit)
+        col.addWidget(self._manual_card)
+
+        # ── Added vehicles list ──────────────────────────────────────────────
+        self._list_hdr = QLabel(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
+        self._list_hdr.setFont(font(14, "bold"))
+        self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        col.addWidget(self._list_hdr)
+
+        self._list_frame = QFrame()
+        self._list_frame.setStyleSheet("background:transparent;")
+        self._list_col = QVBoxLayout(self._list_frame)
+        self._list_col.setContentsMargins(0, 0, 0, 0)
+        self._list_col.setSpacing(6)
+        col.addWidget(self._list_frame)
+
+        self._empty_lbl = QLabel(t("add_vehicles.no_vehicles", default="No custom vehicles added yet."))
+        self._empty_lbl.setFont(font(12))
+        self._empty_lbl.setAlignment(Qt.AlignCenter)
+        self._empty_lbl.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
+        self._list_col.addWidget(self._empty_lbl)
+
+        col.addStretch()
+        scroll.setWidget(inner)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(scroll)
+
+        self._reload_list()
+
+    # ── Handlers ─────────────────────────────────────────────────────────────
+
+    def _on_items_added(self):
+        self._reload_list()
+        self.vehicle_added.emit()
+
+    def _on_manual_submit(
+        self, carid: str, carname: str, json_path: str, jbeam_path: str, img_path: str
+    ):
+        if not carid:
+            self._notify(t("add_vehicles.notification.enter_vehicle_id", default="Enter a vehicle ID."), "warning")
+            return
+        if not carname:
+            self._notify(t("add_vehicles.notification.enter_display_name", default="Enter a display name."), "warning")
+            return
+        if not json_path:
+            self._notify(t("add_vehicles.notification.select_json", default="Select a JSON file."), "warning")
+            return
+        if not jbeam_path:
+            self._notify(t("add_vehicles.notification.select_jbeam", default="Select a JBEAM file."), "warning")
+            return
+
+        existing = load_added_vehicles_json() if _BACKEND_OK else {}
+        if carid in existing:
+            self._notify(
+                t("add_vehicles.notification.vehicle_already_exists",
+                  carid=carid, default=f"Vehicle '{carid}' already exists."),
+                "warning",
+            )
+            return
+
+        self._manual_card._add_btn.setEnabled(False)
+        ok = False
+        if _BACKEND_OK:
+            ok = process_custom_vehicle(
+                carid      = carid,
+                carname    = carname,
+                json_path  = json_path,
+                jbeam_path = jbeam_path,
+                image_path = img_path or None,
+            )
+        self._manual_card._add_btn.setEnabled(True)
+
+        if ok:
+            self._notify(
+                t("add_vehicles.notification.vehicle_added",
+                  carname=carname, default=f"Added '{carname}' successfully."),
+                "success",
+            )
+            # Copy any manually-selected UV map so CarListTab can show
+            # the "Get UV Map" button for this vehicle without BeamNG installed.
+            uv_path = self._manual_card._uv_picker.path() if self._manual_card._uv_picker else ""
+            if uv_path:
+                _copy_uv_maps_to_images(carid, [uv_path])
+            self._manual_card.clear_fields()
+            self._reload_list()
+            self.vehicle_added.emit()
+        else:
+            self._notify(t("add_vehicles.notification.vehicle_add_failed",
+                           default="Failed to add vehicle."), "error")
+
+    def _on_delete(self, carid: str):
+        ok = delete_custom_vehicle(carid) if _BACKEND_OK else False
+        if ok:
+            self._notify(
+                t("add_vehicles.notification.vehicle_deleted_id",
+                  carid=carid, default=f"Deleted '{carid}'."),
+                "info",
+            )
+            self._reload_list()
+            self.vehicle_deleted.emit()
+        else:
+            self._notify(
+                t("add_vehicles.notification.vehicle_delete_failed",
+                  carid=carid, default=f"Failed to delete '{carid}'."),
+                "error",
+            )
+
+    def _reload_list(self):
+        for card in self._cards:
+            card.setParent(None)
+            card.deleteLater()
+        self._cards.clear()
+
+        vehicles = load_added_vehicles_json() if _BACKEND_OK else {}
+
+        if not vehicles:
+            self._empty_lbl.setVisible(True)
+            return
+
+        self._empty_lbl.setVisible(False)
+        for carid, carname in sorted(vehicles.items(), key=lambda x: x[1].lower()):
+            card = _VehicleListCard(carid, carname, self._list_frame)
+            card.delete_requested.connect(self._on_delete)
+            self._list_col.insertWidget(self._list_col.count() - 1, card)
+            self._cards.append(card)
+            fade_in(card, 150)
+
+    # ── Translations ──────────────────────────────────────────────────────────
+
+    def retranslate_ui(self):
+        self._list_hdr.setText(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
+        self._empty_lbl.setText(t("add_vehicles.no_vehicles", default="No custom vehicles added yet."))
+        self._smart_card.retranslate_ui()
+        self._manual_card.retranslate_ui()
+        for card in self._cards:
+            card.retranslate_ui()
+
+    def refresh_ui(self):
+        self.retranslate_ui()
+        self._reload_list()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Variants sub-tab
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _VariantsTab(QWidget):
+    variant_added   = Signal()
+    variant_deleted = Signal()
+
+    def __init__(self, notify_fn, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"background:{COLORS['app_bg']};")
+        self._notify = notify_fn
+        self._cards: List[_VariantListCard] = []
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{background:transparent;border:none;}")
+
+        inner = QWidget()
+        inner.setStyleSheet(f"background:{COLORS['app_bg']};")
+        col = QVBoxLayout(inner)
+        col.setContentsMargins(20, 20, 20, 20)
+        col.setSpacing(16)
+
+        # ── Info banner ───────────────────────────────────────────────────────
+        self._info_lbl = QLabel(t("add_vehicles.variants_info_banner",
+                                   default="Variants add extra body types to an existing vehicle."))
+        self._info_lbl.setWordWrap(True)
+        self._info_lbl.setFont(font(11))
+        self._info_lbl.setStyleSheet(f"""
+            color:{COLORS['text']};
+            background:{COLORS['frame_bg']};
+            border:none;
+            border-radius:8px;
+            padding:10px 14px;
+        """)
+        col.addWidget(self._info_lbl)
+
+        # ── Smart import card ─────────────────────────────────────────────────
+        self._smart_card = _SmartImportCard(notify_fn, mode="variants", parent=inner)
+        self._smart_card.items_added.connect(self._on_items_added)
+        col.addWidget(self._smart_card)
+
+        # ── Manual entry card (collapsible) ───────────────────────────────────
+        self._manual_card = _ManualEntryCard(mode="variant", parent=inner)
+        self._manual_card.submitted.connect(self._on_manual_submit)
+        col.addWidget(self._manual_card)
+
+        # ── Added variants list ───────────────────────────────────────────────
+        self._list_hdr = QLabel(t("add_vehicles.variants_added_header", default="Added Variants"))
+        self._list_hdr.setFont(font(14, "bold"))
+        self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        col.addWidget(self._list_hdr)
+
+        self._list_frame = QFrame()
+        self._list_frame.setStyleSheet("background:transparent;")
+        self._list_col = QVBoxLayout(self._list_frame)
+        self._list_col.setContentsMargins(0, 0, 0, 0)
+        self._list_col.setSpacing(6)
+        col.addWidget(self._list_frame)
+
+        self._empty_lbl = QLabel(t("add_vehicles.variants_no_variants", default="No custom variants added yet."))
+        self._empty_lbl.setFont(font(12))
+        self._empty_lbl.setAlignment(Qt.AlignCenter)
+        self._empty_lbl.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
+        self._list_col.addWidget(self._empty_lbl)
+
+        col.addStretch()
+        scroll.setWidget(inner)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(scroll)
+
+        self._reload_list()
+
+    # ── Handlers ──────────────────────────────────────────────────────────────
+
+    def _on_items_added(self):
+        self._reload_list()
+        self.variant_added.emit()
+
+    def _on_manual_submit(
+        self, carid: str, suffix: str, json_path: str, jbeam_path: str, img_path: str
+    ):
+        if not carid:
+            self._notify(t("add_vehicles.notification.enter_vehicle_id", default="Enter a vehicle ID."), "warning")
+            return
+        if not suffix:
+            self._notify(t("add_vehicles.notification.enter_suffix", default="Enter a variant suffix."), "warning")
+            return
+        if not json_path:
+            self._notify(t("add_vehicles.notification.select_json", default="Select a JSON file."), "warning")
+            return
+        if not jbeam_path:
+            self._notify(t("add_vehicles.notification.select_jbeam", default="Select a JBEAM file."), "warning")
+            return
+
+        existing = load_added_variants_json() if _BACKEND_OK else {}
+        if f"{carid}__{suffix}" in existing:
+            self._notify(
+                t("add_vehicles.notification.variant_already_exists",
+                  carid=carid, suffix=suffix,
+                  default=f"Variant '{carid} + {suffix}' already exists."),
+                "warning",
+            )
+            return
+
+        self._manual_card._add_btn.setEnabled(False)
+        ok = False
+        if _BACKEND_OK:
+            ok = process_custom_variant(
+                carid          = carid,
+                variant_suffix = suffix,
+                json_path      = json_path,
+                jbeam_path     = jbeam_path,
+                image_path     = img_path or None,
+            )
+        self._manual_card._add_btn.setEnabled(True)
+
+        if ok:
+            self._notify(
+                t("add_vehicles.notification.variant_added",
+                  carid=carid, suffix=suffix.upper(),
+                  default=f"Added variant '{carid} + {suffix}' successfully."),
+                "success",
+            )
+            self._manual_card.clear_fields()
+            self._reload_list()
+            self.variant_added.emit()
+        else:
+            self._notify(t("add_vehicles.notification.variant_add_failed",
+                           default="Failed to add variant."), "error")
+
+    def _on_delete(self, carid: str, suffix: str):
+        ok = delete_custom_variant(carid, suffix) if _BACKEND_OK else False
+        if ok:
+            self._notify(
+                t("add_vehicles.notification.variant_deleted",
+                  carid=carid, suffix=suffix, default=f"Deleted variant '{carid} + {suffix}'."),
+                "info",
+            )
+            self._reload_list()
+            self.variant_deleted.emit()
+        else:
+            self._notify(
+                t("add_vehicles.notification.variant_delete_failed",
+                  carid=carid, suffix=suffix, default=f"Failed to delete variant."),
+                "error",
+            )
+
+    def _reload_list(self):
+        for card in self._cards:
+            card.setParent(None)
+            card.deleteLater()
+        self._cards.clear()
+
+        variants = load_added_variants_json() if _BACKEND_OK else {}
+
+        if not variants:
+            self._empty_lbl.setVisible(True)
+            return
+
+        self._empty_lbl.setVisible(False)
+        for key, info in sorted(variants.items()):
+            carid  = info.get("carid",  key)
+            suffix = info.get("suffix", "")
+            card   = _VariantListCard(carid, suffix, self._list_frame)
+            card.delete_requested.connect(self._on_delete)
+            self._list_col.insertWidget(self._list_col.count() - 1, card)
+            self._cards.append(card)
+            fade_in(card, 150)
+
+    # ── Translations ──────────────────────────────────────────────────────────
+
+    def retranslate_ui(self):
+        self._info_lbl.setText(t("add_vehicles.variants_info_banner",
+                                  default="Variants add extra body types to an existing vehicle."))
+        self._list_hdr.setText(t("add_vehicles.variants_added_header", default="Added Variants"))
+        self._empty_lbl.setText(t("add_vehicles.variants_no_variants", default="No custom variants added yet."))
+        self._smart_card.retranslate_ui()
+        self._manual_card.retranslate_ui()
+        for card in self._cards:
+            card.retranslate_ui()
+
+    def refresh_ui(self):
+        self.retranslate_ui()
+        self._reload_list()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public tab
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_added_vehicles_at_startup():
+    """Called from main.py to warm up the added vehicles list."""
+    try:
+        if _BACKEND_OK:
+            load_added_vehicles_json()
+    except Exception:
+        pass
+
+
+class AddVehiclesTab(QWidget):
+    """
+    Public tab shown in the main navigation.
+    Contains two sub-tabs: Vehicles and Variants.
+    """
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        notification_callback=None,
+        refresh_vehicle_list_callback=None,
+        **_kwargs,
+    ):
+        super().__init__(parent)
+        self.setStyleSheet(f"background:{COLORS['app_bg']};")
+
+        self._notify     = notification_callback or self._fallback_notify
+        self._refresh_cb = refresh_vehicle_list_callback
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ── Page header ───────────────────────────────────────────────────────
+        hdr_frame = QFrame()
+        hdr_frame.setStyleSheet(f"background:{COLORS['frame_bg']};border:none;")
+        hdr_frame.setFixedHeight(60)
+        hdr_row = QHBoxLayout(hdr_frame)
+        hdr_row.setContentsMargins(24, 0, 24, 0)
+
+        self._title = QLabel(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
+        self._title.setFont(font(18, "bold"))
+        self._title.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        hdr_row.addWidget(self._title)
+        hdr_row.addStretch()
+        root.addWidget(hdr_frame)
+
+        # ── Tab widget ────────────────────────────────────────────────────────
+        self._tabs = QTabWidget()
+        self._tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: none;
+                background: {COLORS['app_bg']};
+            }}
+            QTabBar::tab {{
+                background: {COLORS['frame_bg']};
+                color: {COLORS['text_secondary']};
+                border: none;
+                padding: 8px 24px;
+                font-size: 13px;
+                font-weight: bold;
+            }}
+            QTabBar::tab:selected {{
+                background: {COLORS['app_bg']};
+                color: {COLORS['accent']};
+            }}
+            QTabBar::tab:hover:!selected {{
+                background: {COLORS['card_hover']};
+                color: {COLORS['text']};
+            }}
+        """)
+
+        self._vehicles_tab = _VehiclesTab(self._notify, self)
+        self._variants_tab = _VariantsTab(self._notify, self)
+
+        self._tabs.addTab(self._vehicles_tab, t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._tabs.addTab(self._variants_tab, t("add_vehicles.tab_variants", default="Variants"))
+
+        self._vehicles_tab.vehicle_added.connect(self._on_list_changed)
+        self._vehicles_tab.vehicle_deleted.connect(self._on_list_changed)
+        self._variants_tab.variant_added.connect(self._on_list_changed)
+        self._variants_tab.variant_deleted.connect(self._on_list_changed)
+
+        root.addWidget(self._tabs)
+
+    def retranslate_ui(self):
+        self._title.setText(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
+        self._tabs.setTabText(0, t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._tabs.setTabText(1, t("add_vehicles.tab_variants", default="Variants"))
+        self._vehicles_tab.retranslate_ui()
+        self._variants_tab.retranslate_ui()
+
+    def _fallback_notify(self, msg: str, kind: str = "info", duration: int = 3000):
+        print(f"[{kind.upper()}] {msg}")
+
+    def _on_list_changed(self):
+        if self._refresh_cb:
             try:
-                self.refresh_developer_list()
-            except Exception:
-                pass  # Silently ignore errors during widget destruction
-        
-        self.dev_search_var.trace("w", safe_refresh)
+                self._refresh_cb()
+            except Exception as e:
+                print(f"[WARNING] refresh_vehicle_list_callback failed: {e}")
 
-        self.dev_list_scroll = ctk.CTkScrollableFrame(
-            self,
-            fg_color=state.colors["frame_bg"],
-            corner_radius=12
-        )
-        self.dev_list_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-    def _browse_json(self):
-        """Browse for JSON file"""
-        filename = filedialog.askopenfilename(
-            title="Select info JSON file",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if filename:
-            self.json_path_var.set(filename)
-
-    def _browse_jbeam(self):
-        """Browse for JBeam file"""
-        filename = filedialog.askopenfilename(
-            title="Select JBeam file",
-            filetypes=[("JBeam files", "*.jbeam"), ("All files", "*.*")]
-        )
-        if filename:
-            self.jbeam_path_var.set(filename)
-
-    def _browse_image(self):
-        """Browse for image file"""
-        filename = filedialog.askopenfilename(
-            title="Select vehicle image",
-            filetypes=[
-                ("Image files", "*.png *.jpg *.jpeg *.dds"),
-                ("All files", "*.*")
-            ]
-        )
-        if filename:
-            self.image_path_var.set(filename)
-
-    def add_vehicle(self):
-
-        print(f"[DEBUG] add_vehicle called")
-        """Add a custom vehicle"""
-        carid = self.carid_var.get().strip()
-        carname = self.carname_var.get().strip()
-        json_path = self.json_path_var.get().strip()
-        jbeam_path = self.jbeam_path_var.get().strip()
-        image_path = self.image_path_var.get().strip()
-
-        if not carid or not carname:
-            self.show_notification(t("add_vehicles.notification.name_and_id_required"), "error")
-            return
-
-        if not json_path or not jbeam_path:
-            self.show_notification(t("add_vehicles.notification.json_and_jbeam_required"), "error")
-            return
-
-        if not os.path.exists(json_path) or not os.path.exists(jbeam_path):
-            self.show_notification(t("add_vehicles.notification.selected_files_do_not_exist"), "error")
-            return
-
-        if image_path and not os.path.exists(image_path):
-            self.show_notification(t("add_vehicles.notification.selected_image_does_not_exist"), "error")
-            return
-
-        if carid in state.added_vehicles:
-            self.show_notification(f"{t('add_vehicles.notification.vehicle_already_exists')} '{carid}'", "error")
-            return
-
-        self.dev_status_label.pack(padx=10, pady=(5, 0))
-        self.dev_progress_bar.pack(fill="x", padx=10, pady=(5, 5))
-        self.dev_status_label.configure(text="Processing vehicle files...")
-        self.dev_progress_bar.set(0.3)
-
-        try:
-
-            from core.add_vehicles import process_custom_vehicle
-
-            success = process_custom_vehicle(
-                carid=carid,
-                carname=carname,
-                json_path=json_path,
-                jbeam_path=jbeam_path,
-                image_path=image_path if image_path else None
-            )
-
-            if success:
-                self.dev_status_label.configure(text="Saving vehicle data...")
-                self.dev_progress_bar.set(0.7)
-
-                self._reload_added_vehicles_from_file()
-
-                self.dev_status_label.configure(text="Vehicle added successfully!")
-                self.dev_progress_bar.set(1.0)
-
-                self.carid_var.set("")
-                self.carname_var.set("")
-                self.json_path_var.set("")
-                self.jbeam_path_var.set("")
-                self.image_path_var.set("")
-
-                self.show_notification(f"{t('add_vehicles.notification.vehicle_added')} '{carname}'", 4000)
-                self.refresh_developer_list()
-
-                print(f"[DEBUG] Refreshing all tabs after adding vehicle...")
-                self._refresh_all_tabs()
-                print(f"[DEBUG] All tabs refreshed successfully")
-
-            else:
-                self.dev_status_label.configure(text="Error: Processing failed")
-                self.show_notification("Failed to process vehicle files", "error")
-
-        except ImportError:
-            self.dev_status_label.configure(text="Error: Developer module not found")
-            self.show_notification("Developer module not available", "error")
-            print("[ERROR] core.add_vehicles module not found")
-        except Exception as e:
-            self.dev_status_label.configure(text=f"Error: {str(e)}")
-            self.show_notification(f"Error: {str(e)}", "error")
-            print(f"[ERROR] Failed to add vehicle: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-
-            self.after(2000, lambda: self.dev_progress_bar.pack_forget())
-            self.after(2000, lambda: self.dev_status_label.pack_forget())
-
-    def delete_vehicle(self, carid: str):
-
-        print(f"[DEBUG] delete_vehicle called")
-        """Delete a custom vehicle using themed confirmation dialog"""
-        carname = state.added_vehicles.get(carid, carid)
-
-        response = self._show_confirmation_dialog(
-            title="Confirm Delete",
-            message=f"Are you sure you want to delete '{carname}'?\n\nThis will remove the vehicle from all menus and delete all associated files.",
-            danger=True
-        )
-
-        if response:
-            if carid in state.added_vehicles:
-                try:
-                    from core.add_vehicles import delete_custom_vehicle
-                    file_delete_success = delete_custom_vehicle(carid)
-
-                    if not file_delete_success:
-                        print(f"[WARNING] Failed to delete some files for {carid}")
-                except ImportError:
-                    print(f"[WARNING] core.add_vehicles module not found, only removing from state")
-                except Exception as e:
-                    print(f"[ERROR] Failed to delete vehicle files: {e}")
-
-                self._reload_added_vehicles_from_file()
-
-                self.show_notification(f"{t('add_vehicles.notification.deleted_vehicle')} '{carname}'", "info")
-                self.refresh_developer_list()
-
-                print(f"[DEBUG] Refreshing all tabs after deleting vehicle...")
-                self._refresh_all_tabs()
-                print(f"[DEBUG] All tabs refreshed successfully")
-
-    def _on_dev_search_focus_in(self, event):
-        """Handle focus in for dev search entry - remove placeholder"""
-        if self.dev_search_var.get() == self.dev_search_placeholder:
-            self.dev_search_var.set("")
-            self.dev_search_entry.configure(text_color=state.colors["text"])
-
-    def _on_dev_search_focus_out(self, event):
-        """Handle focus out for dev search entry - restore placeholder if empty"""
-        if not self.dev_search_var.get():
-            self.dev_search_var.set(self.dev_search_placeholder)
-            self.dev_search_entry.configure(text_color="#888888")
-
-    def refresh_developer_list(self):
-
-        print(f"[DEBUG] refresh_developer_list called")
-        """Refresh the list of custom vehicles"""
-        
-        # Safety check: widget may be destroyed during UI refresh
-        if not hasattr(self, 'dev_list_scroll') or not self.dev_list_scroll.winfo_exists():
-            return
-
-        for widget in self.dev_list_scroll.winfo_children():
-            widget.destroy()
-
-        search_query = self.dev_search_var.get()
-
-        if search_query == self.dev_search_placeholder:
-            search_query = ""
-
-        search_query = search_query.lower().strip()
-
-        if not state.added_vehicles:
-            empty_label = ctk.CTkLabel(
-                self.dev_list_scroll,
-                text="No custom vehicles added yet",
-                font=ctk.CTkFont(size=13),
-                text_color=state.colors["text_secondary"]
-            )
-            empty_label.pack(pady=20)
-            return
-
-        for carid, carname in sorted(state.added_vehicles.items(), key=lambda x: x[1].lower()):
-            if search_query and search_query not in carid.lower() and search_query not in carname.lower():
-                continue
-
-            self._add_vehicle_card(carid, carname)
-
-    def _add_vehicle_card(self, carid: str, carname: str):
-        """Add a vehicle card to the list"""
-        card = ctk.CTkFrame(
-            self.dev_list_scroll,
-            fg_color=state.colors["card_bg"],
-            corner_radius=10,
-            border_width=1,
-            border_color=state.colors["border"]
-        )
-        card.pack(fill="x", padx=5, pady=5)
-
-        info_frame = ctk.CTkFrame(card, fg_color="transparent")
-        info_frame.pack(side="left", fill="x", expand=True, padx=15, pady=10)
-
-        ctk.CTkLabel(
-            info_frame,
-            text=carname,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=state.colors["text"],
-            anchor="w"
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            info_frame,
-            text=carid,
-            font=ctk.CTkFont(size=12),
-            text_color=state.colors["text_secondary"],
-            anchor="w"
-        ).pack(anchor="w")
-
-        delete_btn = ctk.CTkButton(
-            card,
-            text="🗑️ Delete",
-            width=100,
-            height=32,
-            fg_color=state.colors["error"],
-            hover_color=state.colors["error_hover"],
-            text_color=state.colors["accent_text"],
-            command=lambda c=carid: self.delete_vehicle(c)
-        )
-        delete_btn.pack(side="right", padx=10, pady=10)
+    def refresh_ui(self):
+        self._title.setText(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
+        self._tabs.setTabText(0, t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._tabs.setTabText(1, t("add_vehicles.tab_variants", default="Variants"))
+        self._vehicles_tab.refresh_ui()
+        self._variants_tab.refresh_ui()

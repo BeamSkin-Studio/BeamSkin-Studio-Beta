@@ -1,32 +1,21 @@
-# BeamSkin Studio - Python Dependencies
-# Cross-platform: Windows, Linux, macOS
 # Install with: pip install -r requirements.txt
 
-# Core GUI Framework
-customtkinter>=5.2.0
+# ── Core GUI Framework (PySide6 edition) ──────────────────────────────────────
+PySide6>=6.5.0
 
-# Image Processing
+# ── Image Processing ──────────────────────────────────────────────────────────
 Pillow>=10.0.0
+imageio>=2.28.0
 
-# HTTP Requests (for update checker)
+# ── HTTP Requests (update checker, online tab) ────────────────────────────────
 requests>=2.31.0
 
-deep-translator>=1.11.4
-
-# Windows-specific (optional, for better Windows integration)
+# ── Windows-specific (optional — better taskbar / file-dialog integration) ────
 pywin32>=306; sys_platform == 'win32'
 
-# Note for Linux users:
-# You may need to install tkinter separately using your package manager:
-#   Ubuntu/Debian: sudo apt install python3-tk
-#   Fedora: sudo dnf install python3-tkinter
-#   Arch: sudo pacman -S tk
-#
-# For file dialog support on Linux, you may also want:
-#   Ubuntu/Debian: sudo apt install python3-tk zenity
-#   Fedora: sudo dnf install python3-tkinter zenity
-
-# Optional: wmctrl for better window management on Linux
-# Install on Linux: sudo apt install wmctrl (Ubuntu/Debian)
-#                   sudo dnf install wmctrl (Fedora)
-#                   sudo pacman -S wmctrl (Arch)
+# ── Note for Linux users ──────────────────────────────────────────────────────
+# PySide6 bundles its own Qt libraries, so no system Qt packages are needed.
+# You may still need libGL for rendering:
+#   Ubuntu/Debian: sudo apt install libgl1
+#   Fedora:        sudo dnf install mesa-libGL
+#   Arch:          sudo pacman -S mesa

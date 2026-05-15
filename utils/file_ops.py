@@ -13,17 +13,14 @@ VEHICLE_FOLDER = "vehicles"
 ADDED_VEHICLES_JSON = os.path.join("vehicles", "added_vehicles.json")
 
 def sanitize_skin_id(name):
-
     print(f"[DEBUG] sanitize_skin_id called")
     return name.lower().replace(" ", "_")
 
 def sanitize_mod_name(name):
-
     print(f"[DEBUG] sanitize_mod_name called")
     return name.strip().replace(" ", "_")
 
 def get_beamng_mods_path():
-
     print(f"[DEBUG] get_beamng_mods_path called")
     username = getpass.getuser()
     return os.path.join(
@@ -38,7 +35,6 @@ def get_beamng_mods_path():
     )
 
 def zip_folder(source_dir, zip_path):
-
     print(f"[DEBUG] zip_folder called")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root_dir, _, files in os.walk(source_dir):
@@ -49,24 +45,30 @@ def zip_folder(source_dir, zip_path):
 
 def create_vehicle_folders(carid):
     print(f"[DEBUG] create_vehicle_folders called for: {carid}")
-
     vehicle_path = os.path.join(VEHICLE_FOLDER, carid, "SKINNAME")
     os.makedirs(vehicle_path, exist_ok=True)
-
     print(f"[DEBUG] Created vehicle folders: {vehicle_path}")
+    return True
+
+def create_variant_folders(carid, suffix_upper):
+    """Create vehicles/{carid}/SKINNAME{suffix_upper}/.
+    The parent {carid} dir is created if needed, so variants can be added
+    to built-in vehicles that have no custom folder yet."""
+    print(f"[DEBUG] create_variant_folders called for: {carid} / SKINNAME{suffix_upper}")
+    variant_path = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
+    os.makedirs(variant_path, exist_ok=True)
+    print(f"[DEBUG] Created variant folder: {variant_path}")
     return True
 
 def delete_vehicle_folders(carid):
     print(f"[DEBUG] delete_vehicle_folders called for: {carid}")
-
     try:
-
         vehicle_path = os.path.join(VEHICLE_FOLDER, carid)
         if os.path.exists(vehicle_path):
             shutil.rmtree(vehicle_path)
             print(f"[DEBUG] Deleted vehicle folder: {vehicle_path}")
 
-        preview_path = os.path.join("imagesforgui", "vehicles", carid)
+        preview_path = os.path.join("gui", "images", "vehicles", carid)
         if os.path.exists(preview_path):
             shutil.rmtree(preview_path)
             print(f"[DEBUG] Deleted preview folder: {preview_path}")
@@ -76,31 +78,81 @@ def delete_vehicle_folders(carid):
         print(f"[ERROR] Failed to delete vehicle folders: {e}")
         raise
 
-def load_added_vehicles_json():
-    print(f"[DEBUG] load_added_vehicles_json called")
+def delete_variant_folders(carid, suffix_upper):
+    """Remove vehicles/{carid}/SKINNAME{suffix_upper}/ only.
+    Does NOT remove the parent {carid} folder."""
+    print(f"[DEBUG] delete_variant_folders called for: {carid} / SKINNAME{suffix_upper}")
+    try:
+        variant_path = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
+        if os.path.exists(variant_path):
+            shutil.rmtree(variant_path)
+            print(f"[DEBUG] Deleted variant folder: {variant_path}")
+        else:
+            print(f"[DEBUG] Variant folder not found, skipping: {variant_path}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to delete variant folders: {e}")
+        raise
 
+# ── JSON helpers ───────────────────────────────────────────────────────────────
+#
+# added_vehicles.json structure:
+#   {
+#     "pickup": "Gavril Pickup",          ← custom vehicle entries  (carid: name)
+#     "__variants__": {                   ← custom variant entries  (never shown as vehicles)
+#       "pickup__box": {"carid": "pickup", "suffix": "box"}
+#     }
+#   }
+#
+# load_added_vehicles_json() strips __ keys so callers only see vehicles.
+# Internal write helpers use _load_raw_json() so __variants__ is never lost.
+
+def _load_raw_json() -> dict:
+    """Load added_vehicles.json exactly as stored (including __variants__)."""
+    if not os.path.exists(ADDED_VEHICLES_JSON):
+        return {}
+    try:
+        with open(ADDED_VEHICLES_JSON, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[ERROR] _load_raw_json failed: {e}")
+        return {}
+
+def load_added_vehicles_json():
+    """Return only vehicle entries — strips __variants__ and any other __ key."""
+    print(f"[DEBUG] load_added_vehicles_json called")
     if not os.path.exists(ADDED_VEHICLES_JSON):
         print(f"[DEBUG] {ADDED_VEHICLES_JSON} not found, returning empty dict")
         return {}
-
     try:
-        with open(ADDED_VEHICLES_JSON, 'r', encoding='utf-8') as f:
-            vehicles = json.load(f)
-            print(f"[DEBUG] Loaded {len(vehicles)} vehicles from {ADDED_VEHICLES_JSON}")
-            return vehicles
+        raw = _load_raw_json()
+        vehicles = {k: v for k, v in raw.items() if not k.startswith("__")}
+        print(f"[DEBUG] Loaded {len(vehicles)} vehicles from {ADDED_VEHICLES_JSON}")
+        return vehicles
     except Exception as e:
         print(f"[ERROR] Failed to load {ADDED_VEHICLES_JSON}: {e}")
         return {}
 
+def load_added_variants_json() -> dict:
+    """Return the __variants__ dict:
+    { "pickup__box": {"carid": "pickup", "suffix": "box"}, ... }"""
+    print(f"[DEBUG] load_added_variants_json called")
+    raw = _load_raw_json()
+    variants = raw.get("__variants__", {})
+    print(f"[DEBUG] Loaded {len(variants)} variants from {ADDED_VEHICLES_JSON}")
+    return variants
+
 def save_added_vehicles_json(vehicles_dict):
+    """Save vehicle entries while preserving __variants__ already on disk."""
     print(f"[DEBUG] save_added_vehicles_json called with {len(vehicles_dict)} vehicles")
-
     try:
-
         os.makedirs(VEHICLE_FOLDER, exist_ok=True)
-
+        # Preserve all __ keys (e.g. __variants__) from the existing file
+        raw = _load_raw_json()
+        reserved = {k: v for k, v in raw.items() if k.startswith("__")}
+        merged = {**vehicles_dict, **reserved}
         with open(ADDED_VEHICLES_JSON, 'w', encoding='utf-8') as f:
-            json.dump(vehicles_dict, f, indent=2)
+            json.dump(merged, f, indent=2)
         print(f"[DEBUG] Successfully saved to {ADDED_VEHICLES_JSON}")
         return True
     except Exception as e:
@@ -109,28 +161,57 @@ def save_added_vehicles_json(vehicles_dict):
 
 def add_vehicle_to_json(carid, carname):
     print(f"[DEBUG] add_vehicle_to_json called: {carid} = {carname}")
-
-    vehicles = load_added_vehicles_json()
-
-    vehicles[carid] = carname
-
-    save_added_vehicles_json(vehicles)
-
+    raw = _load_raw_json()
+    raw[carid] = carname
+    os.makedirs(VEHICLE_FOLDER, exist_ok=True)
+    with open(ADDED_VEHICLES_JSON, 'w', encoding='utf-8') as f:
+        json.dump(raw, f, indent=2)
     print(f"[DEBUG] Vehicle {carid} added to JSON successfully")
     return True
 
 def remove_vehicle_from_json(carid):
     print(f"[DEBUG] remove_vehicle_from_json called: {carid}")
-
-    vehicles = load_added_vehicles_json()
-
-    if carid in vehicles:
-        del vehicles[carid]
-        save_added_vehicles_json(vehicles)
+    raw = _load_raw_json()
+    if carid in raw:
+        del raw[carid]
+        with open(ADDED_VEHICLES_JSON, 'w', encoding='utf-8') as f:
+            json.dump(raw, f, indent=2)
         print(f"[DEBUG] Vehicle {carid} removed from JSON successfully")
         return True
     else:
         print(f"[WARNING] Vehicle {carid} not found in JSON")
+        return False
+
+def add_variant_to_json(carid: str, suffix_lower: str) -> bool:
+    """Record a custom variant under __variants__ in added_vehicles.json."""
+    print(f"[DEBUG] add_variant_to_json called: {carid}__{suffix_lower}")
+    key = f"{carid}__{suffix_lower}"
+    raw = _load_raw_json()
+    raw.setdefault("__variants__", {})[key] = {"carid": carid, "suffix": suffix_lower}
+    os.makedirs(VEHICLE_FOLDER, exist_ok=True)
+    with open(ADDED_VEHICLES_JSON, 'w', encoding='utf-8') as f:
+        json.dump(raw, f, indent=2)
+    print(f"[DEBUG] Variant {key} added to JSON successfully")
+    return True
+
+def remove_variant_from_json(carid: str, suffix_lower: str) -> bool:
+    """Remove a custom variant from __variants__ in added_vehicles.json."""
+    print(f"[DEBUG] remove_variant_from_json called: {carid}__{suffix_lower}")
+    key = f"{carid}__{suffix_lower}"
+    raw = _load_raw_json()
+    variants = raw.get("__variants__", {})
+    if key in variants:
+        del variants[key]
+        if not variants:
+            raw.pop("__variants__", None)
+        else:
+            raw["__variants__"] = variants
+        with open(ADDED_VEHICLES_JSON, 'w', encoding='utf-8') as f:
+            json.dump(raw, f, indent=2)
+        print(f"[DEBUG] Variant {key} removed from JSON successfully")
+        return True
+    else:
+        print(f"[WARNING] Variant {key} not found in JSON")
         return False
 
 def fix_stage_two_material_properties(stage2, carid, prefix):
@@ -166,7 +247,6 @@ def fix_stage_two_material_properties(stage2, carid, prefix):
             added_count += 1
             print(f"[DEBUG]   ✓ Added missing property: {prop} = {value}")
         elif prop == "baseColorMap":
-
             old_value = stage2[prop]
             stage2[prop] = value
             print(f"[DEBUG]   ✓ Replaced baseColorMap:")
@@ -187,7 +267,6 @@ def edit_material_json(source_json_path, target_folder, carid):
     print(f"[DEBUG]   CarID: {carid}")
 
     try:
-
         source_basename = os.path.basename(source_json_path)
 
         if source_basename.startswith("skin."):
@@ -208,9 +287,7 @@ def edit_material_json(source_json_path, target_folder, carid):
             print(f"[DEBUG] Attempting to fix JSON5 format (trailing commas, comments)...")
 
             content = re.sub(r'//[^\n]*', '', content)
-
             content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-
             content = re.sub(r',(\s*[}\]])', r'\1', content)
 
             try:
@@ -227,37 +304,32 @@ def edit_material_json(source_json_path, target_folder, carid):
                 print(f"[DEBUG] Copied file directly (BeamNG will parse it)")
                 return True
 
-        skin_pattern_prefixes = [
-            f"{carid}",
-            f"{carid}_body",
-            f"{carid}_extra",
-            f"{carid}_aftermarket",
-            f"{carid}_main",
-            f"{carid}_mechanical"
-        ]
+        # Match any key of the form:  {prefix}.skin.{skinname}
+        # or the lbe variant:         {prefix}.skin_lbe.{skinname}
+        #
+        # The prefix is intentionally unrestricted — NOT anchored to carid — because
+        # BeamNG mods use material-layer names as prefixes rather than the vehicle
+        # folder name.  For example a vehicle with carid "sprinfox20_fox" uses keys
+        # like "sprinfox20_paint.skin.60054", "sprinfox20_paint_ext.skin.60054",
+        # "sprinfox20_color.skin.60054" — none of which starts with "sprinfox20_fox".
+        # Anchoring to carid caused skin_groups to always be empty for these mods,
+        # leaving the output file completely unedited.
+        general_skin_pattern = r"^(.+?)\.skin(?:_lbe)?\.(.+)$"
 
         skin_groups = {}
 
         print(f"[DEBUG] Scanning for skin entries matching carid: {carid}")
 
         for key, value in data.items():
-
-            for prefix in skin_pattern_prefixes:
-
-                pattern = rf"^{re.escape(prefix)}\.skin[^.]*\.(.+)$"
-                match = re.match(pattern, key)
-
-                if match:
-
-                    skinname = match.group(1)
-
-                    if skinname:
-
-                        if skinname not in skin_groups:
-                            skin_groups[skinname] = {}
-                        skin_groups[skinname][key] = (key, value, prefix)
-                        print(f"[DEBUG] Found skin entry: {key} (skinname: {skinname})")
-                    break
+            match = re.match(general_skin_pattern, key)
+            if match:
+                prefix   = match.group(1)
+                skinname = match.group(2)
+                if skinname:
+                    if skinname not in skin_groups:
+                        skin_groups[skinname] = {}
+                    skin_groups[skinname][key] = (key, value, prefix)
+                    print(f"[DEBUG] Found skin entry: {key} (prefix: {prefix}, skinname: {skinname})")
 
         if not skin_groups:
             print(f"[WARNING] No skin entries found matching carid: {carid}")
@@ -274,9 +346,7 @@ def edit_material_json(source_json_path, target_folder, carid):
         filtered_data = {}
 
         for key, (original_key, value, prefix) in selected_entries.items():
-
             normalized_key = f"{prefix}.skin.skinname"
-
             print(f"[DEBUG] Transforming: {original_key} → {normalized_key}")
 
             import copy
@@ -300,7 +370,6 @@ def edit_material_json(source_json_path, target_folder, carid):
                 if len(new_value["Stages"]) >= 2:
                     stage2 = new_value["Stages"][1]
                     if isinstance(stage2, dict):
-
                         new_value["Stages"][1] = fix_stage_two_material_properties(stage2, carid, prefix)
 
             fields_to_remove = [
@@ -318,10 +387,6 @@ def edit_material_json(source_json_path, target_folder, carid):
                     print(f"[DEBUG] Removed field: {field} from {normalized_key}")
 
             if "Stages" in new_value and isinstance(new_value["Stages"], list):
-                original_length = len(new_value["Stages"])
-
-                new_value["Stages"] = new_value["Stages"][:2]
-
                 stage_fields_to_remove = ["colorPaletteMap", "colorPaletteMapUseUV"]
                 for stage_idx, stage in enumerate(new_value["Stages"]):
                     if isinstance(stage, dict):
@@ -330,8 +395,7 @@ def edit_material_json(source_json_path, target_folder, carid):
                                 del stage[field]
                                 print(f"[DEBUG] Removed {field} from {normalized_key} Stage {stage_idx}")
 
-                new_length = len(new_value["Stages"])
-                print(f"[DEBUG] Trimmed Stages array in {normalized_key}: {original_length} -> {new_length} stages")
+                print(f"[DEBUG] Kept all {len(new_value['Stages'])} stages in {normalized_key}")
 
             filtered_data[normalized_key] = new_value
             print(f"[DEBUG] Transformed: {original_key} -> {normalized_key}")
@@ -356,7 +420,6 @@ def edit_jbeam_material(source_jbeam_path, target_folder, carid):
     print(f"[DEBUG]   CarID: {carid}")
 
     try:
-
         output_name = os.path.basename(source_jbeam_path)
         target_path = os.path.join(target_folder, output_name)
 
@@ -391,7 +454,6 @@ def edit_info_json(source_json_path, target_folder):
     print(f"[DEBUG]   Target: {target_folder}")
 
     try:
-
         output_name = os.path.basename(source_json_path)
         target_path = os.path.join(target_folder, output_name)
 
@@ -422,7 +484,6 @@ def create_single_skin_mod(
     output_path=None,
     progress_callback=None
 ):
-
     print(f"[DEBUG] create_single_skin_mod called")
     temp_dir = tempfile.mkdtemp(prefix="beamng_mod_")
 
@@ -459,7 +520,6 @@ def create_single_skin_mod(
             progress_callback(0.4)
 
         process_jbeam_files(mod_vehicle_dir, dds_identifier, skin_name, author)
-
         process_json_files(mod_vehicle_dir, vehicle_id, skin_id, dds_filename, dds_identifier)
 
         if progress_callback:
@@ -468,11 +528,9 @@ def create_single_skin_mod(
         if preview_image_path and os.path.exists(preview_image_path):
             preview_dir = os.path.join(temp_dir, "imagesforgui", "vehicles", vehicle_id)
             os.makedirs(preview_dir, exist_ok=True)
-
             preview_ext = os.path.splitext(preview_image_path)[1]
             preview_name = f"{skin_id}{preview_ext}"
             preview_target = os.path.join(preview_dir, preview_name)
-
             shutil.copy2(preview_image_path, preview_target)
 
         if progress_callback:
@@ -507,7 +565,6 @@ def create_single_skin_mod(
         return zip_path
 
     finally:
-
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
@@ -518,7 +575,6 @@ def create_multi_skin_mod(
     output_path=None,
     progress_callback=None
 ):
-
     print(f"[DEBUG] create_multi_skin_mod called")
     temp_dir = tempfile.mkdtemp(prefix="beamng_mod_multi_")
 
@@ -574,7 +630,6 @@ def create_multi_skin_mod(
                 progress_callback(base_progress + (skin_progress_weight * 0.4))
 
             process_jbeam_files(mod_vehicle_dir, dds_identifier, skin_name, author)
-
             process_json_files(mod_vehicle_dir, vehicle_id, skin_id, dds_filename, dds_identifier)
 
             if progress_callback:
@@ -583,11 +638,9 @@ def create_multi_skin_mod(
             if preview_image_path and os.path.exists(preview_image_path):
                 preview_dir = os.path.join(temp_dir, "imagesforgui", "vehicles", vehicle_id)
                 os.makedirs(preview_dir, exist_ok=True)
-
                 preview_ext = os.path.splitext(preview_image_path)[1]
                 preview_name = f"{skin_id}{preview_ext}"
                 preview_target = os.path.join(preview_dir, preview_name)
-
                 shutil.copy2(preview_image_path, preview_target)
 
             if "config_data" in skin:
@@ -645,12 +698,10 @@ def create_multi_skin_mod(
         return zip_path
 
     finally:
-
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
 def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
-
     print(f"[DEBUG] process_jbeam_files called")
     for root_dir, _, files in os.walk(folder_path):
         for file in files:
@@ -704,7 +755,6 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author):
             )
 
             def replace_extra_skin_name(match):
-
                 print(f"[DEBUG] replace_extra_skin_name called")
                 return f'{match.group(1)}{dds_identifier}"'
 
@@ -737,7 +787,6 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
             print(f"[DEBUG] Processing JSON file: {file_path}")
 
             try:
-
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
@@ -771,12 +820,9 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
 
                     if "Stages" in material_data and isinstance(material_data["Stages"], list):
                         stages = material_data["Stages"]
-
                         if len(stages) > 1 and isinstance(stages[1], dict):
                             stage2 = stages[1]
-
                             new_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{vehicle_id}_skin_{dds_identifier}.dds"
-
                             if "baseColorMap" in stage2:
                                 original_path = stage2["baseColorMap"]
                                 stage2["baseColorMap"] = new_path
@@ -814,7 +860,7 @@ def process_json_files(folder_path, vehicle_id, skin_folder_name, dds_filename, 
                         return f'{match.group(1)}{dds_identifier}"'
 
                     content = content.replace('.skin_lbe.', '.skin.')
-                    
+
                     content = re.sub(
                         r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',
                         replace_skin_name,

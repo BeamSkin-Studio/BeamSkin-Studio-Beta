@@ -373,89 +373,6 @@
             line-height: 1.6;
         }
 
-        /* ── Upcoming ── */
-        .upcoming-header {
-            font-size: 0.68rem;
-            font-weight: 900;
-            letter-spacing: 0.13em;
-            color: var(--text-mute);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 18px 0 10px;
-        }
-
-        .upcoming-header::before,
-        .upcoming-header::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #1e2430;
-        }
-
-        .upcoming-header i { color: #f39c12; }
-
-        .upcoming-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-
-        .upcoming-card {
-            background: rgba(243, 156, 18, 0.04);
-            border: 1px solid rgba(243, 156, 18, 0.18);
-            border-radius: 10px;
-            padding: 13px 14px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upcoming-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(to right, #f39c12, transparent);
-        }
-
-        .upcoming-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.63rem;
-            font-weight: 700;
-            color: #f39c12;
-            background: rgba(243, 156, 18, 0.1);
-            border: 1px solid rgba(243, 156, 18, 0.2);
-            border-radius: 20px;
-            padding: 2px 8px;
-            margin-bottom: 9px;
-        }
-
-        .upcoming-icon {
-            width: 30px; height: 30px;
-            border-radius: 7px;
-            background: rgba(243, 156, 18, 0.08);
-            border: 1px solid rgba(243, 156, 18, 0.18);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.78rem;
-            color: #f39c12;
-            margin-bottom: 9px;
-        }
-
-        .upcoming-label {
-            font-size: 0.74rem;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 4px;
-        }
-
-        .upcoming-desc {
-            font-size: 0.69rem;
-            color: var(--text-mute);
-            line-height: 1.6;
-        }
-
         /* ══════════════════════════════════════════════════════════════════
            INSTALLATION GUIDE SECTION
         ══════════════════════════════════════════════════════════════════ */
@@ -922,6 +839,28 @@
             padding: 6px 14px;
         }
 
+        /* upcoming-header reused for section dividers */
+        .upcoming-header {
+            font-size: 0.68rem;
+            font-weight: 900;
+            letter-spacing: 0.13em;
+            color: var(--text-mute);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 18px 0 10px;
+        }
+
+        .upcoming-header::before,
+        .upcoming-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #1e2430;
+        }
+
+        .upcoming-header i { color: #f39c12; }
+
         @media (max-width: 900px) {
             .release-row { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
             .release-tag { min-width: unset; font-size: 0.78rem; }
@@ -962,7 +901,6 @@
             .count-tag { font-size: 12px; }
 
             .features-grid { grid-template-columns: 1fr 1fr; }
-            .upcoming-grid { grid-template-columns: 1fr; }
             .steps-grid    { grid-template-columns: 1fr 1fr; }
             .steps-grid-4  { grid-template-columns: 1fr 1fr; }
 
@@ -1001,7 +939,6 @@
             BeamSkin Studio is <strong>usable but still in active development.</strong><br>- crashes are rare, but bugs are possible.<br><br>
             <strong>Known limitations:</strong><br>
             • <strong>Game updates</strong> may rename textures, breaking some skins until patched.<br>
-            • <strong>Vehicle variants</strong> (box trucks, ambulances, etc.) are not supported yet.<br>
             • <strong>Mod support</strong> is present but limited — not all mods work.<br>
             • Some features are still <strong>missing or incomplete</strong>.<br>
             • <strong>Linux version</strong> is completely untested — may not work.<br>
@@ -1117,14 +1054,6 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-puzzle-piece"></i></div>
-                    <div class="feature-text">
-                        <div class="feature-label">Mod Support</div>
-                        <div class="feature-desc">Basic mod support is included, allowing custom vehicle skins from supported mods — coverage is still expanding.</div>
-                    </div>
-                </div>
-
-                <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-palette"></i></div>
                     <div class="feature-text">
                         <div class="feature-label">Colorable Skins</div>
@@ -1160,58 +1089,56 @@
                     <div class="feature-icon"><i class="fas fa-floppy-disk"></i></div>
                     <div class="feature-text">
                         <div class="feature-label">Save / Load Projects</div>
-                        <div class="feature-desc">Save your current skin setup as a project file and reload it later to pick up exactly where you left off.</div>
+                        <div class="feature-desc">Saving a project now remembers its location automatically. Loading opens a built-in menu listing all your saved projects in one place — no more navigating through File Explorer to track down a save file.</div>
                     </div>
                 </div>
 
-            </div>
-
-            <!-- Upcoming -->
-            <div class="upcoming-header">
-                <i class="fas fa-clock-rotate-left"></i> COMING IN V.0.8.0.BETA
-            </div>
-            <div class="upcoming-grid">
-
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-sun"></i></div>
-                    <div class="upcoming-label">Reflective Map Support</div>
-                    <div class="upcoming-desc">Users will be able to add a reflectivity map to their skin, making specific areas reflective — useful for things like police car decals or chrome accents.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-sun"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">Reflective Map Support</div>
+                        <div class="feature-desc">Add a reflectivity map to your skin, making specific areas reflective — perfect for police car decals, chrome accents, and other shiny surfaces.</div>
+                    </div>
                 </div>
 
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-truck-moving"></i></div>
-                    <div class="upcoming-label">Body Variant Support</div>
-                    <div class="upcoming-desc">Skinning support for cargo, box truck, and ambulance body variants.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-truck-moving"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">Body Variant Support</div>
+                        <div class="feature-desc">Create skins for vehicle body variants including bus, cargo, box truck, and ambulance configurations.</div>
+                    </div>
                 </div>
 
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-desktop"></i></div>
-                    <div class="upcoming-label">Migrated to PySide6</div>
-                    <div class="upcoming-desc">The UI framework is being moved from CustomTkinter to PySide6 — enabling a more modern, flexible interface and better long-term maintainability.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-desktop"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">PySide6 Interface</div>
+                        <div class="feature-desc">The UI runs on PySide6 — a modern Qt-based framework using your GPU for rendering, giving a smoother and more stable experience.</div>
+                    </div>
                 </div>
 
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-folder-open"></i></div>
-                    <div class="upcoming-label">Unpacked Mod Toggle</div>
-                    <div class="upcoming-desc">A toggle to export the mod as a plain folder instead of a ZIP file — useful for testing or editing the mod directly without extracting it first.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-folder-open"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">Unpacked Mod Export</div>
+                        <div class="feature-desc">Export your mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly without extracting it first.</div>
+                    </div>
                 </div>
 
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-puzzle-piece"></i></div>
-                    <div class="upcoming-label">Auto Mod Import</div>
-                    <div class="upcoming-desc">Point BeamSkin Studio at a mod and it will automatically scan and extract everything needed — vehicle JSON, JBeam files, and the vehicle's default preview image used in the car list and hover preview — then add the modded vehicle ready to skin. No more manually hunting through mod folders for the right files.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-puzzle-piece"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">Auto Add Mods</div>
+                        <div class="feature-desc">BeamSkin Studio can now add your mods and find the correct files automatically — no more hunting through mod folders for the right files yourself.</div>
+                    </div>
                 </div>
 
-                <div class="upcoming-card">
-                    <div class="upcoming-badge"><i class="fas fa-hourglass-half"></i> V.0.8.0.Beta</div>
-                    <div class="upcoming-icon"><i class="fas fa-floppy-disk"></i></div>
-                    <div class="upcoming-label">Improved Save / Load</div>
-                    <div class="upcoming-desc">Saving a project now remembers its location automatically. Loading opens a built-in menu listing all your saved projects in one place — no more navigating through File Explorer to track down a save file. Pick a save from the list and you're straight back in.</div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-folder-tree"></i></div>
+                    <div class="feature-text">
+                        <div class="feature-label">Smart Config Browsing</div>
+                        <div class="feature-desc">When browsing for <code style="background:rgba(255,102,0,0.1);border:1px solid rgba(255,102,0,0.2);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:0.65rem;">.pc</code> and <code style="background:rgba(255,102,0,0.1);border:1px solid rgba(255,102,0,0.2);color:var(--accent);padding:1px 4px;border-radius:3px;font-size:0.65rem;">.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div>
+                    </div>
                 </div>
 
             </div>

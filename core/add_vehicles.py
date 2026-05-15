@@ -111,7 +111,7 @@ def process_custom_vehicle(
             print(f"[DEBUG]   Source: {image_path}")
             
             try:
-                preview_folder = os.path.join("imagesforgui", "vehicles", carid)
+                preview_folder = os.path.join("gui", "images", "vehicles", carid)
                 os.makedirs(preview_folder, exist_ok=True)
                 
                 image_target = os.path.join(preview_folder, "default.jpg")
@@ -178,6 +178,134 @@ def delete_custom_vehicle(carid: str) -> bool:
         return True
     except Exception as e:
         print(f"[ERROR] Failed to delete vehicle {carid}: {e}")
+        return False
+
+
+def process_custom_variant(
+    carid: str,
+    variant_suffix: str,
+    json_path: str,
+    jbeam_path: str,
+    image_path: Optional[str] = None,
+) -> bool:
+    """
+    Import a body variant (e.g. ambulance, box) for an existing vehicle.
+
+    Creates  vehicles/{carid}/SKINNAME{SUFFIX}/  and writes the processed
+    materials JSON + a template JBEAM into it, then records the variant in
+    added_vehicles.json under __variants__.
+    """
+    from utils.file_ops import (
+        create_variant_folders,
+        delete_variant_folders,
+        edit_material_json,
+        edit_jbeam_material,
+        add_variant_to_json,
+        VEHICLE_FOLDER,
+    )
+
+    suffix_upper = variant_suffix.upper()
+    suffix_lower = variant_suffix.lower()
+
+    print(f"[DEBUG] {'='*60}")
+    print(f"[DEBUG] PROCESSING VARIANT: {carid} + {suffix_upper}")
+    print(f"[DEBUG] {'='*60}")
+
+    try:
+        # Step 1: Validate input files
+        print(f"[DEBUG] Step 1: Validating input files...")
+        if not os.path.exists(json_path):
+            print(f"[ERROR] JSON file not found: {json_path}")
+            return False
+        if not os.path.exists(jbeam_path):
+            print(f"[ERROR] JBEAM file not found: {jbeam_path}")
+            return False
+        if image_path and not os.path.exists(image_path):
+            print(f"[WARNING] Image file not found, skipping: {image_path}")
+            image_path = None
+
+        # Step 2: Create variant folder  vehicles/{carid}/SKINNAME{SUFFIX}/
+        print(f"[DEBUG] Step 2: Creating variant folder structure...")
+        try:
+            create_variant_folders(carid, suffix_upper)
+        except Exception as e:
+            print(f"[ERROR] Failed to create variant folders: {e}")
+            return False
+
+        variant_folder = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
+        if not os.path.exists(variant_folder):
+            print(f"[ERROR] Variant folder was not created: {variant_folder}")
+            return False
+
+        # Step 3: Process JSON
+        print(f"[DEBUG] Step 3: Processing JSON file...")
+        try:
+            edit_material_json(json_path, variant_folder, carid)
+        except Exception as e:
+            print(f"[ERROR] Failed to process JSON file: {e}")
+            import traceback; traceback.print_exc()
+            delete_variant_folders(carid, suffix_upper)
+            return False
+
+        # Step 4: Process JBEAM
+        print(f"[DEBUG] Step 4: Processing JBEAM file...")
+        try:
+            edit_jbeam_material(jbeam_path, variant_folder, carid)
+        except Exception as e:
+            print(f"[ERROR] Failed to process JBEAM file: {e}")
+            import traceback; traceback.print_exc()
+            delete_variant_folders(carid, suffix_upper)
+            return False
+
+        # Step 5: Preview image (optional)
+        if image_path and image_path.lower().endswith(('.jpg', '.jpeg')):
+            print(f"[DEBUG] Step 5: Copying preview image...")
+            try:
+                preview_folder = os.path.join("gui", "images", "vehicles", carid)
+                os.makedirs(preview_folder, exist_ok=True)
+                shutil.copy2(image_path, os.path.join(preview_folder, f"default_{suffix_lower}.jpg"))
+            except Exception as e:
+                print(f"[WARNING] Failed to copy preview image (non-critical): {e}")
+
+        # Step 6: Record in JSON
+        try:
+            add_variant_to_json(carid, suffix_lower)
+            print(f"[DEBUG] ✓ Variant saved to added_vehicles.json")
+        except Exception as e:
+            print(f"[WARNING] Failed to save variant to JSON (non-critical): {e}")
+
+        print(f"[DEBUG] ✓ SUCCESS: Variant {carid}+{suffix_upper} processed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Unexpected error processing variant: {e}")
+        import traceback; traceback.print_exc()
+        try:
+            from utils.file_ops import delete_variant_folders as _dvf
+            _dvf(carid, suffix_upper)
+        except Exception:
+            pass
+        return False
+
+
+def delete_custom_variant(carid: str, suffix: str) -> bool:
+    """
+    Delete a custom variant and remove it from added_vehicles.json.
+    Does NOT touch the parent vehicle folder.
+    """
+    from utils.file_ops import delete_variant_folders, remove_variant_from_json
+
+    suffix_upper = suffix.upper()
+    suffix_lower = suffix.lower()
+
+    print(f"[DEBUG] delete_custom_variant called: {carid} + {suffix_upper}")
+    try:
+        delete_variant_folders(carid, suffix_upper)
+        remove_variant_from_json(carid, suffix_lower)
+        print(f"[DEBUG] ✓ Variant {carid}+{suffix_upper} deleted successfully")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to delete variant {carid}+{suffix}: {e}")
         return False
 
 

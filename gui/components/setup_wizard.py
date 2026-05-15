@@ -1,609 +1,620 @@
-"""
-First-Time Setup Wizard for BeamSkin Studio
-"""
-import customtkinter as ctk
-from tkinter import filedialog
-from PIL import Image
+from __future__ import annotations
 import os
-from typing import Optional, Callable
+import platform
+from typing import Callable, Optional
+
+from PySide6.QtCore    import Qt, Signal
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
+    QScrollArea, QWidget, QLineEdit, QFileDialog, QApplication,
+    QStackedWidget, QSizePolicy,
+)
+from PySide6.QtGui import QPixmap
+
+from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.widgets import AnimButton, GhostButton, HSeparator, Badge
 from gui.icon_helper import set_window_icon
 
 try:
     from core.localization import t, set_language, get_available_languages
 except ImportError:
-    def t(key, **kwargs): return key
+    def t(key, **kw): return key
     def set_language(lang): return True
-    def get_available_languages(): return {}
+    def get_available_languages():
+        return {"en": {"name": "English", "native": "English", "flag": "🇬🇧"}}
 
-print("[DEBUG] setup_wizard.py loaded with localization")
+print("[DEBUG] setup_wizard.py loaded (PySide6)")
 
-class SetupWizard:
-    """Multi-step setup wizard: 1. Language → 2. Paths"""
 
-    def __init__(self, parent, colors: dict, on_complete: Callable[[dict], None]):
-        self.colors = colors
+# LANGUAGE ROW
+
+class _LangRow(QFrame):
+    selected = Signal(str)
+
+    def __init__(self, code: str, info: dict, is_selected: bool, parent=None):
+        print(f"[DEBUG] __init__() called")
+        super().__init__(parent)
+        self.code = code
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(60)
+        self._apply(is_selected)
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(14, 8, 14, 8)
+        row.setSpacing(12)
+
+        flag = QLabel(info.get("flag", "🌐"))
+        flag.setFont(font(24))
+        flag.setStyleSheet("background:transparent;border:none;")
+        row.addWidget(flag)
+
+        names = QVBoxLayout()
+        names.setSpacing(1)
+        native = QLabel(info.get("native", info.get("name", code)))
+        native.setFont(font(14, "bold"))
+        tc = COLORS["accent_text"] if is_selected else COLORS["text"]
+        native.setStyleSheet(f"color:{tc};background:transparent;border:none;")
+        names.addWidget(native)
+
+        if info.get("native") and info.get("native") != info.get("name"):
+            eng = QLabel(info.get("name", ""))
+            eng.setFont(font(11))
+            tc2 = COLORS["accent_text"] if is_selected else COLORS["text_secondary"]
+            eng.setStyleSheet(f"color:{tc2};background:transparent;border:none;")
+            names.addWidget(eng)
+
+        row.addLayout(names, 1)
+
+        if is_selected:
+            chk = QLabel("✓")
+            chk.setFont(font(18, "bold"))
+            chk.setStyleSheet(
+                f"color:{COLORS['accent_text']};background:transparent;border:none;"
+            )
+            row.addWidget(chk)
+
+    def _apply(self, active: bool):
+        print(f"[DEBUG] _apply() called")
+        if active:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['accent']};
+                    border-radius: 10px;
+                    border: none;
+                }}
+            """)
+        else:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {COLORS['card_bg']};
+                    border-radius: 10px;
+                    border: 1px solid {COLORS['border']};
+                }}
+                QFrame:hover {{
+                    background-color: {COLORS['card_hover']};
+                    border-color: {COLORS['accent']};
+                }}
+            """)
+
+    def mousePressEvent(self, _event):
+        print(f"[DEBUG] mousePressEvent() called")
+        self.selected.emit(self.code)
+
+
+# SETUP WIZARD DIALOG
+
+class SetupWizard(QDialog):
+
+    def __init__(self, parent: QWidget, colors: dict,
+                 on_complete: Callable[[dict], None]):
+        super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
+        set_window_icon(self)
+        self.setModal(True)
+        self.setFixedSize(860, 760)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background:transparent;")
+
+        self.colors      = colors
         self.on_complete = on_complete
-        self.parent = parent
-        self.paths = {
-            "beamng_install": "",
-            "mods_folder": ""
-        }
-        self.selected_language = None
-        self.current_step = 1  # 1 = Language, 2 = Paths
-        self._lang_scroll = None
-        self._search_var = None
-        self._search_trace_id = None
+        self.paths       = {"beamng_install": "", "mods_folder": ""}
+        self._selected_lang = "en"
 
-        # Create dialog
-        self.dialog = ctk.CTkToplevel(parent)
-        set_window_icon(self.dialog)
-        self.dialog.title(t("setup_wizard.title", default="Welcome to BeamSkin Studio"))
-        self.dialog.geometry("850x750")
-        self.dialog.resizable(False, False)
+        # centre on parent / screen
+        if parent:
+            pg = parent.frameGeometry()
+            self.move(pg.x() + (pg.width() - 860) // 2,
+                      pg.y() + (pg.height() - 760) // 2)
+        else:
+            sg = QApplication.primaryScreen().geometry()
+            self.move((sg.width() - 860) // 2, (sg.height() - 760) // 2)
 
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
+        self._build()
+        fade_in(self._card, 220)
 
-        # Center on screen
-        self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (850 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (750 // 2)
-        self.dialog.geometry(f"850x750+{x}+{y}")
 
-        self.dialog.lift()
-        self.dialog.focus_force()
-        self.dialog.attributes('-topmost', True)
-        self.dialog.after(100, lambda: self.dialog.attributes('-topmost', False))
+    def _build(self):
+        print(f"[DEBUG] _build() called")
+        self._card = QFrame(self)
+        self._card.setObjectName("wizardCard")
+        self._card.setGeometry(0, 0, 860, 760)
+        self._card.setStyleSheet(f"""
+            #wizardCard {{
+                background-color: {COLORS['frame_bg']};
+                border-radius: 20px;
+                border: 1px solid {COLORS['border']};
+            }}
+        """)
+        drop_shadow(self._card, 36, (0, 10))
 
-        self.dialog.protocol("WM_DELETE_WINDOW", self._on_exit_program)
+        root = QVBoxLayout(self._card)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # Create main container
-        self.main_frame = ctk.CTkFrame(self.dialog, fg_color=colors["frame_bg"])
-        self.main_frame.pack(fill="both", expand=True, padx=25, pady=(25, 30))
+        # stacked pages
+        self._stack = QStackedWidget()
+        root.addWidget(self._stack, 1)
 
-        # Show language selection first
-        self._show_language_step()
+        self._page_lang  = self._build_language_page()
+        self._page_paths = self._build_paths_page()
+        self._stack.addWidget(self._page_lang)
+        self._stack.addWidget(self._page_paths)
+        self._stack.setCurrentIndex(0)
 
-    def _show_language_step(self):
-        print("[DEBUG] Showing language selection step")
+    # PAGE 1 — LANGUAGE
 
-        # Reset search state so stale trace callbacks don't reference destroyed widgets
-        self._lang_scroll = None
-        self._search_var = None
+    def _build_language_page(self) -> QWidget:
+        print(f"[DEBUG] _build_language_page() called")
+        page = QWidget()
+        page.setStyleSheet("background:transparent;")
+        col = QVBoxLayout(page)
+        col.setContentsMargins(36, 28, 36, 28)
+        col.setSpacing(16)
 
-        # Clear main frame
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
+        # header
+        hdr = QVBoxLayout()
+        hdr.setSpacing(6)
 
-        # Header
-        self._create_header_language()
+        logo_path = os.path.join("gui", "Icons", "BeamSkin_Studio_White.png")
+        if os.path.exists(logo_path):
+            logo_lbl = QLabel()
+            px = QPixmap(logo_path).scaled(
+                80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            logo_lbl.setPixmap(px)
+            logo_lbl.setAlignment(Qt.AlignCenter)
+            logo_lbl.setStyleSheet("background:transparent;border:none;")
+            hdr.addWidget(logo_lbl)
+        else:
+            globe = QLabel("🌍")
+            globe.setFont(font(48))
+            globe.setAlignment(Qt.AlignCenter)
+            globe.setStyleSheet("background:transparent;border:none;")
+            hdr.addWidget(globe)
 
-        # Language selection content
-        content_frame = ctk.CTkFrame(self.main_frame, fg_color=self.colors["card_bg"], corner_radius=12)
-        content_frame.pack(fill="both", expand=True, pady=(0, 15))
+        title = QLabel(t("setup_wizard.title"))
+        title.setFont(font(22, "bold"))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        hdr.addWidget(title)
+        self._welcome_title = title
 
-        # ── Search bar ──────────────────────────────────────────────────── #
-        search_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        search_frame.pack(fill="x", padx=25, pady=(20, 8))
-
-        self._search_var = ctk.StringVar()
-        search_entry = ctk.CTkEntry(
-            search_frame,
-            textvariable=self._search_var,
-            placeholder_text="🔍  " + t("language_selection.search", default="Search languages…"),
-            font=ctk.CTkFont(size=13),
-            height=38,
-            fg_color=self.colors["frame_bg"],
-            border_color=self.colors["border"],
-            corner_radius=8,
+        sub = QLabel(t("language_selection.selection"))
+        sub.setFont(font(13))
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        search_entry.pack(fill="x")
+        hdr.addWidget(sub)
+        self._welcome_sub = sub
+        col.addLayout(hdr)
 
-        # ── Scrollable language list ─────────────────────────────────────── #
-        languages_scroll = ctk.CTkScrollableFrame(
-            content_frame,
-            fg_color=self.colors["frame_bg"],
-            corner_radius=8
+        # search bar
+        self._lang_search = QLineEdit()
+        self._lang_search.setPlaceholderText(
+            "🔍  " + t("language_selection.search")
         )
-        languages_scroll.pack(fill="both", expand=True, padx=25, pady=(4, 25))
+        self._lang_search.setMinimumHeight(38)
+        self._lang_search.setFont(font(13))
+        self._lang_search.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:8px;
+                padding:6px 12px;
+                font-size:13px;
+            }}
+            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
+        """)
+        self._lang_search.textChanged.connect(self._filter_languages)
+        col.addWidget(self._lang_search)
 
-        # Get available languages once
-        available_languages = get_available_languages()
-        if not available_languages:
-            available_languages = {"en": {"name": "English", "native": "English", "flag": "🇬🇧"}}
+        # language list scroll
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background:transparent; border:none; }}
+            QScrollArea > QWidget > QWidget {{ background:transparent; }}
+        """)
+        self._lang_list_widget = QWidget()
+        self._lang_list_widget.setStyleSheet("background:transparent;")
+        self._lang_list_layout = QVBoxLayout(self._lang_list_widget)
+        self._lang_list_layout.setContentsMargins(2, 2, 2, 2)
+        self._lang_list_layout.setSpacing(5)
+        scroll.setWidget(self._lang_list_widget)
+        col.addWidget(scroll, 1)
 
-        self._all_languages = dict(
-            sorted(available_languages.items(), key=lambda x: x[1]["name"])
+        self._populate_languages("")
+
+        # footer button
+        col.addWidget(HSeparator())
+        next_btn = AnimButton(
+            t("language_selection.continue"),
+            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
+            font_size=14, bold=True, padding="12px 32px",
         )
-        self.language_buttons = {}
-        self._lang_scroll = languages_scroll
+        next_btn.setMinimumHeight(46)
+        next_btn.clicked.connect(self._go_to_paths)
+        col.addWidget(next_btn)
+        self._next_btn = next_btn
 
-        # Initial render (no filter)
-        self._render_language_list("")
+        return page
 
-        # Wire up live search — remove any previous trace first to avoid accumulation.
-        # _show_language_step() is called on every language click, so without cleanup
-        # each call leaves an orphaned callback referencing the old StringVar.
-        def _on_search_change(*_):
-            if self._search_var is not None:
-                self._render_language_list(self._search_var.get())
+    def _populate_languages(self, query: str):
+        print(f"[DEBUG] _populate_languages() called")
+        # clear
+        while self._lang_list_layout.count():
+            item = self._lang_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        self._search_trace_id = self._search_var.trace_add("write", _on_search_change)
-
-        # Buttons
-        self._create_buttons_language()
-
-    def _render_language_list(self, query: str):
-        if self._lang_scroll is None:
-            return
-        for widget in self._lang_scroll.winfo_children():
-            widget.destroy()
-        self.language_buttons = {}
-
+        langs = get_available_languages()
         q = query.strip().lower()
-        for lang_code, lang_info in self._all_languages.items():
-            # Match against native name, English name, or lang code
+        for code, info in sorted(langs.items(),
+                                  key=lambda x: x[1].get("name", x[0])):
             if q and not any(
                 q in s.lower()
-                for s in (lang_info.get("native", ""), lang_info.get("name", ""), lang_code)
+                for s in (info.get("native", ""), info.get("name", ""), code)
             ):
                 continue
-            self._create_language_option(self._lang_scroll, lang_code, lang_info)
+            row = _LangRow(code, info, code == self._selected_lang)
+            row.selected.connect(self._on_lang_selected)
+            self._lang_list_layout.addWidget(row)
 
-    def _create_header_language(self):
-        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 15))
+        self._lang_list_layout.addStretch()
 
-        # Logo
-        try:
-            logo_path = os.path.join("gui", "Icons", "BeamSkin_Studio_White.png")
-            if os.path.exists(logo_path):
-                logo_image = ctk.CTkImage(
-                    light_image=Image.open(logo_path),
-                    dark_image=Image.open(logo_path),
-                    size=(80, 80)
-                )
-                ctk.CTkLabel(header_frame, image=logo_image, text="").pack(pady=(0, 10))
-        except Exception as e:
-            print(f"[DEBUG] Could not load logo: {e}")
-            ctk.CTkLabel(header_frame, text="🌍", font=ctk.CTkFont(size=48)).pack(pady=(0, 8))
+    def _filter_languages(self, text: str):
+        print(f"[DEBUG] _filter_languages() called")
+        self._populate_languages(text)
 
-        ctk.CTkLabel(
-            header_frame,
-            text=t("setup_wizard.title", default="Welcome to BeamSkin Studio!"),
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=self.colors["text"]
-        ).pack()
+    def _on_lang_selected(self, code: str):
+        print(f"[DEBUG] _on_lang_selected: {code!r}")
+        self._selected_lang = code
+        set_language(code)
+        self._populate_languages(self._lang_search.text())
+        self._refresh_texts()
 
-        ctk.CTkLabel(
-            header_frame,
-            text=t("language_selection.selection", default="Language Selection"),
-            font=ctk.CTkFont(size=13),
-            text_color=self.colors["text_secondary"]
-        ).pack(pady=(4, 0))
-
-    def _create_language_option(self, parent, lang_code: str, lang_info: dict):
-        is_selected = self.selected_language == lang_code
-
-        # Create a clickable frame instead of button to avoid geometry manager issues
-        btn_frame = ctk.CTkFrame(
-            parent,
-            fg_color=self.colors["accent"] if is_selected else self.colors["card_bg"],
-            corner_radius=8,
-            height=65
+    def _refresh_texts(self):
+        """Re-evaluate all t() calls and push updated strings into existing widgets."""
+        self._welcome_title.setText(t("setup_wizard.title"))
+        self._welcome_sub.setText(t("language_selection.selection"))
+        self._lang_search.setPlaceholderText(
+            "🔍  " + t("language_selection.search")
         )
-        btn_frame.pack(fill="x", padx=5, pady=3)
-        btn_frame.pack_propagate(False)
-        
-        # Make the frame clickable
-        btn_frame.bind("<Button-1>", lambda e: self._select_language(lang_code))
-        btn_frame.bind("<Enter>", lambda e: btn_frame.configure(
-            fg_color=self.colors["accent_hover"] if is_selected else self.colors["card_hover"]
-        ))
-        btn_frame.bind("<Leave>", lambda e: btn_frame.configure(
-            fg_color=self.colors["accent"] if is_selected else self.colors["card_bg"]
-        ))
+        self._next_btn.setText(t("language_selection.continue"))
 
-        # Content container
-        content = ctk.CTkFrame(btn_frame, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=12, pady=8)
-        content.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        self._paths_title_lbl.setText(t("setup_wizard.paths_title"))
+        self._paths_sub_lbl.setText(t("setup_wizard.paths_desc"))
+        self._back_btn.setText("←  " + t("common.back"))
+        self._finish_btn.setText("✓  " + t("common.finish"))
 
-        # Left side - flag and names
-        left = ctk.CTkFrame(content, fg_color="transparent")
-        left.pack(side="left", fill="both", expand=True)
-        left.bind("<Button-1>", lambda e: self._select_language(lang_code))
-
-        # Flag
-        flag_lbl = ctk.CTkLabel(left, text=lang_info["flag"], font=ctk.CTkFont(size=28))
-        flag_lbl.pack(side="left", padx=(0, 12))
-        flag_lbl.bind("<Button-1>", lambda e: self._select_language(lang_code))
-
-        # Names container
-        names = ctk.CTkFrame(left, fg_color="transparent")
-        names.pack(side="left", fill="both", expand=True)
-        names.bind("<Button-1>", lambda e: self._select_language(lang_code))
-
-        # Native name
-        native_lbl = ctk.CTkLabel(
-            names,
-            text=lang_info["native"],
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=self.colors["accent_text"] if is_selected else self.colors["text"],
-            anchor="w"
+        self._beamng_hdr_lbl.setText(
+            f"{self._beamng_number}.  " + t("setup_wizard.beamng_install")
         )
-        native_lbl.pack(anchor="w")
-        native_lbl.bind("<Button-1>", lambda e: self._select_language(lang_code))
+        self._beamng_desc_lbl.setText(t("setup_wizard.beamng_description"))
+        self._beamng_entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
+        self._beamng_browse_btn.setText(t("common.browse"))
 
-        # English name (smaller) shown under native when different
-        if lang_info.get("name", "") != lang_info.get("native", ""):
-            eng_lbl = ctk.CTkLabel(
-                names,
-                text=lang_info.get("name", ""),
-                font=ctk.CTkFont(size=11),
-                text_color=self.colors["accent_text"] if is_selected else self.colors["text_secondary"],
-                anchor="w",
-            )
-            eng_lbl.pack(anchor="w")
-            eng_lbl.bind("<Button-1>", lambda e, lc=lang_code: self._select_language(lc))
+        self._mods_hdr_lbl.setText(
+            f"{self._mods_number}.  " + t("setup_wizard.mods_folder")
+        )
+        self._mods_desc_lbl.setText(t("setup_wizard.mods_description"))
+        self._mods_entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
+        self._mods_browse_btn.setText(t("common.browse"))
 
-        # Checkmark for selected
-        if is_selected:
-            check = ctk.CTkLabel(
-                content, 
-                text="✓", 
-                font=ctk.CTkFont(size=20, weight="bold"),
-                text_color=self.colors["accent_text"]
-            )
-            check.pack(side="right", padx=(8, 0))
-            check.bind("<Button-1>", lambda e: self._select_language(lang_code))
-
-        self.language_buttons[lang_code] = btn_frame
-
-    def _select_language(self, lang_code: str):
-        print(f"[DEBUG] Language selected: {lang_code}")
-        self.selected_language = lang_code
-        set_language(lang_code)
-        self._show_language_step()
-
-    def _create_buttons_language(self):
-        footer = ctk.CTkFrame(self.main_frame, fg_color=self.colors["card_bg"], corner_radius=12, height=72)
-        footer.pack(fill="x", pady=(10, 0))
-        footer.pack_propagate(False)
-        ctk.CTkFrame(footer, fg_color=self.colors["border"], height=1).pack(fill="x")
-        row = ctk.CTkFrame(footer, fg_color="transparent")
-        row.place(relx=0.5, rely=0.58, anchor="center")
-        ctk.CTkButton(
-            row, text=t("common.cancel", default="Exit"), command=self._on_exit_program,
-            height=40, width=160, fg_color=self.colors["frame_bg"],
-            hover_color=self.colors["card_hover"], text_color=self.colors["text"],
-            border_width=1, border_color=self.colors["border"],
-            font=ctk.CTkFont(size=13), corner_radius=8,
-        ).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(
-            row, text=t("common.next", default="Next") + "  →", command=self._on_language_next,
-            height=40, width=160, fg_color=self.colors["accent"],
-            hover_color=self.colors["accent_hover"], text_color=self.colors["accent_text"],
-            font=ctk.CTkFont(size=13, weight="bold"), corner_radius=8,
-        ).pack(side="left")
-
-    def _on_language_next(self):
-        if not self.selected_language:
-            # Default to English if nothing selected
-            self.selected_language = "en"
-            set_language("en")
-        
-        print(f"[DEBUG] Moving to paths step with language: {self.selected_language}")
-        
-        # Save language to settings (non-fatal — still proceed on error)
+    def _go_to_paths(self):
+        set_language(self._selected_lang)
         try:
             from core.settings import app_settings, save_settings
-            app_settings["language"] = self.selected_language
+            app_settings["language"] = self._selected_lang
             save_settings()
-        except Exception as e:
-            print(f"[ERROR] Failed to save language setting: {e}")
-        
-        # Move to paths step
-        self._show_paths_step()
+        except Exception:
+            pass
+        self._stack.setCurrentIndex(1)
+        self._refresh_texts()
 
-    def _show_paths_step(self):
-        print("[DEBUG] Showing paths configuration step")
+    # PAGE 2 — PATHS
 
-        # Nullify lang-step state BEFORE destroying widgets. If any in-flight
-        # StringVar trace fires during widget teardown it will hit the
-        # `if self._lang_scroll is None: return` guard in _render_language_list
-        # and exit cleanly instead of crashing on a destroyed frame (silent TclError
-        # is what caused the Next button to appear to do nothing).
-        self._lang_scroll = None
-        self._search_var = None
-        self._search_trace_id = None
+    def _build_paths_page(self) -> QWidget:
+        page = QWidget()
+        page.setStyleSheet("background:transparent;")
+        col = QVBoxLayout(page)
+        col.setContentsMargins(36, 28, 36, 28)
+        col.setSpacing(16)
 
-        # Clear main frame
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
-
-        self._create_header_paths()
-        self._create_beamng_section(self.main_frame)
-        self._create_mods_section(self.main_frame)
-        self._create_buttons_paths()
-
-    def _create_header_paths(self):
-        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 15))
-
-        try:
-            logo_path = os.path.join("gui", "Icons", "BeamSkin_Studio_White.png")
-            if os.path.exists(logo_path):
-                logo_image = ctk.CTkImage(
-                    light_image=Image.open(logo_path),
-                    dark_image=Image.open(logo_path),
-                    size=(80, 80)
-                )
-                ctk.CTkLabel(header_frame, image=logo_image, text="").pack(pady=(0, 10))
-        except:
-            ctk.CTkLabel(header_frame, text="🎮", font=ctk.CTkFont(size=40)).pack(pady=(0, 8))
-
-        ctk.CTkLabel(
-            header_frame,
-            text=t("setup_wizard.title", default="Welcome to BeamSkin Studio!"),
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color=self.colors["text"]
-        ).pack()
-
-        ctk.CTkLabel(
-            header_frame,
-            text=t("setup_wizard.step_paths", default="Configure Paths"),
-            font=ctk.CTkFont(size=13),
-            text_color=self.colors["text_secondary"]
-        ).pack(pady=(4, 0))
-
-    def _create_beamng_section(self, parent):
-        section_frame = ctk.CTkFrame(parent, fg_color=self.colors["card_bg"], corner_radius=12)
-        section_frame.pack(fill="x", pady=(0, 12))
-
-        title_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
-        title_frame.pack(fill="x", padx=20, pady=(12, 8))
-
-        ctk.CTkLabel(
-            title_frame,
-            text="1. " + t("setup_wizard.beamng_install", default="BeamNG.drive Installation"),
-            font=ctk.CTkFont(size=15, weight="bold"),
-            text_color=self.colors["text"],
-            anchor="w"
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            section_frame,
-            text=t("setup_wizard.beamng_description", default="Required for extracting UV maps from vehicle files"),
-            font=ctk.CTkFont(size=11),
-            text_color=self.colors["text_secondary"],
-            anchor="w"
-        ).pack(fill="x", padx=20, pady=(0, 8))
-
-        path_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
-        path_frame.pack(fill="x", padx=20, pady=(0, 12))
-
-        self.beamng_entry = ctk.CTkEntry(
-            path_frame,
-            placeholder_text=t("setup_wizard.no_path_selected", default="No path selected"),
-            font=ctk.CTkFont(size=12),
-            height=38,
-            fg_color=self.colors["frame_bg"],
-            border_color=self.colors["border"]
+        # header
+        hdr_lbl = QLabel(t("setup_wizard.paths_title"))
+        hdr_lbl.setFont(font(20, "bold"))
+        hdr_lbl.setAlignment(Qt.AlignCenter)
+        hdr_lbl.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
         )
-        self.beamng_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        col.addWidget(hdr_lbl)
+        self._paths_title_lbl = hdr_lbl
 
-        ctk.CTkButton(
-            path_frame,
-            text=t("common.browse", default="Browse..."),
-            command=self._browse_beamng,
-            width=100,
-            height=38,
-            fg_color=self.colors["accent"],
-            hover_color=self.colors["accent_hover"],
-            text_color=self.colors["accent_text"],
-            font=ctk.CTkFont(size=12, weight="bold")
-        ).pack(side="right")
-
-        self.beamng_status = ctk.CTkLabel(
-            section_frame,
-            text="",
-            font=ctk.CTkFont(size=11),
-            text_color=self.colors["text_secondary"],
-            anchor="w"
+        sub_lbl = QLabel(t("setup_wizard.paths_desc"))
+        sub_lbl.setFont(font(13))
+        sub_lbl.setAlignment(Qt.AlignCenter)
+        sub_lbl.setWordWrap(True)
+        sub_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        self.beamng_status.pack(fill="x", padx=20, pady=(0, 8))
+        col.addWidget(sub_lbl)
+        self._paths_sub_lbl = sub_lbl
+        col.addWidget(HSeparator())
 
-    def _create_mods_section(self, parent):
-        """Create mods folder path section"""
-        section_frame = ctk.CTkFrame(parent, fg_color=self.colors["card_bg"], corner_radius=12)
-        section_frame.pack(fill="x", pady=(0, 12))
+        # scroll area for path sections
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{ background:transparent; border:none; }}
+            QScrollArea > QWidget > QWidget {{ background:transparent; }}
+        """)
+        inner = QWidget()
+        inner.setStyleSheet("background:transparent;")
+        inner_col = QVBoxLayout(inner)
+        inner_col.setContentsMargins(0, 0, 0, 0)
+        inner_col.setSpacing(14)
 
-        title_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
-        title_frame.pack(fill="x", padx=20, pady=(12, 8))
+        # BeamNG install section
+        inner_col.addWidget(self._path_section(
+            number="1",
+            title=t("setup_wizard.beamng_install"),
+            desc=t("setup_wizard.beamng_description"),
+            attr="beamng",
+            browse_cb=self._browse_beamng,
+        ))
 
-        ctk.CTkLabel(
-            title_frame,
-            text="2. " + t("setup_wizard.mods_folder", default="BeamNG Mods Folder"),
-            font=ctk.CTkFont(size=15, weight="bold"),
-            text_color=self.colors["text"],
-            anchor="w"
-        ).pack(side="left")
+        # Mods folder section
+        inner_col.addWidget(self._path_section(
+            number="2",
+            title=t("setup_wizard.mods_folder"),
+            desc=t("setup_wizard.mods_description"),
+            attr="mods",
+            browse_cb=self._browse_mods,
+        ))
 
-        ctk.CTkLabel(
-            section_frame,
-            text=t("setup_wizard.mods_description", default="Used for the 'Save to Steam' option when generating mods"),
-            font=ctk.CTkFont(size=11),
-            text_color=self.colors["text_secondary"],
-            anchor="w"
-        ).pack(fill="x", padx=20, pady=(0, 8))
+        inner_col.addStretch()
+        scroll.setWidget(inner)
+        col.addWidget(scroll, 1)
 
-        path_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
-        path_frame.pack(fill="x", padx=20, pady=(0, 12))
+        # footer buttons
+        col.addWidget(HSeparator())
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
 
-        self.mods_entry = ctk.CTkEntry(
-            path_frame,
-            placeholder_text=t("setup_wizard.no_path_selected", default="No path selected"),
-            font=ctk.CTkFont(size=12),
-            height=38,
-            fg_color=self.colors["frame_bg"],
-            border_color=self.colors["border"]
+        back_btn = GhostButton(
+            "←  " + t("common.back"),
+            font_size=13,
         )
-        self.mods_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        back_btn.setMinimumHeight(44)
+        back_btn.clicked.connect(lambda: self._stack.setCurrentIndex(0))
+        btn_row.addWidget(back_btn, 1)
+        self._back_btn = back_btn
 
-        ctk.CTkButton(
-            path_frame,
-            text=t("common.browse", default="Browse..."),
-            command=self._browse_mods,
-            width=100,
-            height=38,
-            fg_color=self.colors["accent"],
-            hover_color=self.colors["accent_hover"],
-            text_color=self.colors["accent_text"],
-            font=ctk.CTkFont(size=12, weight="bold")
-        ).pack(side="right")
-
-        self.mods_status = ctk.CTkLabel(
-            section_frame,
-            text="",
-            font=ctk.CTkFont(size=11),
-            text_color=self.colors["text_secondary"],
-            anchor="w"
+        finish_btn = AnimButton(
+            "✓  " + t("common.finish"),
+            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
+            font_size=13, bold=True, padding="12px 32px",
         )
-        self.mods_status.pack(fill="x", padx=20, pady=(0, 8))
+        finish_btn.setMinimumHeight(44)
+        finish_btn.setEnabled(False)
+        finish_btn.clicked.connect(self._on_finish)
+        btn_row.addWidget(finish_btn, 1)
+        self._finish_btn = finish_btn
+        col.addLayout(btn_row)
 
-    def _create_buttons_paths(self):
-        footer = ctk.CTkFrame(self.main_frame, fg_color=self.colors["card_bg"], corner_radius=12, height=72)
-        footer.pack(fill="x", pady=(10, 0))
-        footer.pack_propagate(False)
-        ctk.CTkFrame(footer, fg_color=self.colors["border"], height=1).pack(fill="x")
-        row = ctk.CTkFrame(footer, fg_color="transparent")
-        row.place(relx=0.5, rely=0.58, anchor="center")
-        ctk.CTkButton(
-            row, text="←  " + t("common.back", default="Back"), command=self._on_back_to_language,
-            height=40, width=160, fg_color=self.colors["frame_bg"],
-            hover_color=self.colors["card_hover"], text_color=self.colors["text"],
-            border_width=1, border_color=self.colors["border"],
-            font=ctk.CTkFont(size=13), corner_radius=8,
-        ).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(
-            row, text="✓  " + t("common.finish", default="Finish"), command=self._on_paths_finish,
-            height=40, width=160, fg_color=self.colors["accent"],
-            hover_color=self.colors["accent_hover"], text_color=self.colors["accent_text"],
-            font=ctk.CTkFont(size=13, weight="bold"), corner_radius=8,
-        ).pack(side="left")
+        return page
 
-    def _on_back_to_language(self):
-        self._show_language_step()
+    def _path_section(
+        self,
+        number: str,
+        title: str,
+        desc: str,
+        attr: str,
+        browse_cb: Callable,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("pathSectionCard")
+        card.setStyleSheet(f"""
+            #pathSectionCard {{
+                background-color: {COLORS['card_bg']};
+                border-radius: 12px;
+                border: 1px solid {COLORS['border']};
+            }}
+        """)
+        inner = QVBoxLayout(card)
+        inner.setContentsMargins(20, 16, 20, 16)
+        inner.setSpacing(8)
+
+        hdr = QLabel(f"{number}.  {title}")
+        hdr.setFont(font(14, "bold"))
+        hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        inner.addWidget(hdr)
+
+        d_lbl = QLabel(desc)
+        d_lbl.setFont(font(12))
+        d_lbl.setWordWrap(True)
+        d_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+        )
+        inner.addWidget(d_lbl)
+
+        entry_row = QHBoxLayout()
+        entry_row.setSpacing(8)
+
+        entry = QLineEdit()
+        entry.setReadOnly(True)
+        entry.setMinimumHeight(36)
+        entry.setFont(font(12))
+        entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
+        entry.setStyleSheet(f"""
+            QLineEdit {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['border']};
+                border-radius:7px;
+                padding:4px 10px;
+                font-size:12px;
+            }}
+        """)
+        entry_row.addWidget(entry, 1)
+
+        browse_btn = AnimButton(
+            t("common.browse"),
+            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
+            font_size=12, bold=True, padding="6px 14px",
+        )
+        browse_btn.setFixedHeight(36)
+        browse_btn.clicked.connect(browse_cb)
+        entry_row.addWidget(browse_btn)
+        inner.addLayout(entry_row)
+
+        status = QLabel("")
+        status.setFont(font(11))
+        status.setStyleSheet("background:transparent;border:none;")
+        inner.addWidget(status)
+
+        setattr(self, f"_{attr}_entry",      entry)
+        setattr(self, f"_{attr}_status",     status)
+        setattr(self, f"_{attr}_hdr_lbl",    hdr)
+        setattr(self, f"_{attr}_desc_lbl",   d_lbl)
+        setattr(self, f"_{attr}_browse_btn", browse_btn)
+        setattr(self, f"_{attr}_number",     number)
+        return card
+
 
     def _browse_beamng(self):
-        self.dialog.grab_release()
-        
-        try:
-            path = filedialog.askdirectory(
-                parent=self.dialog,
-                title="Select BeamNG.drive Installation Folder",
-                initialdir="C:/Program Files (x86)/Steam/steamapps/common" if os.name == 'nt' else "~"
-            )
+        print(f"[DEBUG] _browse_beamng: opening BeamNG install folder dialog")
+        init = self.paths.get("beamng_install") or ""
+        if not init or not os.path.exists(init):
+            if platform.system() == "Windows":
+                init = r"C:\Program Files (x86)\Steam\steamapps\common"
+            else:
+                init = os.path.expanduser("~")
 
-            if path:
-                if self._validate_beamng_path(path):
-                    self.paths["beamng_install"] = path
-                    self.beamng_entry.delete(0, "end")
-                    self.beamng_entry.insert(0, path)
-                    self.beamng_status.configure(
-                        text=t("setup_wizard.beamng_valid", default="✓ Valid BeamNG.drive installation found"),
-                        text_color=self.colors["success"]
-                    )
-                else:
-                    self.beamng_status.configure(
-                        text=t("setup_wizard.beamng_invalid", default="✗ Invalid path - BeamNG.drive not found here"),
-                        text_color=self.colors["error"]
-                    )
-        finally:
-            self.dialog.grab_set()
+        path = QFileDialog.getExistingDirectory(
+            self, t("setup_wizard.browse_beamng_title"), init
+        )
+        if not path:
+            return
+
+        self._beamng_entry.setText(path)
+        if self._validate_beamng(path):
+            self.paths["beamng_install"] = path
+            self._beamng_status.setText(t("setup_wizard.beamng_valid"))
+            self._beamng_status.setStyleSheet(
+                f"color:{COLORS['success']};background:transparent;border:none;"
+            )
+        else:
+            self.paths["beamng_install"] = ""
+            self._beamng_status.setText(t("setup_wizard.beamng_invalid"))
+            self._beamng_status.setStyleSheet(
+                f"color:{COLORS['error']};background:transparent;border:none;"
+            )
+        self._check_finish_ready()
 
     def _browse_mods(self):
-        self.dialog.grab_release()
-        
-        try:
-            path = filedialog.askdirectory(
-                parent=self.dialog,
-                title="Select BeamNG Mods Folder",
-                initialdir=os.path.expanduser("~/AppData/Local/BeamNG.drive/current/mods") if os.name == 'nt' else "~"
+        print(f"[DEBUG] _browse_mods: opening mods folder dialog")
+        init = self.paths.get("mods_folder") or ""
+        if not init or not os.path.exists(init):
+            if platform.system() == "Windows":
+                init = os.path.expanduser(
+                    r"~\AppData\Local\BeamNG\BeamNG.drive\current\mods"
+                )
+            else:
+                init = os.path.expanduser("~")
+
+        path = QFileDialog.getExistingDirectory(
+            self, t("setup_wizard.browse_mods_title"), init
+        )
+        if not path:
+            return
+
+        self._mods_entry.setText(path)
+        if os.path.isdir(path) and os.path.basename(path).lower() == "mods":
+            self.paths["mods_folder"] = path
+            self._mods_status.setText(t("setup_wizard.mods_valid"))
+            self._mods_status.setStyleSheet(
+                f"color:{COLORS['success']};background:transparent;border:none;"
             )
+        else:
+            self.paths["mods_folder"] = ""
+            self._mods_status.setText(t("setup_wizard.mods_invalid"))
+            self._mods_status.setStyleSheet(
+                f"color:{COLORS['error']};background:transparent;border:none;"
+            )
+        self._check_finish_ready()
 
-            if path:
-                if self._validate_mods_path(path):
-                    self.paths["mods_folder"] = path
-                    self.mods_entry.delete(0, "end")
-                    self.mods_entry.insert(0, path)
-                    self.mods_status.configure(
-                        text=t("setup_wizard.mods_valid", default="✓ Valid mods folder selected"),
-                        text_color=self.colors["success"]
-                    )
-                else:
-                    self.mods_status.configure(
-                        text=t("setup_wizard.mods_invalid", default="✗ Invalid path - not a valid mods folder"),
-                        text_color=self.colors["error"]
-                    )
-        finally:
-            self.dialog.grab_set()
 
-    def _validate_beamng_path(self, path: str) -> bool:
+    def _validate_beamng(self, path: str) -> bool:
+        print(f"[DEBUG] _validate_beamng() called")
         if not os.path.exists(path):
             return False
-
-        exe_path_64 = os.path.join(path, "Bin64", "BeamNG.drive.x64.exe")
-        exe_path = os.path.join(path, "Bin64", "BeamNG.drive.exe")
-        has_exe = os.path.exists(exe_path_64) or os.path.exists(exe_path)
-
-        content_path = os.path.join(path, "content")
-        has_content = os.path.exists(content_path) and os.path.isdir(content_path)
-
+        sys = platform.system()
+        if sys == "Windows":
+            has_exe = (
+                os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.x64.exe"))
+                or os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.exe"))
+            )
+        else:
+            has_exe = os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.x64"))
+        has_content = os.path.isdir(os.path.join(path, "content"))
         return has_exe and has_content
 
-    def _validate_mods_path(self, path: str) -> bool:
-        """Validate mods folder path"""
-        return os.path.exists(path) and os.path.isdir(path)
 
-    def _on_exit_program(self):
-        print("[DEBUG] Setup wizard: User chose to exit program")
-        try:
-            self.dialog.destroy()
-        except:
-            pass
-        try:
-            self.parent.quit()
-            self.parent.destroy()
-        except:
-            pass
-        import os
-        os._exit(0)
+    def _check_finish_ready(self):
+        """Enable the Finish button only when both paths have been confirmed valid."""
+        ready = bool(self.paths.get("beamng_install")) and bool(self.paths.get("mods_folder"))
+        self._finish_btn.setEnabled(ready)
 
-    def _on_paths_finish(self):
-        print(f"[DEBUG] Setup wizard: Complete with paths: {self.paths}")
+    def _on_finish(self):
+        print(f"[DEBUG] _on_finish: wizard complete, paths={self.paths}")
+        self.on_complete(self.paths)
+        self.accept()
 
-        # Destroy the dialog FIRST so it always closes regardless of what
-        # on_complete does. The old order was on_complete() then destroy():
-        # any exception thrown inside the callback (UI refresh, path reload,
-        # language change, etc.) is silently swallowed by Tkinter, leaving
-        # the wizard frozen on screen with the button appearing to do nothing.
-        try:
-            self.dialog.destroy()
-        except Exception as e:
-            print(f"[ERROR] Failed to destroy setup wizard dialog: {e}")
-
-        try:
-            self.on_complete(self.paths)
-        except Exception as e:
-            import traceback
-            print(f"[ERROR] on_complete callback raised an exception: {e}")
-            traceback.print_exc()
+    def keyPressEvent(self, event):
+        print(f"[DEBUG] keyPressEvent() called")
+        # prevent Escape from closing without completing
+        if event.key() == Qt.Key_Escape:
+            return
+        super().keyPressEvent(event)
 
     def show(self):
-        self.dialog.wait_window()
+        print(f"[DEBUG] show() called")
+        self.exec()
 
-def show_setup_wizard(parent, colors: dict, on_complete: Callable[[dict], None]):
+
+# PUBLIC HELPER  (same signature as before)
+
+def show_setup_wizard(
+    parent: QWidget,
+    colors: dict,
+    on_complete: Callable[[dict], None],
+):
     wizard = SetupWizard(parent, colors, on_complete)
     wizard.show()
+
+

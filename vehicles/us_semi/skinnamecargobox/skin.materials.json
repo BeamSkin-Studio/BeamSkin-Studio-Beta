@@ -1,0 +1,139 @@
+{
+  "cabover_main.skin.skinnamecargobox": {
+    "name": "cabover_main.skin.skinnamenobox",
+    "mapTo": "cabover_main.skin.skinnamenobox",
+    "class": "Material",
+    "persistentId": "",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/vehicles/us_semi/cabover_main_ao.data.png",
+        "baseColorMap": "/vehicles/us_semi/cabover_main_b.color.png",
+        "clearCoatFactor": null,
+        "colorPaletteMapUseUV": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": 1,
+        "metallicMap": "/vehicles/us_semi/cabover_main_m.data.png",
+        "normalMap": "vehicles/us_semi/cabover_main_nm.normal.png",
+        "roughnessMap": "/vehicles/us_semi/cabover_main_r.data.png"
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/us_semi/cabover_main_ao.data.png",
+        "baseColorMap": "/vehicles/us_semi/skinnamecargobox/cabover_skin_skinnamecargobox.dds",
+        "clearCoatFactor": 1,
+		"clearCoatRoughnessFactor":0.05,
+        "clearCoatMap": "/vehicles/us_semi/cabover_main_c.data.png",
+        "diffuseMapUseUV": 1,
+        "metallicFactor": 0.75,
+        "normalMap": "/vehicles/us_semi/cabover_main_nm.normal.png",
+        "opacityMap": "/vehicles/us_semi/cabover_main_c.data.png",
+		"roughnessFactor": 1
+      },
+      {
+        "clearCoatFactor": null,
+        "colorPaletteMapUseUV": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": null
+      },
+      {
+        "clearCoatFactor": null,
+        "colorPaletteMapUseUV": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": null
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  },
+  "longnose_main.skin.skinnamecargobox": {
+    "name": "longnose_main.skin.skinnamenobox",
+    "mapTo": "longnose_main.skin.skinnamenobox",
+    "class": "Material",
+    "persistentId": "6436ce55-07f4-49d8-965b-6815fda691e1",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/vehicles/us_semi/longnose_main_ao.data.png",
+        "baseColorMap": "/vehicles/us_semi/longnose_main_b.color.png",
+        "clearCoatFactor": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": 1,
+        "metallicMap": "/vehicles/us_semi/longnose_main_m.data.png",
+        "normalMap": "vehicles/us_semi/longnose_main_nm.normal.png",
+        "roughnessFactor": null,
+        "roughnessMap": "/vehicles/us_semi/longnose_main_r.data.png"
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/us_semi/longnose_main_ao.data.png",
+        "baseColorMap": "/vehicles/us_semi/skinnamecargobox/conventional_skin_skinnamecargobox.dds",
+        "clearCoatFactor": 1,
+		"clearCoatRoughnessFactor":0.05,
+        "clearCoatMap": "/vehicles/us_semi/longnose_main_cc.data.png",
+        "diffuseMapUseUV": 1,
+        "metallicFactor": 0.75,
+        "normalMap": "/vehicles/us_semi/longnose_main_nm.normal.png",
+        "opacityMap": "/vehicles/us_semi/longnose_main_c.data.png",
+        "roughnessFactor": 1
+      },
+      {
+        "clearCoatFactor": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": null,
+        "roughnessFactor": null
+      },
+      {
+        "clearCoatFactor": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": null,
+        "roughnessFactor": null
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  },
+  "us_semi_cargobox.skin_us_semi_cargobox.SKINNAME": {
+    "name": "us_semi_cargobox.skin_us_semi_cargobox.SKINNAME",
+    "mapTo": "us_semi_cargobox.skin_us_semi_cargobox.SKINNAME",
+    "class": "Material",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "vehicles/common/us_semi_cargobox/cargobox_ao.data.png",
+        "baseColorMap": "vehicles/common/us_semi_cargobox/cargobox_b.color.png",
+        "diffuseMapUseUV": null,
+        "metallicFactor": 1,
+        "metallicMap": "vehicles/common/us_semi_cargobox/cargobox_m.data.png",
+        "normalMap": "vehicles/common/us_semi_cargobox/cargobox_nm.normal.png",
+        "roughnessFactor": null,
+        "roughnessMap": "vehicles/common/us_semi_cargobox/cargobox_r.data.png"
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/common/us_semi_cargobox/cargobox_ao.data.png",
+        "baseColorMap": "vehicles/us_semi/SKINNAME/cargobox_skin_SKINNAME.dds",
+        "diffuseMapUseUV": 1,
+        "metallicFactor": 0.800000012,
+        "normalMap": "vehicles/common/us_semi_cargobox/cargobox_nm.normal.png",
+        "opacityMap": "/vehicles/common/us_semi_cargobox/cargobox_c.data.png",
+        "roughnessFactor": 0.600000024
+      },
+      {
+        "diffuseMapUseUV": null,
+        "metallicFactor": null,
+        "roughnessFactor": null
+      },
+      {
+        "diffuseMapUseUV": null,
+        "metallicFactor": null,
+        "roughnessFactor": null
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  },
+}

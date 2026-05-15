@@ -1,65 +1,22 @@
+"""
+main.py — BeamSkin Studio entry point  (PySide6 edition)
+"""
+
 import os
 import sys
 import threading
 import platform
-import io
-import tkinter as tk
 
-from gui.components.dialogs import run_startup_sequence
-
+# ── working directory ─────────────────────────────────────────────────────────
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print(f"[DEBUG] Working directory: {os.getcwd()}")
 print(f"[DEBUG] Platform: {platform.system()}")
 
 
-# ─── Suppress harmless CustomTkinter widget destruction errors ─────────────────
-"""
-CustomTkinter's CTkEntry widgets fire textvariable callbacks after the widget
-is destroyed during UI refresh cycles. These TclErrors from CustomTkinter's
-internal code are harmless. We filter them from stderr.
-"""
-class _ErrorFilter(io.StringIO):
-    """Filter that suppresses harmless widget destruction errors."""
-    def __init__(self, original_stderr):
-        super().__init__()
-        self.original_stderr = original_stderr
-        
-    def write(self, message: str) -> int:
-        # Suppress harmless CustomTkinter entry widget destruction errors
-        if "_tkinter.TclError: invalid command name" in message and ".!entry" in message:
-            return len(message)
-        if "_tkinter.TclError: bad window path name" in message and ".!ctkscrollableframe" in message:
-            return len(message)
-        # Write all other messages normally
-        self.original_stderr.write(message)
-        return len(message)
-    
-    def flush(self):
-        self.original_stderr.flush()
-
-_original_stderr = sys.stderr
-sys.stderr = _ErrorFilter(_original_stderr)
-
-
-# ─── Override Tkinter callback exception handling for harmless widget teardown errors ──
-_original_report_callback_exception = tk.Tk.report_callback_exception
-
-def _patched_report_callback_exception(self, exc, val, tb):
-    if isinstance(val, tk.TclError):
-        message = str(val)
-        if "invalid command name" in message and ".!entry" in message:
-            return
-        if "bad window path name" in message and ".!ctkscrollableframe" in message:
-            return
-    return _original_report_callback_exception(self, exc, val, tb)
-
-tk.Tk.report_callback_exception = _patched_report_callback_exception
-
-
-# ─── Error popup helper (works even if customtkinter isn't available) ──────────
-def show_error_and_exit(title, message, detail=None):
-    """Show a user-friendly error dialog then exit."""
+# ── error popup helper  (pure PySide6, no Tkinter) ───────────────────────────
+def show_error_and_exit(title: str, message: str, detail: str = None):
+    """Show a themed error dialog then terminate."""
     full_message = message
     if detail:
         full_message += f"\n\nDetails:\n{detail}"
@@ -70,26 +27,26 @@ def show_error_and_exit(title, message, detail=None):
         print(f"        {detail}")
 
     try:
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        root.wm_attributes("-topmost", True)
-        messagebox.showerror(f"BeamSkin Studio — {title}", full_message)
-        root.destroy()
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        _app = QApplication.instance() or QApplication(sys.argv)
+        box = QMessageBox()
+        box.setWindowTitle(f"BeamSkin Studio — {title}")
+        box.setText(message)
+        if detail:
+            box.setDetailedText(detail)
+        box.setIcon(QMessageBox.Critical)
+        box.exec()
     except Exception:
-        pass
+        pass  # if Qt itself is broken, the .bat crash log shows the traceback
 
     sys.exit(1)
 
 
-# ─── Dependency check ─────────────────────────────────────────────────────────
+# ── dependency check  (PySide6-era packages) ─────────────────────────────────
 REQUIRED_PACKAGES = {
-    "customtkinter": "customtkinter",
-    "PIL":           "Pillow",
-    "requests":      "requests",
-    "flag":          "flagpy",
-    "deep_translator": "deep-translator",
+    "PySide6":        "PySide6",
+    "PIL":            "Pillow",
+    "requests":       "requests",
 }
 
 missing = []
@@ -104,59 +61,25 @@ if missing:
         "Missing Dependencies",
         "The following required packages are not installed:\n\n"
         + "\n".join(f"  • {p}" for p in missing)
-        + "\n\nPlease run install.bat to fix this."
+        + "\n\nPlease run install.bat to fix this.",
     )
 
 
-# ─── Icon patch ───────────────────────────────────────────────────────────────
-def _patch_ctk_icon():
-    import customtkinter as ctk
-    _ico = os.path.join(os.getcwd(), "gui", "Icons", "BeamSkin_Studio.ico")
-
-    def _our_icon(self):
-        try:
-            if os.path.exists(_ico):
-                self.after(0, lambda: self.iconbitmap(_ico))
-        except Exception as e:
-            print(f"[ICON] iconbitmap failed: {e}")
-
-    ctk.CTkToplevel._windows_set_titlebar_icon = _our_icon
-    ctk.CTk._windows_set_titlebar_icon = _our_icon
-    print(f"[ICON] CTkToplevel icon patch applied — using: {_ico}")
-
-_patch_ctk_icon()
-
-
-# ─── AppUserModelID (taskbar icon) ────────────────────────────────────────────
-if sys.platform == 'win32':
+# ── AppUserModelID  (taskbar icon grouping on Windows) ───────────────────────
+if sys.platform == "win32":
     try:
         import ctypes
-        myappid = 'BeamSkinStudio.BeamSkinStudio.Application.1.0'
+        myappid = "BeamSkinStudio.BeamSkinStudio.Application.1.0"
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        print(f"[DEBUG] Set AppUserModelID for taskbar icon")
+        print("[DEBUG] Set AppUserModelID for taskbar icon")
     except Exception as e:
         print(f"[DEBUG] Failed to set AppUserModelID: {e}")
 
 
-# ─── Window helper ────────────────────────────────────────────────────────────
-def center_window(window):
-    print(f"[DEBUG] center_window called")
-    window.geometry("1600x1200")
-    window.update_idletasks()
-
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
-
-    x = (screen_width // 2) - (1600 // 2)
-    y = (screen_height // 2) - (1200 // 2)
-
-    window.geometry(f'1600x1200+{x}+{y}')
-
-
-# ─── Main entry point ─────────────────────────────────────────────────────────
+# ── main entry point ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
 
-    # Single instance check
+    # Single-instance lock
     try:
         from utils.single_instance import check_single_instance, release_global_lock
         import atexit
@@ -164,7 +87,8 @@ if __name__ == "__main__":
         if not check_single_instance("BeamSkinStudio"):
             show_error_and_exit(
                 "Already Running",
-                "BeamSkin Studio is already open.\n\nPlease close the existing window before launching a new one."
+                "BeamSkin Studio is already open.\n\n"
+                "Please close the existing window before launching a new one.",
             )
 
         atexit.register(release_global_lock)
@@ -172,21 +96,24 @@ if __name__ == "__main__":
 
     except ImportError as e:
         print(f"[WARNING] Could not import single_instance module: {e}")
-        print(f"[WARNING] Multiple instances may run simultaneously")
+        print("[WARNING] Multiple instances may run simultaneously")
 
-    # Core imports
+    # Core module imports
     try:
         from core.updater import check_for_updates, CURRENT_VERSION, set_app_instance
-        from core.settings import colors
-        from utils.debug import setup_universal_scroll_handler
+        from gui.theme import COLORS as colors
     except ImportError as e:
-        show_error_and_exit(
-            "Missing Core Files",
-            "A required core module could not be loaded.",
-            str(e)
-        )
+        show_error_and_exit("Missing Core Files",
+                            "A required core module could not be loaded.", str(e))
 
-    print(f"[DEBUG] Using NEW refactored GUI structure...")
+    # PySide6 application object — must exist before any QWidget
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import Qt, QTimer
+
+    app = QApplication(sys.argv)
+    app.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
 
     # GUI import
     try:
@@ -203,21 +130,20 @@ if __name__ == "__main__":
             "  gui/tabs/generator.py\n"
             "  gui/tabs/settings.py\n"
             "  gui/tabs/howto.py\n"
-            "  gui/components/preview.py\n"
             "  gui/components/navigation.py\n"
             "  gui/components/dialogs.py",
-            traceback.format_exc()
+            traceback.format_exc(),
         )
 
-    # Create app window
+    # Create main window
     try:
-        app = BeamSkinStudioApp()
+        window = BeamSkinStudioApp()
     except Exception as e:
         import traceback
         show_error_and_exit(
             "Startup Error",
             "BeamSkin Studio encountered an error while starting up.",
-            traceback.format_exc()
+            traceback.format_exc(),
         )
 
     print(f"\n[DEBUG] ========================================")
@@ -226,33 +152,47 @@ if __name__ == "__main__":
     print(f"[DEBUG] Platform: {platform.system()} {platform.release()}")
     print(f"[DEBUG] ========================================\n")
 
-    set_app_instance(app, colors)
+    set_app_instance(window, colors)
 
-    print(f"[DEBUG] Centering window...")
-    center_window(app)
+    # Centre window on primary screen and show it immediately so Qt always
+    # has a visible window — if show_startup_sequence throws, the window
+    # is still on screen rather than leaving the app in an invisible state.
+    screen = app.primaryScreen().geometry()
+    w, h = 1600, 1000
+    window.resize(w, h)
+    window.move((screen.width() - w) // 2, (screen.height() - h) // 2)
+    window.show()
+    window.raise_()
+    window.activateWindow()
 
-    print(f"[DEBUG] Bringing window to front...")
+    # Signal the splash screen that the main window is visible and ready
+    try:
+        import tempfile
+        _signal_path = os.path.join(tempfile.gettempdir(), "BeamSkinStudio_ready.signal")
+        with open(_signal_path, "w") as _f:
+            _f.write("ready")
+        print(f"[DEBUG] Wrote ready signal to: {_signal_path}")
+    except Exception as _e:
+        print(f"[DEBUG] Could not write ready signal: {_e}")
 
-    print(f"[DEBUG] Initializing scroll handler...")
-    app.after(100, lambda: setup_universal_scroll_handler(app))
-
+    # Connection helpers
     def _do_connection_check():
         from utils.connection import check_connection
         from gui.components.connection_dialog import show_connection_dialog
 
         def on_success():
             print("[DEBUG] Server connection: OK")
-            report_tab = app.tabs.get("report")
+            report_tab = window.tabs.get("report")
             if report_tab and hasattr(report_tab, "_refresh_status_badge"):
-                app.after(0, report_tab._refresh_status_badge)
-                app.after(0, report_tab._update_cooldown_ui)
+                QTimer.singleShot(0, report_tab._refresh_status_badge)
+                QTimer.singleShot(0, report_tab._update_cooldown_ui)
 
         def on_failure():
             print("[DEBUG] Server connection: FAILED — showing dialog")
-            app.after(0, lambda: show_connection_dialog(
-                app,
-                on_retry   = _do_connection_check,
-                on_offline = _go_offline
+            QTimer.singleShot(0, lambda: show_connection_dialog(
+                window,
+                on_retry=_do_connection_check,
+                on_offline=_go_offline,
             ))
 
         check_connection(on_success=on_success, on_failure=on_failure)
@@ -262,75 +202,68 @@ if __name__ == "__main__":
 
         def on_success():
             print("[DEBUG] Server connection (bg): OK")
-            report_tab = app.tabs.get("report")
+            report_tab = window.tabs.get("report")
             if report_tab and hasattr(report_tab, "_refresh_status_badge"):
-                app.after(0, report_tab._refresh_status_badge)
-                app.after(0, report_tab._update_cooldown_ui)
+                QTimer.singleShot(0, report_tab._refresh_status_badge)
+                QTimer.singleShot(0, report_tab._update_cooldown_ui)
 
         def on_failure():
-            print("[DEBUG] Server connection (bg): FAILED — dialog deferred to startup sequence")
+            print("[DEBUG] Server connection (bg): FAILED")
 
         check_connection(on_success=on_success, on_failure=on_failure)
 
     def _go_offline():
         print("[DEBUG] User chose offline mode")
-        report_tab = app.tabs.get("report")
+        report_tab = window.tabs.get("report")
         if report_tab and hasattr(report_tab, "_refresh_status_badge"):
             report_tab._refresh_status_badge()
             report_tab._update_cooldown_ui()
 
     def show_startup_sequence():
-        print(f"[DEBUG] show_startup_sequence called")
-        """Show startup dialogs in sequence after window is ready"""
-
+        print("[DEBUG] show_startup_sequence called")
         try:
-            app.attributes('-topmost', False)
-        except:
-            pass
-
-        from core.settings import is_setup_complete
-
-        print("[DEBUG] Checking server connection in background...")
-        threading.Thread(target=_do_connection_check_bg, daemon=True).start()
-
-
-        print("[DEBUG] Revealing main window...")
-        app.deiconify()
-        app.lift()
-        app.focus_force()
-
-        if not is_setup_complete():
-            print("[DEBUG] First-time setup not complete, showing setup wizard...")
-            app.after(200, app.show_setup_wizard)
+            from core.settings import is_setup_complete
+            from gui.components.dialogs import run_startup_sequence
+        except Exception as e:
+            import traceback
+            print(f"[FATAL] show_startup_sequence import failed:\n{traceback.format_exc()}")
             return
 
-        def _show_offline_dialog():
-            from gui.components.connection_dialog import show_connection_dialog
-            show_connection_dialog(
-                app,
-                on_retry   = _do_connection_check,
-                on_offline = _go_offline,
-            )
+        try:
+            threading.Thread(target=_do_connection_check_bg, daemon=True).start()
 
-        run_startup_sequence(
-            app,
-            show_offline_dialog_fn=_show_offline_dialog,
-        )
+            if not is_setup_complete():
+                print("[DEBUG] First-time setup not complete, showing setup wizard...")
+                QTimer.singleShot(200, window.show_setup_wizard)
+                return
 
-    print(f"[DEBUG] Scheduling startup sequence...")
-    app.after(500, show_startup_sequence)
+            def _show_offline_dialog():
+                from gui.components.connection_dialog import show_connection_dialog
+                show_connection_dialog(
+                    window,
+                    on_retry=_do_connection_check,
+                    on_offline=_go_offline,
+                )
 
-    print(f"[DEBUG] Starting main event loop...")
-    print(f"[DEBUG] ========================================\n")
+            run_startup_sequence(window, show_offline_dialog_fn=_show_offline_dialog)
+
+        except Exception:
+            import traceback
+            print(f"[FATAL] show_startup_sequence crashed:\n{traceback.format_exc()}")
+
+    QTimer.singleShot(500, show_startup_sequence)
+
+    print("[DEBUG] Starting main event loop...")
+    print("[DEBUG] ========================================\n")
 
     try:
-        app.mainloop()
+        exit_code = app.exec()
     except Exception as e:
         import traceback
         show_error_and_exit(
             "Runtime Error",
             "BeamSkin Studio crashed during runtime.",
-            traceback.format_exc()
+            traceback.format_exc(),
         )
     finally:
         print("[DEBUG] Application closed")
@@ -338,3 +271,5 @@ if __name__ == "__main__":
             release_global_lock()
         except Exception:
             pass
+
+    sys.exit(exit_code)

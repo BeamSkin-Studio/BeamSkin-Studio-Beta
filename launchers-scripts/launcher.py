@@ -1,620 +1,489 @@
 """
-BeamSkin Studio - installer
+launcher.py — BeamSkin Studio splash / dependency installer  (PySide6 edition)
+===============================================================================
+Replaces the old CustomTkinter LauncherWindow.
+
+Responsibilities:
+  1. Check that required Python packages are installed; install any that are
+     missing (pip is invoked in a background thread so the UI stays responsive).
+  2. Show an animated splash screen while the main app loads.
+  3. Launch main.py and close the splash once the main window is visible.
+
+If Python itself is missing the user is directed to python.org — we cannot
+bootstrap a Python installer from inside a Python script that isn't running.
 """
+
+from __future__ import annotations
+
+import os
 import subprocess
 import sys
-import os
 import threading
 import time
 import urllib.request
-import tempfile
+
+# ── stdlib-only bootstrap: install PySide6 if it is somehow absent ───────────
+# (Normally install.bat guarantees this; this is a last-resort safety net.)
+def _ensure_pyside6() -> None:
+    try:
+        import PySide6  # noqa: F401
+    except ImportError:
+        print("[LAUNCHER] PySide6 not found — attempting pip install …")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "PySide6", "--quiet"]
+        )
+        print("[LAUNCHER] PySide6 installed — restarting launcher …")
+        os.execl(sys.executable, sys.executable, *sys.argv)
 
 
-def ensure_packages():
-    """Check if required packages are installed, install if not"""
-    print("[LAUNCHER] Checking required packages...")
-    
-    required_packages = [
-        ("customtkinter", "customtkinter"),
-        ("Pillow", "PIL"),
-        ("requests", "requests")
-    ]
-    
-    missing_packages = []
-    
-    for package_name, import_name in required_packages:
-        try:
-            __import__(import_name)
-            print(f"[LAUNCHER]   ✓ {package_name} is installed")
-        except ImportError:
-            print(f"[LAUNCHER]   ✗ {package_name} is NOT installed")
-            missing_packages.append(package_name)
-    
-    if missing_packages:
-        print(f"[LAUNCHER] Installing missing packages: {', '.join(missing_packages)}")
-        print("[LAUNCHER] This may take 1-2 minutes...")
-        
-        for package in missing_packages:
-            print(f"[LAUNCHER]   Installing {package}...")
-            try:
-                subprocess.check_call(
-                    [sys.executable, "-m", "pip", "install", package, "--quiet"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-                print(f"[LAUNCHER]   ✓ {package} installed successfully")
-            except subprocess.CalledProcessError as e:
-                print(f"[LAUNCHER]   ✗ Failed to install {package}")
-                print(f"[LAUNCHER]   Please run manually: pip install {package}")
-                input("\nPress Enter to exit...")
-                sys.exit(1)
-        
-        print("[LAUNCHER] All packages installed successfully!")
-    else:
-        print("[LAUNCHER] All required packages are already installed")
-    
-    print("[LAUNCHER] Starting GUI launcher...")
+_ensure_pyside6()
 
-ensure_packages()
+# ── allow importing gui.theme from the project root ───────────────────────────
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-import customtkinter as ctk
-from PIL import Image
+# ── now safe to import Qt and theme colors ───────────────────────────────────
+from PySide6.QtCore import (Qt, QThread, Signal, QObject,
+                             QTimer, QPropertyAnimation, QEasingCurve)
+from PySide6.QtGui  import QColor, QFont, QPixmap, QPainter, QPen, QBrush
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
+    QPushButton, QProgressBar, QMessageBox,
+)
+from gui.theme import COLORS
 
-COLORS = {
-    "bg": "#0a0a0a",
-    "frame_bg": "#141414",
-    "card": "#1e1e1e",
-    "card_hover": "#282828",
-    "accent": "#39E09B",
-    "accent_hover": "#2fc97f",
-    "text": "#f5f5f5",
-    "text_secondary": "#999999",
-    "success": "#39E09B",
-    "error": "#ff4444",
-    "warning": "#ffa726"
-}
+_REQUIRED = [
+    ("PySide6",   "PySide6"),
+    ("Pillow",    "PIL"),
+    ("requests",  "requests"),
+]
 
-print(f"[DEBUG] Loading class: LauncherWindow")
 
-class LauncherWindow:
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKER  — package install in background thread
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _InstallSignals(QObject):
+    progress = Signal(str, float)   # (message, 0-1)
+    finished = Signal(bool, str)    # (success, error_msg)
+
+
+class _InstallWorker(QThread):
     def __init__(self):
-        print(f"[DEBUG] __init__ called")
-        self.app = ctk.CTk()
-        self.app.title("BeamSkin Studio - Launcher")
-        self.app.geometry("700x600") 
-        self.app.resizable(False, False)
-        self.app.configure(fg_color=COLORS["bg"])
-        
-        self.app.attributes('-topmost', True)
+        super().__init__()
+        self.signals = _InstallSignals()
 
-        self.logo_image = self._load_logo()
-
-        self.center_window()
-        
-        self.create_ui()
-
-        self.app.lift()
-        self.app.focus_force()
-    
-    def _load_logo(self):
-        """Load the BeamSkin Studio logo"""
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = os.path.dirname(script_dir)
-        logo_path = os.path.join(parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png")
-        
-        try:
-            if os.path.exists(logo_path):
-                pil_image = Image.open(logo_path)
-                logo_image = ctk.CTkImage(
-                    light_image=pil_image,
-                    dark_image=pil_image,
-                    size=(200, 200) 
-                )
-                print(f"[DEBUG] Loaded logo from: {logo_path}")
-                return logo_image
-            else:
-                print(f"[DEBUG] Logo not found at: {logo_path}")
-                return None
-        except Exception as e:
-            print(f"[DEBUG] Failed to load logo: {e}")
-            return None
-        
-    def center_window(self):
-        
-        print(f"[DEBUG] center_window called")
-        """Center the window on screen"""
-        self.app.update_idletasks()
-        x = (self.app.winfo_screenwidth() // 2) - (700 // 2)
-        y = (self.app.winfo_screenheight() // 2) - (600 // 2)
-        self.app.geometry(f"700x600+{x}+{y}")
-    
-    def create_ui(self):
-    
-        print(f"[DEBUG] create_ui called")
-        """Create the launcher UI"""
-        main_frame = ctk.CTkFrame(self.app, fg_color=COLORS["bg"])
-        main_frame.pack(fill="both", expand=True, padx=25, pady=25)
-        
-        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(pady=(0, 20))
-        
-        if self.logo_image:
-            ctk.CTkLabel(
-                header_frame,
-                text="",
-                image=self.logo_image
-            ).pack(pady=(0, 15))
-        else:
-            ctk.CTkLabel(
-                header_frame,
-                text="🎨",
-                font=ctk.CTkFont(size=56)
-            ).pack()
-        
-        ctk.CTkLabel(
-            header_frame,
-            text="Professional Skin Modding Tool",
-            font=ctk.CTkFont(size=13),
-            text_color=COLORS["text_secondary"]
-        ).pack()
-
-        self.status_card = ctk.CTkFrame(
-            main_frame,
-            fg_color=COLORS["card"],
-            corner_radius=16,
-            border_width=2,
-            border_color=COLORS["accent"]
-        )
-        self.status_card.pack(fill="both", expand=True, pady=(0, 20))
-
-        status_content = ctk.CTkFrame(self.status_card, fg_color="transparent")
-        status_content.pack(fill="both", expand=True, padx=30, pady=30)
-
-        self.status_icon = ctk.CTkLabel(
-            status_content,
-            text="🔍",
-            font=ctk.CTkFont(size=64)
-        )
-        self.status_icon.pack(pady=(20, 15))
-
-        self.status_label = ctk.CTkLabel(
-            status_content,
-            text="Initializing...",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=COLORS["text"]
-        )
-        self.status_label.pack(pady=(0, 10))
-        
-        self.detail_label = ctk.CTkLabel(
-            status_content,
-            text="",
-            font=ctk.CTkFont(size=12),
-            text_color=COLORS["text_secondary"]
-        )
-        self.detail_label.pack(pady=(0, 15))
-        
-        self.progress_bar = ctk.CTkProgressBar(
-            status_content,
-            width=500,
-            height=8,
-            corner_radius=4,
-            fg_color=COLORS["frame_bg"],
-            progress_color=COLORS["accent"]
-        )
-        self.progress_bar.pack(pady=(0, 20))
-        self.progress_bar.set(0)
-        
-        self.action_button = ctk.CTkButton(
-            status_content,
-            text="",
-            command=None,
-            fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"],
-            text_color=COLORS["bg"],
-            width=200,
-            height=45,
-            corner_radius=10,
-            font=ctk.CTkFont(size=15, weight="bold")
-        )
-        
-        footer_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        footer_frame.pack()
-        
-        ctk.CTkLabel(
-            footer_frame,
-            text="Please wait while we prepare BeamSkin Studio...",
-            font=ctk.CTkFont(size=11),
-            text_color=COLORS["text_secondary"]
-        ).pack()
-        
-    def update_status(self, icon, message, detail="", progress=None):
-        
-        print(f"[DEBUG] update_status called")
-        """Update the status display"""
-        self.status_icon.configure(text=icon)
-        self.status_label.configure(text=message, text_color=COLORS["text"])
-        self.detail_label.configure(text=detail)
-        if progress is not None:
-            self.progress_bar.set(progress)
-        self.app.update()
-        
-    def show_error(self, message, detail="", button_text="Close", button_command=None):
-        
-        print(f"[DEBUG] show_error called")
-        """Show error state"""
-        self.status_icon.configure(text="❌")
-        self.status_label.configure(text=message, text_color=COLORS["error"])
-        self.detail_label.configure(text=detail)
-        self.progress_bar.set(0)
-        
-        if button_command is None:
-            button_command = self.app.quit
-            
-        self.action_button.configure(
-            text=button_text,
-            command=button_command,
-            fg_color=COLORS["error"],
-            hover_color="#cc3636"
-        )
-        self.action_button.pack(pady=10)
-        
-    def show_success(self, message, detail=""):
-        
-        print(f"[DEBUG] show_success called")
-        """Show success state"""
-        self.status_icon.configure(text="✅")
-        self.status_label.configure(text=message, text_color=COLORS["success"])
-        self.detail_label.configure(text=detail)
-        self.progress_bar.set(1.0)
-        
-    def show_choice(self, icon, message, detail, yes_text, no_text, yes_command, no_command):
-        
-        print(f"[DEBUG] show_choice called")
-        """Show a choice dialog"""
-        self.status_icon.configure(text=icon)
-        self.status_label.configure(text=message)
-        self.detail_label.configure(text=detail)
-        self.progress_bar.set(0)
-        
-        button_frame = ctk.CTkFrame(self.status_card, fg_color="transparent")
-        button_frame.pack(pady=10)
-        
-        ctk.CTkButton(
-            button_frame,
-            text=yes_text,
-            command=lambda: [button_frame.destroy(), yes_command()],
-            fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"],
-            text_color=COLORS["bg"],
-            width=150,
-            height=40,
-            corner_radius=10,
-            font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(side="left", padx=5)
-        
-        ctk.CTkButton(
-            button_frame,
-            text=no_text,
-            command=lambda: [button_frame.destroy(), no_command()],
-            fg_color=COLORS["card"],
-            hover_color=COLORS["card_hover"],
-            text_color=COLORS["text"],
-            width=150,
-            height=40,
-            corner_radius=10,
-            font=ctk.CTkFont(size=14)
-        ).pack(side="left", padx=5)
-        
     def run(self):
-        
-        print(f"[DEBUG] run called")
-        """Start the launcher"""
-        self.app.mainloop()
-
-
-print(f"[DEBUG] Loading class: SetupManager")
-
-
-class SetupManager:
-    """Handles Python installation and dependency management"""
-    
-    def __init__(self, launcher):
-    
-        print(f"[DEBUG] __init__ called")
-        self.launcher = launcher
-        
-    def check_python(self):
-        
-        print(f"[DEBUG] check_python called")
-        """Check if Python is installed"""
         try:
-            result = subprocess.run(
-                ["python", "--version"],
+            missing = []
+            for pkg_name, import_name in _REQUIRED:
+                try:
+                    __import__(import_name)
+                except ImportError:
+                    missing.append(pkg_name)
+
+            if not missing:
+                self.signals.progress.emit("All dependencies ready!", 1.0)
+                self.signals.finished.emit(True, "")
+                return
+
+            total = len(missing) + 1  # +1 for pip upgrade
+            step  = 0
+
+            # Upgrade pip first
+            self.signals.progress.emit("Updating pip…", step / total)
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--upgrade",
+                 "pip", "--quiet"],
                 capture_output=True,
-                text=True,
-                check=False,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                creationflags=(subprocess.CREATE_NO_WINDOW
+                               if sys.platform == "win32" else 0),
             )
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                return True, version
-            return False, None
-        except FileNotFoundError:
-            return False, None
-    
-    def download_python_installer(self):
-    
-        print(f"[DEBUG] download_python_installer called")
-        """Download Python installer for Windows"""
-        import webbrowser
-        
-        python_url = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
-        
-        self.launcher.update_status(
-            "📥",
-            "Downloading Python installer...",
-            "This may take a few minutes",
-            0.2
-        )
-        
-        try:
-            import os
-            downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
-            installer_path = os.path.join(downloads_folder, "python-3.11.9-amd64.exe")
+            step += 1
 
-            def download_progress(block_num, block_size, total_size):
-                print(f"[DEBUG] download_progress called")
-                downloaded = block_num * block_size
-                if total_size > 0:
-                    progress = min(downloaded / total_size, 1.0)
-                    self.launcher.progress_bar.set(0.2 + (progress * 0.6))
-                    self.launcher.app.update()
-            
-            urllib.request.urlretrieve(python_url, installer_path, download_progress)
-            
-            self.launcher.update_status(
-                "✅",
-                "Python installer downloaded!",
-                "Starting installation...",
-                0.9
-            )
-            
-            time.sleep(0.5)
-
-            self.launcher.update_status(
-                "🔧",
-                "Installing Python...",
-                "This will take a few minutes\nPlease wait...",
-                0.95
-            )
-            
-            try:
-
+            for pkg_name, _ in [(p, n) for p, n in _REQUIRED if p in missing]:
+                self.signals.progress.emit(f"Installing {pkg_name}…",
+                                           step / total)
                 result = subprocess.run(
-                    [installer_path, "/passive", "PrependPath=1", "Include_pip=1"],
-                    check=False
-                )
-                
-                if result.returncode == 0:
-                    self.launcher.show_success(
-                        "Python Installed Successfully!",
-                        "Please restart this launcher to continue"
-                    )
-                    
-                    self.launcher.action_button.configure(
-                        text="Restart Launcher",
-                        command=lambda: [self.launcher.app.quit(), os.execl(sys.executable, sys.executable, *sys.argv)],
-                        fg_color=COLORS["accent"],
-                        hover_color=COLORS["accent_hover"]
-                    )
-                    self.launcher.action_button.pack(pady=10)
-                else:
-                    self.launcher.show_error(
-                        "Installation Issue",
-                        "Python installation may have been cancelled or failed.\n"
-                        "Please run the installer manually from Downloads folder.",
-                        "Open Downloads",
-                        lambda: [os.startfile(downloads_folder) if sys.platform == 'win32' else None, self.launcher.app.quit()]
-                    )
-                    
-            except Exception as e:
-                self.launcher.show_error(
-                    "Installation Error",
-                    f"Error running installer: {str(e)}\n\n"
-                    f"Installer saved to:\n{installer_path}",
-                    "Open Downloads",
-                    lambda: [os.startfile(downloads_folder) if sys.platform == 'win32' else None, self.launcher.app.quit()]
-                )
-            
-        except Exception as e:
-            self.launcher.show_error(
-                "Download Failed",
-                f"Error: {str(e)}\n\nOpening download page in browser instead...",
-                "Open Browser",
-                lambda: [webbrowser.open("https://www.python.org/downloads/"), self.launcher.app.quit()]
-            )
-    
-    def install_packages(self):
-    
-        print(f"[DEBUG] install_packages called")
-        """Install required Python packages"""
-        packages = ["pip", "customtkinter", "Pillow", "requests"]
-        
-        for i, package in enumerate(packages):
-            progress = 0.3 + (i + 1) / len(packages) * 0.6 
-            
-            if package == "pip":
-                self.launcher.update_status(
-                    "📦",
-                    "Updating package manager...",
-                    "Upgrading pip to latest version",
-                    progress
-                )
-                
-                result = subprocess.run(
-                    ["python", "-m", "pip", "install", "--upgrade", "pip", "--quiet"],
+                    [sys.executable, "-m", "pip", "install",
+                     "--upgrade", pkg_name, "--quiet"],
                     capture_output=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                    creationflags=(subprocess.CREATE_NO_WINDOW
+                                   if sys.platform == "win32" else 0),
                 )
-            else:
-                self.launcher.update_status(
-                    "📦",
-                    "Installing packages...",
-                    f"Installing {package}",
-                    progress
-                )
-                
-                result = subprocess.run(
-                    ["python", "-m", "pip", "install", "--upgrade", package, "--quiet"],
-                    capture_output=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
-                )
-            
-            if result.returncode != 0:
-                
-                if package == "pip":
-                    continue
-                raise Exception(f"Failed to install {package}")
-            
-            time.sleep(0.2) 
-    
-    def launch_app(self):
-    
-        print(f"[DEBUG] launch_app called")
-        """Launch the main application via BeamSkin Studio.bat"""
-        self.launcher.update_status(
-            "🚀",
-            "Starting BeamSkin Studio...",
-            "Loading application",
-            0.95
+                if result.returncode != 0:
+                    raise RuntimeError(
+                        f"pip install {pkg_name} failed:\n"
+                        + result.stderr.decode(errors="replace")
+                    )
+                step += 1
+
+            self.signals.progress.emit("All dependencies installed!", 1.0)
+            self.signals.finished.emit(True, "")
+
+        except Exception as exc:
+            self.signals.finished.emit(False, str(exc))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPLASH WINDOW
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SplashWindow(QWidget):
+    """Frameless splash screen shown while packages are verified and the
+    main application window is initialising."""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
-        
-        time.sleep(0.5)
-        
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedSize(640, 420)
+        self._center()
+        self._build_ui()
+
+    # ── layout ────────────────────────────────────────────────────────────── #
+
+    def _build_ui(self):
+        # outer card
+        card = QFrame(self)
+        card.setGeometry(0, 0, 640, 420)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['frame_bg']};
+                border-radius: 16px;
+                border: 1px solid {COLORS['border']};
+            }}
+        """)
+
+        col = QVBoxLayout(card)
+        col.setContentsMargins(48, 40, 48, 36)
+        col.setSpacing(0)
+        col.setAlignment(Qt.AlignCenter)
+
+        # logo
+        self._logo_lbl = QLabel()
+        self._logo_lbl.setAlignment(Qt.AlignCenter)
+        self._logo_lbl.setStyleSheet("background:transparent;border:none;")
+        self._try_load_logo()
+        col.addWidget(self._logo_lbl)
+        col.addSpacing(20)
+
+        # title
+        title = QLabel("BeamSkin Studio")
+        title.setFont(self._font(26, bold=True))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet(
+            f"color:{COLORS['accent']};background:transparent;border:none;"
+        )
+        col.addWidget(title)
+        col.addSpacing(6)
+
+        # subtitle
+        sub = QLabel("Professional Skin Modding Tool for BeamNG.drive")
+        sub.setFont(self._font(12))
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+        )
+        col.addWidget(sub)
+        col.addSpacing(32)
+
+        # status label
+        self._status = QLabel("Initialising…")
+        self._status.setFont(self._font(13))
+        self._status.setAlignment(Qt.AlignCenter)
+        self._status.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        col.addWidget(self._status)
+        col.addSpacing(14)
+
+        # progress bar
+        self._bar = QProgressBar()
+        self._bar.setRange(0, 1000)
+        self._bar.setValue(0)
+        self._bar.setTextVisible(False)
+        self._bar.setFixedHeight(8)
+        self._bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {COLORS['card_bg']};
+                border-radius: 4px;
+                border: none;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLORS['accent']};
+                border-radius: 4px;
+            }}
+        """)
+        col.addWidget(self._bar)
+        col.addSpacing(28)
+
+        # error/action button (hidden by default)
+        self._action_btn = QPushButton("")
+        self._action_btn.setFixedHeight(42)
+        self._action_btn.setVisible(False)
+        self._action_btn.setFont(self._font(13, bold=True))
+        self._action_btn.setCursor(Qt.PointingHandCursor)
+        col.addWidget(self._action_btn)
+
+        # version / footer
+        ver_lbl = QLabel("Loading…")
+        ver_lbl.setFont(self._font(10))
+        ver_lbl.setAlignment(Qt.AlignCenter)
+        ver_lbl.setObjectName("ver_lbl")
+        ver_lbl.setStyleSheet(
+            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+        )
+        col.addWidget(ver_lbl)
+        self._ver_lbl = ver_lbl
+
+    # ── helpers ───────────────────────────────────────────────────────────── #
+
+    @staticmethod
+    def _font(size: int, bold: bool = False) -> QFont:
+        f = QFont("Segoe UI", size)
+        if bold:
+            f.setBold(True)
+        return f
+
+    def _try_load_logo(self):
+        """Load the white logo PNG if available; fall back to text emoji."""
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        # launcher.py lives inside launchers-scripts/ (one level down from root)
         parent_dir = os.path.dirname(script_dir)
-        bat_file_path = os.path.join(parent_dir, "BeamSkin Studio.bat")
-        
-        if not os.path.exists(bat_file_path):
-            self.launcher.show_error(
-                "File Not Found",
-                f"Could not find 'BeamSkin Studio.bat' in:\n{parent_dir}",
-                "Close",
-                self.launcher.app.quit
+        logo_path = os.path.join(
+            parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png"
+        )
+        if not os.path.exists(logo_path):
+            # try root-level (if launcher.py is in project root)
+            logo_path = os.path.join(
+                script_dir, "gui", "Icons", "BeamSkin_Studio_White.png"
             )
-            return
-        
-        if sys.platform == 'win32':
-            process = subprocess.Popen(
-                [bat_file_path],
-                cwd=parent_dir,  
-                creationflags=subprocess.CREATE_NO_WINDOW,
-                shell=True
-            )
-        else:
 
-            process = subprocess.Popen(
-                [bat_file_path],
-                cwd=parent_dir,
-                shell=True
+        if os.path.exists(logo_path):
+            px = QPixmap(logo_path).scaled(
+                160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-        
-        
-        time.sleep(2)  
-        
-        self.launcher.app.withdraw()
-        self.launcher.app.quit()
+            self._logo_lbl.setPixmap(px)
+        else:
+            self._logo_lbl.setText("🎨")
+            self._logo_lbl.setFont(self._font(56))
+            self._logo_lbl.setStyleSheet(
+                f"color:{COLORS['accent']};background:transparent;border:none;"
+            )
+
+    def _center(self):
+        screen = QApplication.primaryScreen().geometry()
+        self.move(
+            (screen.width()  - self.width())  // 2,
+            (screen.height() - self.height()) // 2,
+        )
+
+    # ── public API ────────────────────────────────────────────────────────── #
+
+    def set_status(self, message: str, progress: float = None):
+        """Update status label and optional progress bar (0.0–1.0)."""
+        self._status.setText(message)
+        if progress is not None:
+            self._bar.setValue(int(progress * 1000))
+        QApplication.processEvents()
+
+    def set_version(self, text: str):
+        self._ver_lbl.setText(text)
+
+    def show_error(self, message: str, button_text: str = "Close",
+                   on_click=None):
+        self._status.setStyleSheet(
+            f"color:{COLORS['error']};background:transparent;border:none;"
+        )
+        self._status.setText(message)
+        self._bar.setValue(0)
+        self._action_btn.setText(button_text)
+        self._action_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['error']};
+                color: white;
+                border-radius: 8px;
+                border: none;
+                font-size: 13px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: #DC2626; }}
+        """)
+        if on_click:
+            try:
+                self._action_btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            self._action_btn.clicked.connect(on_click)
+        self._action_btn.setVisible(True)
+        QApplication.processEvents()
+
+    def show_choice(self, message: str,
+                    yes_text: str, no_text: str,
+                    on_yes=None, on_no=None):
+        """Show two buttons side by side (e.g. Download / Cancel)."""
+        self._status.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        self._status.setText(message)
+        self._bar.setValue(0)
+
+        # reuse action_btn as YES; add a NO button dynamically
+        self._action_btn.setText(yes_text)
+        self._action_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['accent']};
+                color: white;
+                border-radius: 8px;
+                border: none;
+                font-size: 13px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: {COLORS['accent_hover']}; }}
+        """)
+        if on_yes:
+            try:
+                self._action_btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            self._action_btn.clicked.connect(on_yes)
+        self._action_btn.setVisible(True)
+
+        if not hasattr(self, "_no_btn"):
+            self._no_btn = QPushButton(no_text)
+            self._no_btn.setFixedHeight(42)
+            self._no_btn.setFont(self._font(13))
+            self._no_btn.setCursor(Qt.PointingHandCursor)
+            self._no_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {COLORS['text_secondary']};
+                    border-radius: 8px;
+                    border: 1px solid {COLORS['border']};
+                    font-size: 13px;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['card_bg']};
+                    color: {COLORS['text']};
+                }}
+            """)
+            # insert the no button right after action_btn
+            layout = self._action_btn.parent().layout()
+            idx = layout.indexOf(self._action_btn)
+            layout.insertWidget(idx + 1, self._no_btn)
+        else:
+            self._no_btn.setText(no_text)
+            try:
+                self._no_btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            self._no_btn.setVisible(True)
+
+        if on_no:
+            self._no_btn.clicked.connect(on_no)
+
+        QApplication.processEvents()
+
+    def hide_buttons(self):
+        self._action_btn.setVisible(False)
+        if hasattr(self, "_no_btn"):
+            self._no_btn.setVisible(False)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN SEQUENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _launch_main_app(splash: SplashWindow):
+    """Launch main.py in the same process (or as subprocess if preferred)."""
+    script_dir  = os.path.dirname(os.path.abspath(__file__))
+    parent_dir  = os.path.dirname(script_dir)
+    main_py     = os.path.join(parent_dir, "main.py")
+
+    if not os.path.exists(main_py):
+        # if launcher.py lives at the root level alongside main.py
+        main_py = os.path.join(script_dir, "main.py")
+
+    if not os.path.exists(main_py):
+        splash.show_error(
+            "main.py not found — check your installation.",
+            "Close",
+            QApplication.quit,
+        )
+        return
+
+    if sys.platform == "win32":
+        subprocess.Popen(
+            ["pythonw", main_py],
+            cwd=os.path.dirname(main_py),
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    else:
+        subprocess.Popen(
+            [sys.executable, main_py],
+            cwd=os.path.dirname(main_py),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
 
 def main():
+    app = QApplication(sys.argv)
+    app.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
+
+    splash = SplashWindow()
+    splash.show()
+    QApplication.processEvents()
+
+    # Try to read version for footer
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    for candidate in [
+        os.path.join(script_dir, "version.txt"),
+        os.path.join(os.path.dirname(script_dir), "version.txt"),
+    ]:
+        if os.path.exists(candidate):
+            try:
+                ver = open(candidate).read().strip()
+                splash.set_version(f"v{ver}")
+            except Exception:
+                pass
+            break
+
+    worker = _InstallWorker()
+
+    def on_progress(msg: str, pct: float):
+        splash.set_status(msg, pct)
+
+    def on_finished(success: bool, error_msg: str):
+        if not success:
+            splash.show_error(
+                f"Setup failed: {error_msg}",
+                "Close",
+                QApplication.quit,
+            )
+            return
+
+        splash.set_status("Launching BeamSkin Studio…", 1.0)
+        QTimer.singleShot(400, lambda: _launch_and_close(splash))
+
+    worker.signals.progress.connect(on_progress)
+    worker.signals.finished.connect(on_finished)
+    worker.start()
+
+    sys.exit(app.exec())
 
 
-    print(f"[DEBUG] main called")
-    """Main launcher sequence"""
-    launcher = LauncherWindow()
-    setup = SetupManager(launcher)
-    
-    def startup_sequence():
-    
-        print(f"[DEBUG] startup_sequence called")
-        """Run the startup checks and launch"""
-        try:
-            launcher.update_status(
-                "🔍",
-                "Checking Python installation...",
-                "Verifying Python is available",
-                0.1
-            )
-            time.sleep(0.5)
-            
-            python_installed, version = setup.check_python()
-            
-            if not python_installed:
-                def download_and_install():
-                    print(f"[DEBUG] download_and_install called")
-                    setup.download_python_installer()
-                
-                launcher.show_choice(
-                    "⚠️",
-                    "Python Not Found",
-                    "Python is required to run BeamSkin Studio.\nWould you like to download and install it now?",
-                    "Download Python",
-                    "Cancel",
-                    download_and_install,
-                    launcher.app.quit
-                )
-                return
-            
-            else:
-                launcher.update_status(
-                    "✅",
-                    f"Python Found: {version}",
-                    "Preparing dependencies...",
-                    0.2
-                )
-                time.sleep(0.3)
-                continue_startup()
-            
-        except Exception as e:
-            launcher.show_error(
-                "Startup Error",
-                str(e)
-            )
-    
-    def continue_startup():
-    
-        print(f"[DEBUG] continue_startup called")
-        """Continue with package installation and app launch"""
-        try:
-            launcher.update_status(
-                "📦",
-                "Checking dependencies...",
-                "This will only take a moment",
-                0.25
-            )
-            time.sleep(0.2)
-            
-            setup.install_packages()
-            
-            launcher.update_status(
-                "✅",
-                "All dependencies ready!",
-                "Launching application...",
-                0.95
-            )
-            time.sleep(0.3)
-
-            setup.launch_app()
-            
-        except Exception as e:
-            launcher.show_error(
-                "Setup Error",
-                str(e)
-            )
-    
-    threading.Thread(target=startup_sequence, daemon=True).start()
-    
-    launcher.run()
+def _launch_and_close(splash: SplashWindow):
+    _launch_main_app(splash)
+    # Give main.py a moment to appear, then close splash
+    QTimer.singleShot(200, QApplication.quit)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,20 @@
+{
+"us_semi_skin_SKINNAME": {
+    "information":{
+        "authors":"SKINNAME",
+        "name":"AUTHOR",
+        "value":0,
+    },
+    "slotType" : "paint_design",
+    "globalSkin" : "SKINNAME",
+},
+"us_semi_cargobox_skin_SKINNAME": {
+    "information":{
+        "authors":"AUTHOR",
+        "name":"SKINNAME",
+        "value":2200
+    },
+    "slotType" : "skin_us_semi_cargobox",
+    "skinName" : "SKINNAME"
+},
+}

@@ -1,15 +1,15 @@
-"""Theme and settings management"""
+"""Settings management"""
 import os
 import json
 
 SETTINGS_FILE = "data/app_settings.json"
 
 app_settings = {
-    "theme": "dark",
     "first_launch": True,
     "setup_complete": False,
     "beamng_install": "",
-    "mods_folder": ""
+    "mods_folder": "",
+    "theme_mode": "dark",
 }
 
 os.makedirs("data", exist_ok=True)
@@ -26,136 +26,6 @@ def save_settings():
     os.makedirs("data", exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(app_settings, f, indent=4)
-
-DEFAULT_THEMES = {
-    "dark": {
-        "app_bg": "#0a0a0a",
-        "frame_bg": "#141414",
-        "card_bg": "#1e1e1e",
-        "card_hover": "#282828",
-        "text": "#f5f5f5",
-        "text_secondary": "#999999",
-        "accent": "#FF6600",
-        "accent_hover": "#CC5100",
-        "accent_text": "#0a0a0a",
-        "tab_selected": "#FF6600",
-        "tab_selected_hover": "#E55B00",
-        "tab_unselected": "#141414",
-        "tab_unselected_hover": "#E55B00",
-        "border": "#2a2a2a",
-        "error": "#ff4444",
-        "error_hover": "#cc3636",
-        "success": "#39E09B",
-        "warning": "#ffa726",
-        "topbar_bg": "#181818",
-        "sidebar_bg": "#121212"
-    },
-    "light": {
-        "app_bg": "#fafafa",
-        "frame_bg": "#CCCCCC",
-        "card_bg": "#B7B7B7",
-        "card_hover": "#070606",
-        "text": "#1a1a1a",
-        "text_secondary": "#323232",
-        "accent": "#FF6600",
-        "accent_hover": "#CC5100",
-        "accent_text": "#0a0a0a",
-        "tab_selected": "#FF6600",
-        "tab_selected_hover": "#E55B00",
-        "tab_unselected": "#CCCCCC",
-        "tab_unselected_hover": "#E55B00",
-        "border": "#e0e0e0",
-        "error": "#ff4444",
-        "error_hover": "#cc3636",
-        "success": "#39E09B",
-        "warning": "#ffa726",
-        "topbar_bg": "#f5f5f5",
-        "sidebar_bg": "#eeeeee"
-    }
-}
-
-EDITABLE_COLOR_KEYS = [
-    "app_bg", "frame_bg", "card_bg", "card_hover",
-    "text", "text_secondary", "accent", "accent_hover", "accent_text",
-    "tab_selected", "tab_selected_hover", "tab_unselected", "tab_unselected_hover",
-    "border", "topbar_bg", "sidebar_bg"
-]
-
-COLOR_LABELS = {
-    "app_bg": "App Background",
-    "frame_bg": "Frame Background",
-    "card_bg": "Card Background",
-    "card_hover": "Card Hover",
-    "text": "Text",
-    "text_secondary": "Secondary Text",
-    "accent": "Accent Color",
-    "accent_hover": "Accent Hover",
-    "accent_text": "Accent Text",
-    "tab_selected": "Tab Selected",
-    "tab_selected_hover": "Tab Selected Hover",
-    "tab_unselected": "Tab Unselected",
-    "tab_unselected_hover": "Tab Unselected Hover",
-    "border": "Border",
-    "topbar_bg": "Top Bar Background",
-    "sidebar_bg": "Sidebar Background"
-}
-
-THEMES = {
-    "dark": {
-        "app_bg": "#0a0a0a",
-        "frame_bg": "#141414",
-        "card_bg": "#1e1e1e",
-        "card_hover": "#282828",
-        "text": "#f5f5f5",
-        "text_secondary": "#999999",
-        "accent": "#FF6600",
-        "accent_hover": "#CC5100",
-        "accent_text": "#0a0a0a",
-        "tab_selected": "#FF6600",
-        "tab_selected_hover": "#E55B00",
-        "tab_unselected": "#141414",
-        "tab_unselected_hover": "#E55B00",
-        "border": "#2a2a2a",
-        "error": "#ff4444",
-        "error_hover": "#cc3636",
-        "success": "#39E09B",
-        "warning": "#ffa726",
-        "topbar_bg": "#181818",
-        "sidebar_bg": "#121212"
-    },
-    "light": {
-        "app_bg": "#fafafa",
-        "frame_bg": "#CCCCCC",
-        "card_bg": "#B7B7B7",
-        "card_hover": "#070606",
-        "text": "#1a1a1a",
-        "text_secondary": "#323232",
-        "accent": "#FF6600",
-        "accent_hover": "#CC5100",
-        "accent_text": "#0a0a0a",
-        "tab_selected": "#FF6600",
-        "tab_selected_hover": "#E55B00",
-        "tab_unselected": "#CCCCCC",
-        "tab_unselected_hover": "#E55B00",
-        "border": "#e0e0e0",
-        "error": "#ff4444",
-        "error_hover": "#cc3636",
-        "success": "#39E09B",
-        "warning": "#ffa726",
-        "topbar_bg": "#f5f5f5",
-        "sidebar_bg": "#eeeeee"
-    }
-}
-
-if "custom_themes" in app_settings:
-    THEMES = app_settings["custom_themes"]
-else:
-    import copy
-    THEMES = copy.deepcopy(DEFAULT_THEMES)
-    # Do NOT write custom_themes to disk here — only save when user explicitly customises
-
-current_theme = app_settings["theme"]
-colors = THEMES[current_theme]
 
 ADDED_VEHICLES_FILE = "vehicles/added_vehicles.json"
 added_vehicles = {}
@@ -209,7 +79,7 @@ def show_wip_warning(app=None, force=False):
         dialog.attributes('-topmost', True)
         dialog.after(100, lambda: dialog.attributes('-topmost', False))
 
-        main_frame = ctk.CTkFrame(dialog, fg_color=colors["frame_bg"])
+        main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         icon_label = ctk.CTkLabel(
@@ -223,11 +93,10 @@ def show_wip_warning(app=None, force=False):
             main_frame,
             text="Work in Progress",
             font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=colors["warning"]
         )
         title_label.pack(pady=(0, 15))
 
-        message_frame = ctk.CTkFrame(main_frame, fg_color=colors["card_bg"], corner_radius=10)
+        message_frame = ctk.CTkFrame(main_frame, corner_radius=10)
         message_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         message_label = ctk.CTkLabel(
@@ -240,7 +109,6 @@ def show_wip_warning(app=None, force=False):
                  "• Regular updates and changes are being made\n\n"
                  "Thank you for your patience and understanding!",
             font=ctk.CTkFont(size=20),
-            text_color=colors["text"],
             justify="left"
         )
         message_label.pack(pady=20, padx=20)
@@ -257,9 +125,6 @@ def show_wip_warning(app=None, force=False):
             main_frame,
             text="Got it!",
             command=close_dialog,
-            fg_color=colors["accent"],
-            hover_color=colors["accent_hover"],
-            text_color=colors["accent_text"],
             height=40,
             corner_radius=8,
             font=ctk.CTkFont(size=14, weight="bold")
@@ -269,140 +134,6 @@ def show_wip_warning(app=None, force=False):
         print(f"[DEBUG] WIP warning dialog created and shown")
     else:
         print(f"[DEBUG] Skipping WIP warning (not first launch)")
-
-def reset_theme_colors(theme_name):
-    """Reset a theme to default colors"""
-    import copy
-    if theme_name not in DEFAULT_THEMES:
-        return False
-
-    THEMES[theme_name] = copy.deepcopy(DEFAULT_THEMES[theme_name])
-
-    # Check if ALL themes are now back to their defaults
-    all_default = all(
-        THEMES.get(t) == DEFAULT_THEMES[t]
-        for t in DEFAULT_THEMES
-    )
-
-    if all_default:
-        # Remove custom_themes entirely — no custom data left to persist
-        app_settings.pop("custom_themes", None)
-        print(f"[DEBUG] All themes back to default — removed custom_themes from save file")
-    else:
-        # Other theme still has customisations, keep the entry updated
-        app_settings["custom_themes"] = THEMES
-
-    save_settings()
-    print(f"[DEBUG] Reset {theme_name} theme to default colors")
-    return True
-
-def update_theme_color(theme_name, color_key, color_value):
-    """Update a single color in a theme
-
-    Args:
-        theme_name: Name of the theme ("dark" or "light")
-        color_key: Key of the color to update
-        color_value: New color value (hex string)
-
-    Returns:
-        True if successful, False otherwise
-    """
-
-    if "custom_themes" not in app_settings:
-        import copy
-        app_settings["custom_themes"] = copy.deepcopy(DEFAULT_THEMES)
-        app_settings["custom_themes"][theme_name] = copy.deepcopy(THEMES[theme_name])
-
-    if theme_name not in THEMES:
-        print(f"[ERROR] Theme '{theme_name}' not found")
-        return False
-
-    if color_key not in THEMES[theme_name]:
-        print(f"[ERROR] Color key '{color_key}' not found in theme '{theme_name}'")
-        return False
-
-    THEMES[theme_name][color_key] = color_value
-    app_settings["custom_themes"][theme_name][color_key] = color_value
-
-    save_settings()
-
-    print(f"[DEBUG] Updated {theme_name}.{color_key} to {color_value}")
-    return True
-
-def get_theme_color(theme_name, color_key):
-    """Get a color value from a theme"""
-    if theme_name in THEMES and color_key in THEMES[theme_name]:
-        return THEMES[theme_name][color_key]
-    return None
-
-def toggle_theme(app_instance=None):
-    """
-    Toggle between dark and light themes
-
-    Args:
-        app_instance: Optional reference to the main app for live UI updates
-
-    Returns:
-        The new theme name ("dark" or "light")
-    """
-    global current_theme, colors
-
-    new_theme = "light" if current_theme == "dark" else "dark"
-
-    current_theme = new_theme
-    colors = THEMES[current_theme]
-
-    app_settings["theme"] = new_theme
-    save_settings()
-
-    print(f"[DEBUG] Theme toggled to: {new_theme}")
-
-    if app_instance:
-        try:
-            from gui.state import state
-            state.current_theme = new_theme
-            state.colors = colors
-            print(f"[DEBUG] Updated app state with new theme")
-        except Exception as e:
-            print(f"[DEBUG] Could not update app state: {e}")
-
-    return new_theme
-
-def set_theme(theme_name, app_instance=None):
-    """
-    Set a specific theme
-
-    Args:
-        theme_name: "dark" or "light"
-        app_instance: Optional reference to the main app for live UI updates
-
-    Returns:
-        True if successful, False if theme doesn't exist
-    """
-    global current_theme, colors
-
-    if theme_name not in THEMES:
-        print(f"[ERROR] Theme '{theme_name}' does not exist")
-        return False
-
-    current_theme = theme_name
-    colors = THEMES[current_theme]
-
-    app_settings["theme"] = theme_name
-    save_settings()
-
-    print(f"[DEBUG] Theme set to: {theme_name}")
-
-    if app_instance:
-        try:
-            from gui.state import state
-            state.current_theme = theme_name
-            state.colors = colors
-            print(f"[DEBUG] Updated app state with new theme")
-        except Exception as e:
-            print(f"[DEBUG] Could not update app state: {e}")
-
-    return True
 
 def set_beamng_paths(beamng_install: str = None, mods_folder: str = None):
     """
