@@ -523,7 +523,6 @@ body::after {
 
 #vImg:hover { opacity: .88; }
 
-/* Zoom hint that appears over the image */
 .viewer-zoom-hint {
   position: absolute;
   bottom: 10px;
@@ -1561,7 +1560,6 @@ body::after {
     <div class="wip-pills">
       <span class="wip-pill">Rare crashes possible</span>
       <span class="wip-pill">Game updates may break textures</span>
-      <span class="wip-pill">No vehicle variant support yet</span>
       <span class="wip-pill">Limited mod support</span>
       <span class="wip-pill">Linux build untested</span>
     </div>
@@ -2010,7 +2008,6 @@ async function fetchChangelog(){
     const body=document.getElementById('clBody');
     body.innerHTML='';
 
-    // Safely escape HTML then convert literal \n to <br>
     const safe = t => t
       .replace(/&/g,'&amp;')
       .replace(/</g,'&lt;')
@@ -2067,7 +2064,276 @@ function showImage(src, card) {
   document.getElementById('vImg').src = src;
   document.getElementById('vVideo').style.display = 'none';
   document.getElementById('vImg').style.display = 'block';
-  /* zoom hint is shown via CSS :hover on .viewer-frame */
+  clearG();
+  if (card) card.classList.add('active');
+}
+
+/* ── Navigation ── */
+const TABS=['home','features','install','releases','changelog'];
+
+function switchTab(name,btn,isMobile){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  const idx=TABS.indexOf(name);
+  if(!isMobile){
+    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+    document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  } else {
+    document.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  }
+}
+
+function switchSub(name,btn){
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sub-'+name).classList.add('active');
+}
+
+function switchInstOS(os){
+  document.querySelectorAll('#sub-inst .os-sect').forEach(s=>s.classList.remove('active'));
+  document.getElementById('inst-'+os).classList.add('active');
+  document.getElementById('instW').className='os-btn'+(os==='windows'?' win-on':'');
+  document.getElementById('instL').className='os-btn'+(os==='linux'?' lin-on':'');
+}
+
+function switchRelOS(os){
+  document.querySelectorAll('#panel-releases .os-sect').forEach(s=>s.classList.remove('active'));
+  document.getElementById('rel-'+os).classList.add('active');
+  document.getElementById('relW').className='os-btn'+(os==='windows'?' win-on':'');
+  document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');
+}
+
+function toggleT(item){ item.classList.toggle('open'); }
+
+document.getElementById('winBtn').onclick=()=>window.location.href=winUrl;
+document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
+
+initData();
+fetchChangelog();
+</script>
+</body>
+</html>        <div class="trouble-item" onclick="toggleT(this)">
+          <div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div>
+          <div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div>
+        </div>
+
+      </div>
+    </div><!-- /sub-trouble -->
+
+  </div><!-- /install -->
+
+  <!-- ── RELEASES ── -->
+  <div class="tab-panel" id="panel-releases">
+    <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
+    <p class="tab-sub">Complete release history for Windows and Linux builds.</p>
+
+    <div class="os-toggle" style="margin-bottom:20px;">
+      <button class="os-btn win-on" id="relW" onclick="switchRelOS('windows')"><i class="fab fa-windows"></i> Windows</button>
+      <button class="os-btn" id="relL" onclick="switchRelOS('linux')"><i class="fab fa-linux"></i> Linux</button>
+    </div>
+
+    <div class="os-sect active" id="rel-windows">
+      <div id="rlw"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
+    </div>
+    <div class="os-sect" id="rel-linux">
+      <div id="rll"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
+    </div>
+  </div><!-- /releases -->
+
+  <!-- ── CHANGELOG ── -->
+  <div class="tab-panel" id="panel-changelog">
+    <div class="cl-wrap">
+      <div class="cl-top">
+        <h2 class="tab-heading">CHANGE<span>LOG</span></h2>
+        <span id="clVer" class="cl-ver">Loading…</span>
+        <span id="clDate" class="cl-date-label"></span>
+      </div>
+      <div class="cl-body" id="clBody">
+        <div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div>
+      </div>
+    </div>
+  </div><!-- /changelog -->
+
+</div><!-- /page-wrap -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-brand">
+    <img src="beamSkin_studio_logo.png" alt="" class="footer-logo">
+    <span class="footer-name">BeamSkin Studio</span>
+  </div>
+  <div class="footer-socials">
+    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+    <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+    <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
+  </div>
+  <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
+</footer>
+
+<!-- LIGHTBOX OVERLAY -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close fullscreen">
+    <i class="fas fa-xmark"></i>
+  </button>
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <img id="lightboxImg" src="" alt="Screenshot fullscreen">
+  </div>
+</div>
+
+<script>
+const WIN_REPO   = 'BeamSkin-Studio/BeamSkin-Studio-Beta';
+const LINUX_REPO = 'BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
+let winUrl   = `https://github.com/${WIN_REPO}/releases/latest`;
+let linuxUrl = `https://github.com/${LINUX_REPO}/releases/latest`;
+
+/* ── GitHub data ── */
+async function initData() {
+  try {
+    const [wR, lR] = await Promise.all([
+      fetch(`https://api.github.com/repos/${WIN_REPO}/releases`).then(r=>r.json()),
+      fetch(`https://api.github.com/repos/${LINUX_REPO}/releases`).then(r=>r.json())
+    ]);
+
+    let wT=0,lT=0,wL=0,lL=0;
+    wR.forEach((r,i)=>r.assets.forEach(a=>{wT+=a.download_count;if(i===0)wL+=a.download_count;}));
+    lR.forEach((r,i)=>r.assets.forEach(a=>{lT+=a.download_count;if(i===0)lL+=a.download_count;}));
+
+    if(wR.length){
+      document.getElementById('winVer').textContent=wR[0].tag_name;
+      if(wR[0].assets.length) winUrl=wR[0].assets[0].browser_download_url;
+    }
+    if(lR.length){
+      document.getElementById('linVer').textContent=lR[0].tag_name;
+      if(lR[0].assets.length) linuxUrl=lR[0].assets[0].browser_download_url;
+    }
+
+    document.getElementById('winCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${wL.toLocaleString()} (latest)`;
+    document.getElementById('linCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${lL.toLocaleString()} (latest)`;
+    document.getElementById('statTotal').textContent=(wT+lT).toLocaleString();
+    document.getElementById('statWin').textContent=wT.toLocaleString();
+    document.getElementById('statLin').textContent=lT.toLocaleString();
+
+    buildRelList(wR,'rlw',false);
+    buildRelList(lR,'rll',true);
+  } catch(e) {
+    console.error(e);
+    ['winVer','linVer'].forEach(id=>document.getElementById(id).textContent='Unavailable');
+  }
+}
+
+function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+
+function buildRelList(rels,id,lin){
+  const c=document.getElementById(id);
+  if(!rels.length){c.innerHTML='<div class="rel-loading">No releases found.</div>';return;}
+  c.innerHTML='';
+  rels.forEach((r,i)=>{
+    const isL=i===0;
+    const dlC=r.assets.reduce((s,a)=>s+a.download_count,0);
+    const url=r.assets.length?r.assets[0].browser_download_url:null;
+    const row=document.createElement('div');
+    row.className='release-row'+(lin?' lin-row':'')+(isL?' is-latest':'');
+    const badge=isL?`<span class="rel-latest-badge ${lin?'lin':''}"><i class="fas fa-circle-check"></i> LATEST</span>`:'';
+    const btn=url
+      ?`<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>`
+      :`<span class="rel-no-asset">No asset</span>`;
+    row.innerHTML=`
+      <div class="rel-tag">${r.tag_name}${badge}</div>
+      <div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div>
+      <div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>
+      ${btn}
+    `;
+    c.appendChild(row);
+  });
+}
+
+/* ── Changelog ── */
+async function fetchChangelog(){
+  try{
+    const res=await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
+    if(!res.ok) throw new Error('fetch');
+    const text=await res.text();
+    const ls=text.indexOf('CHANGELOGS = [');
+    if(ls===-1) throw new Error('no list');
+    const cont=text.slice(ls);
+    let d=0,s=-1,e=-1;
+    for(let i=0;i<cont.length;i++){
+      if(cont[i]==='{'){if(d===0)s=i;d++;}
+      else if(cont[i]==='}'){d--;if(d===0){e=i;break;}}
+    }
+    if(s===-1||e===-1) throw new Error('parse');
+    const blk=cont.slice(s,e+1);
+    const ver=(blk.match(/"version":\s*"([^"]+)"/))||[];
+    const dat=(blk.match(/"date":\s*"([^"]+)"/))||[];
+    document.getElementById('clVer').textContent=`v${ver[1]||'?'}`;
+    document.getElementById('clDate').textContent=dat[1]||'';
+    const entries=[];
+    const re=/(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
+    let m;
+    while((m=re.exec(blk))!==null) entries.push({type:m[1],text:m[2]||''});
+    const body=document.getElementById('clBody');
+    body.innerHTML='';
+
+    const safe = t => t
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/\\n/g,'<br>');
+
+    for(const en of entries){
+      if(en.type==='separator'){const hr=document.createElement('hr');hr.className='cl-sep';body.appendChild(hr);continue;}
+      const div=document.createElement('div');
+      if(en.type==='title'){div.className='cl-title-el';div.innerHTML=safe(en.text);}
+      else if(en.type==='subtitle'){div.className='cl-sub';div.innerHTML=safe(en.text);}
+      else if(en.type==='item'){div.className='cl-item-el';div.innerHTML=safe(en.text);}
+      else if(en.type==='note'){div.className='cl-note-el';div.innerHTML='💡 '+safe(en.text);}
+      body.appendChild(div);
+    }
+  } catch(e){
+    console.error(e);
+    document.getElementById('clBody').innerHTML='<div class="cl-loading">Could not load changelog.</div>';
+    document.getElementById('clVer').textContent='';
+  }
+}
+
+/* ── Lightbox ── */
+function openLightbox() {
+  const img = document.getElementById('vImg');
+  if (!img.src || img.style.display === 'none') return;
+  document.getElementById('lightboxImg').src = img.src;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+/* ── Media viewer ── */
+function clearG(){ document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active')); }
+
+function showVideo(id, card) {
+  document.getElementById('vVideo').src = `https://www.youtube.com/embed/${id}`;
+  document.getElementById('vVideo').style.display = 'block';
+  document.getElementById('vImg').style.display = 'none';
+  document.getElementById('zoomHint').style.display = 'none';
+  clearG();
+  if (card) card.classList.add('active');
+}
+
+function showImage(src, card) {
+  document.getElementById('vImg').src = src;
+  document.getElementById('vVideo').style.display = 'none';
+  document.getElementById('vImg').style.display = 'block';
   clearG();
   if (card) card.classList.add('active');
 }
