@@ -256,14 +256,20 @@ class ProjectBrowserDialog(QDialog):
 
     def __init__(self, parent: QWidget = None):
         print(f"[DEBUG] ProjectBrowserDialog.__init__: called parent={parent}")
-        super().__init__(parent)
+        super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
         self.selected_path: Optional[str] = None
 
-        self.setWindowTitle(t("project_browser.window_title"))
         self.setModal(True)
         self.resize(820, 580)
         self.setMinimumSize(600, 400)
-        self.setStyleSheet(f"background:{COLORS['app_bg']};color:{COLORS['text']};")
+        self.setStyleSheet(f"""
+            QDialog {{
+                background:{COLORS['app_bg']};
+                color:{COLORS['text']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 14px;
+            }}
+        """)
 
         self._entries:     List[Dict] = []
         self._rows:        List[_ProjectRow] = []

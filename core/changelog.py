@@ -43,8 +43,8 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
-        "version": "0.8.0.Beta",
-        "date": "08-15-2026",
+        "version": "0.8.1.Beta",
+        "date": "08-21-2026",
         "entries": [
             title("🚀 New Features"),
             subtitle("Body variant support"),
