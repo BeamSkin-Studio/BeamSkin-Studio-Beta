@@ -57,7 +57,7 @@ body::after {
   z-index: 0;
 }
 
-/* ═══════ LIGHTBOX ═══════ */
+/* LIGHTBOX */
 .lightbox {
   display: none;
   position: fixed;
@@ -69,1445 +69,389 @@ body::after {
   cursor: zoom-out;
   animation: lbFadeIn .18s ease;
 }
-
-@keyframes lbFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
+@keyframes lbFadeIn { from{opacity:0} to{opacity:1} }
 .lightbox.open { display: flex; }
+.lightbox-inner { position:relative;display:flex;align-items:center;justify-content:center;max-width:94vw;max-height:94vh; }
+.lightbox-inner img { max-width:94vw;max-height:92vh;object-fit:contain;border-radius:8px;border:1px solid rgba(255,255,255,.08);cursor:default;user-select:none;display:block;animation:lbImgIn .2s ease; }
+@keyframes lbImgIn { from{transform:scale(.96);opacity:0} to{transform:scale(1);opacity:1} }
+.lightbox-close { position:fixed;top:18px;right:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:.85rem;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s,border-color .2s;z-index:10000; }
+.lightbox-close:hover { background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3); }
 
-.lightbox-inner {
-  position: relative;
+/* NAVBAR */
+.navbar { position:sticky;top:0;z-index:900;backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px);background:rgba(24,24,24,.92);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 24px;gap:0; }
+.nav-brand { display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0; }
+.nav-logo { height:28px;filter:drop-shadow(0 0 8px rgba(255,102,0,.5)); }
+.nav-wordmark { font-family:var(--font-head);font-weight:800;font-size:1.18rem;letter-spacing:.1em;color:var(--text);text-transform:uppercase; }
+.nav-wordmark span { color:var(--accent); }
+.nav-tabs { display:flex;align-items:center;gap:2px;margin-left:32px;flex:1; }
+.nav-tab { font-family:var(--font-head);font-weight:700;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);padding:7px 14px;border-radius:6px;border:none;background:transparent;cursor:pointer;transition:color .2s,background .2s;position:relative; }
+.nav-tab::after { content:'';position:absolute;bottom:0;left:50%;right:50%;height:2px;background:var(--accent);border-radius:2px 2px 0 0;transition:left .25s,right .25s; }
+.nav-tab:hover { color:var(--text);background:var(--bg-2); }
+.nav-tab.active { color:var(--accent); }
+.nav-tab.active::after { left:12px;right:12px; }
+.nav-socials { display:flex;align-items:center;gap:6px;margin-left:auto; }
+.soc-btn { display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg-2);color:var(--text-2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-decoration:none;font-family:var(--font-head);text-transform:uppercase;transition:border-color .2s,color .2s,background .2s,box-shadow .2s; }
+.soc-btn i { font-size:.8rem; }
+.soc-btn:hover { color:var(--text);border-color:var(--border-2);background:var(--bg-3); }
+.soc-btn.discord:hover { color:#7289da;border-color:rgba(114,137,218,.35);box-shadow:0 0 12px rgba(114,137,218,.12); }
+.soc-btn.patreon:hover { color:#f96854;border-color:rgba(249,104,84,.35);box-shadow:0 0 12px rgba(249,104,84,.12); }
+.soc-btn.linktree:hover { color:#39e09b;border-color:rgba(57,224,155,.35);box-shadow:0 0 12px rgba(57,224,155,.12); }
+
+/* WIP BANNER */
+.wip-banner { background:rgba(245,158,11,.05);border-bottom:1px solid rgba(245,158,11,.15);padding:9px 24px;display:flex;align-items:flex-start;gap:10px;font-size:.79rem;color:var(--text-2);flex-wrap:wrap;position:relative;z-index:1; }
+.wip-icon { color:var(--amber);flex-shrink:0;margin-top:2px; }
+.wip-content { flex:1;min-width:200px; }
+.wip-content strong { color:var(--amber); }
+.wip-pills { display:flex;flex-wrap:wrap;gap:5px;margin-top:6px; }
+.wip-pill { font-size:.67rem;font-weight:700;font-family:var(--font-head);letter-spacing:.07em;text-transform:uppercase;padding:2px 9px;border-radius:30px;border:1px solid rgba(245,158,11,.22);background:rgba(245,158,11,.05);color:var(--amber); }
+.wip-links { display:flex;align-items:center;gap:10px;flex-shrink:0;font-size:.74rem; }
+.wip-links a { color:var(--amber);text-decoration:none;font-weight:700;display:flex;align-items:center;gap:5px;transition:opacity .2s; }
+.wip-links a:hover { opacity:.7; }
+.wip-dismiss { background:none;border:none;color:var(--text-3);cursor:pointer;font-size:.8rem;padding:2px;flex-shrink:0;margin-top:1px;transition:color .2s; }
+.wip-dismiss:hover { color:var(--text-2); }
+
+/* LAYOUT */
+.page-wrap { max-width:1380px;margin:0 auto;padding:0 24px;position:relative;z-index:1; }
+.tab-panel { display:none;padding:36px 0 60px; }
+.tab-panel.active { display:block; }
+
+/* HERO */
+.hero { display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:start;padding-bottom:44px;border-bottom:1px solid var(--border); }
+.hero-badge { display:inline-flex;align-items:center;gap:7px;font-family:var(--font-head);font-weight:700;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-md);background:var(--accent-lo);padding:4px 12px;border-radius:30px;margin-bottom:18px; }
+.hero-badge .dot { width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,102,0,.5)} 50%{opacity:.7;box-shadow:0 0 0 5px rgba(255,102,0,0)} }
+.hero-title { font-family:var(--font-head);font-weight:900;font-size:4.6rem;line-height:.93;letter-spacing:-.01em;text-transform:uppercase;color:var(--text);margin-bottom:6px; }
+.hero-title .ac { color:var(--accent); }
+.hero-title .dim { color:var(--text-2); }
+.hero-sub { font-size:.98rem;color:var(--text-2);line-height:1.7;margin-bottom:30px;max-width:420px; }
+.hero-actions { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px; }
+.dl-btn { display:flex;flex-direction:column;align-items:center;padding:13px 22px;border-radius:10px;border:none;cursor:pointer;font-family:var(--font-head);font-weight:800;letter-spacing:.07em;text-transform:uppercase;transition:transform .2s,filter .2s;min-width:175px; }
+.dl-btn:hover { transform:translateY(-2px);filter:brightness(1.12); }
+.dl-btn:active { transform:none; }
+.dl-btn-win { background:var(--accent);color:#000;box-shadow:0 0 28px rgba(255,102,0,.32),0 4px 18px rgba(255,102,0,.22); }
+.dl-btn-linux { background:var(--amber);color:#000;box-shadow:0 0 28px rgba(245,158,11,.28),0 4px 18px rgba(245,158,11,.18); }
+.btn-label { display:flex;align-items:center;gap:8px;font-size:.86rem;color:#000; }
+.btn-ver { font-size:.78rem;font-weight:700;font-family:var(--font-body);letter-spacing:.02em;text-transform:none;margin-top:2px;color:#000; }
+.btn-count { font-size:.74rem;font-weight:600;font-family:var(--font-body);text-transform:none;color:#000; }
+.stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:10px; }
+.stat-card { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:13px 15px;display:flex;align-items:center;gap:11px;transition:border-color .2s; }
+.stat-card:hover { border-color:var(--accent-md); }
+.stat-icon { width:34px;height:34px;border-radius:9px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.82rem;flex-shrink:0; }
+.stat-icon.amb { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
+.stat-label { font-size:.64rem;font-family:var(--font-head);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:1px; }
+.stat-value { font-size:1.18rem;font-weight:700;font-family:var(--font-head);color:var(--text); }
+
+/* VIEWER */
+.viewer-frame { border-radius:12px;border:1px solid var(--border-2);overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;box-shadow:0 0 40px rgba(255,102,0,.1),0 20px 60px rgba(0,0,0,.5);margin-bottom:10px; }
+#vVideo { position:absolute;inset:0;width:100%;height:100%;border:none;display:block; }
+#vImg { position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none;cursor:zoom-in;transition:opacity .15s; }
+#vImg:hover { opacity:.88; }
+.viewer-zoom-hint { position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-family:var(--font-head);font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:5px;display:none;align-items:center;gap:5px;pointer-events:none;z-index:2; }
+.viewer-frame:hover .viewer-zoom-hint { display:flex; }
+.gallery-label { font-family:var(--font-head);font-weight:700;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px;display:flex;align-items:center;gap:6px; }
+.gallery-label i { color:var(--accent); }
+.g-row { display:grid;gap:7px;margin-bottom:10px; }
+.g-row-3 { grid-template-columns:repeat(3,1fr); }
+.g-row-4 { grid-template-columns:repeat(4,1fr); }
+.g-card { border-radius:7px;overflow:hidden;cursor:pointer;border:1px solid var(--border);position:relative;transition:border-color .2s,box-shadow .2s,transform .15s;aspect-ratio:16/9;background:var(--bg-1); }
+.g-card img { width:100%;height:100%;object-fit:cover;opacity:.4;transition:opacity .25s;display:block; }
+.g-card .g-label { position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent);padding:8px 6px 5px;font-family:var(--font-head);font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);text-align:center; }
+.g-card:hover { border-color:var(--accent-hi);transform:scale(1.02); }
+.g-card:hover img,.g-card.active img { opacity:1; }
+.g-card.active { border-color:var(--accent);box-shadow:0 0 12px var(--accent-hi); }
+.gh-link { display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;color:var(--text-3);text-decoration:none;transition:color .2s;margin-top:6px; }
+.gh-link:hover { color:var(--accent); }
+
+/* SECTION DIVIDER */
+.sec-div { display:flex;align-items:center;gap:14px;margin:40px 0 22px; }
+.sec-div-line { flex:1;height:1px;background:var(--border); }
+.sec-div-title { font-family:var(--font-head);font-weight:800;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--text-3);white-space:nowrap;display:flex;align-items:center;gap:8px; }
+.sec-div-title i { color:var(--accent); }
+
+/* QUICK FEATURES */
+.qf-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px; }
+.qf-card { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .2s,transform .2s; }
+.qf-card:hover { border-color:var(--accent-md);transform:translateY(-2px); }
+.qf-icon { width:32px;height:32px;border-radius:8px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.78rem;flex-shrink:0; }
+.qf-title { font-family:var(--font-head);font-weight:700;font-size:.82rem;letter-spacing:.04em;color:var(--text);margin-bottom:3px;text-transform:uppercase; }
+.qf-desc { font-size:.74rem;color:var(--text-2);line-height:1.6; }
+
+/* COMMUNITY */
+.community-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+.comm-card { border-radius:12px;padding:20px;display:flex;gap:14px;align-items:flex-start;text-decoration:none;transition:transform .2s,border-color .2s;border:1px solid transparent; }
+.comm-card:hover { transform:translateY(-3px); }
+.comm-icon { width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0; }
+.comm-title { font-family:var(--font-head);font-weight:800;font-size:.92rem;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px; }
+.comm-desc { font-size:.78rem;color:var(--text-2);line-height:1.6; }
+.comm-discord { background:rgba(114,137,218,.07);border-color:rgba(114,137,218,.2); }
+.comm-discord:hover { border-color:rgba(114,137,218,.45); }
+.comm-discord .comm-icon { background:rgba(114,137,218,.12);color:#7289da; }
+.comm-discord .comm-title { color:#7289da; }
+.comm-patreon { background:rgba(249,104,84,.05);border-color:rgba(249,104,84,.18); }
+.comm-patreon:hover { border-color:rgba(249,104,84,.42); }
+.comm-patreon .comm-icon { background:rgba(249,104,84,.1);color:#f96854; }
+.comm-patreon .comm-title { color:#f96854; }
+.comm-linktree { background:rgba(57,224,155,.04);border-color:rgba(57,224,155,.15); }
+.comm-linktree:hover { border-color:rgba(57,224,155,.38); }
+.comm-linktree .comm-icon { background:rgba(57,224,155,.08);color:#39e09b; }
+.comm-linktree .comm-title { color:#39e09b; }
+
+/* FEATURES TAB */
+.tab-heading { font-family:var(--font-head);font-weight:900;font-size:3.2rem;text-transform:uppercase;color:var(--text);line-height:1;margin-bottom:6px; }
+.tab-heading span { color:var(--accent); }
+.tab-sub { color:var(--text-2);font-size:.9rem;margin-bottom:28px; }
+.feat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+.feat-card { background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:border-color .25s,transform .25s; }
+.feat-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--accent),transparent);opacity:0;transition:opacity .25s; }
+.feat-card:hover { border-color:var(--accent-md);transform:translateY(-3px); }
+.feat-card:hover::before { opacity:1; }
+.feat-head { display:flex;align-items:flex-start;gap:12px;margin-bottom:10px; }
+.feat-icon { width:38px;height:38px;border-radius:10px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.88rem;flex-shrink:0; }
+.feat-title { font-family:var(--font-head);font-weight:800;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text);margin-top:5px; }
+.feat-desc { font-size:.78rem;color:var(--text-2);line-height:1.65; }
+
+/* UPCOMING */
+.upc-hdr { display:flex;align-items:center;gap:12px;margin:40px 0 18px; }
+.upc-hdr-line { flex:1;height:1px;background:rgba(245,158,11,.15); }
+.upc-hdr-title { font-family:var(--font-head);font-weight:800;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);white-space:nowrap;display:flex;align-items:center;gap:7px; }
+.upc-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+.upc-card { background:var(--amber-lo);border:1px solid var(--amber-md);border-radius:12px;padding:18px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s; }
+.upc-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--amber),transparent); }
+.upc-card:hover { transform:translateY(-2px);border-color:rgba(245,158,11,.38); }
+.upc-badge { display:inline-flex;align-items:center;gap:5px;font-family:var(--font-head);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);border-radius:20px;padding:2px 9px;margin-bottom:11px; }
+.upc-icon { width:32px;height:32px;border-radius:9px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:.8rem;margin-bottom:10px; }
+.upc-title { font-family:var(--font-head);font-weight:800;font-size:.88rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin-bottom:5px; }
+.upc-desc { font-size:.76rem;color:var(--text-2);line-height:1.65; }
+
+/* INSTALL TAB */
+.sub-tabs { display:flex;gap:3px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:22px;width:fit-content; }
+.sub-tab { font-family:var(--font-head);font-weight:700;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);padding:8px 18px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:7px;transition:color .2s,background .2s; }
+.sub-tab i { font-size:.78rem; }
+.sub-tab:hover { color:var(--text);background:var(--bg-2); }
+.sub-tab.active { background:var(--accent-lo);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-md); }
+.sub-panel { display:none; }
+.sub-panel.active { display:block; }
+.os-toggle { display:flex;gap:8px;margin-bottom:20px; }
+.os-btn { display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);color:var(--text-2);font-family:var(--font-head);font-weight:700;font-size:.73rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s; }
+.os-btn:hover { color:var(--text);border-color:var(--border-2); }
+.os-btn.win-on { background:var(--accent-lo);color:var(--accent);border-color:var(--accent-md); }
+.os-btn.lin-on { background:var(--amber-lo);color:var(--amber);border-color:var(--amber-md); }
+.os-sect { display:none; }
+.os-sect.active { display:block; }
+.lin-warn { display:flex;gap:10px;align-items:flex-start;background:var(--amber-lo);border:1px solid var(--amber-md);border-left:3px solid var(--amber);border-radius:8px;padding:12px 14px;font-size:.79rem;color:var(--text-2);line-height:1.65;margin-bottom:16px; }
+.lin-warn strong { color:var(--amber); }
+.lin-warn a { color:var(--amber);font-weight:700;text-decoration:none; }
+.steps-grid { display:grid;gap:10px; }
+.sg5 { grid-template-columns:repeat(5,1fr); }
+.sg4 { grid-template-columns:repeat(4,1fr); }
+.sg3 { grid-template-columns:repeat(3,1fr); }
+.step-card { background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:16px 15px;position:relative;overflow:hidden;transition:border-color .2s; }
+.step-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0;transition:opacity .2s; }
+.step-card.lin::before { background:var(--amber); }
+.step-card:hover::before { opacity:1; }
+.step-card:hover { border-color:rgba(255,102,0,.2); }
+.step-card.lin:hover { border-color:rgba(245,158,11,.2); }
+.step-num { font-family:var(--font-head);font-size:2.6rem;font-weight:900;color:rgba(255,102,0,.1);line-height:1;margin-bottom:8px; }
+.step-num.l { color:rgba(245,158,11,.12); }
+.step-icon { width:30px;height:30px;border-radius:8px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.76rem;margin-bottom:9px; }
+.step-icon.l { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
+.step-label { font-family:var(--font-head);font-weight:800;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text);margin-bottom:5px; }
+.step-desc { font-size:.74rem;color:var(--text-2);line-height:1.65; }
+.step-desc code { font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px; }
+.step-desc code.l { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
+.step-tip { margin-top:7px;font-size:.69rem;color:var(--text-3);font-style:italic;line-height:1.5; }
+.opt-badge { display:inline-flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-2);background:var(--bg-2);border-radius:20px;padding:1px 8px;margin-bottom:8px; }
+.pkgs-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px; }
+.lin-info { margin-top:14px;padding:12px 16px;background:var(--amber-lo);border:1px solid var(--amber-md);border-left:3px solid var(--amber);border-radius:9px;font-size:.77rem;color:var(--text-2);line-height:1.7; }
+.lin-info strong { color:var(--amber); }
+.lin-info code { font-family:var(--font-mono);font-size:.7rem;background:var(--amber-lo);border:1px solid var(--amber-md);color:var(--amber);padding:1px 5px;border-radius:4px; }
+
+/* TROUBLESHOOTING */
+.trouble-list { display:flex;flex-direction:column;gap:6px; }
+.trouble-item { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s; }
+.trouble-item.open { border-color:var(--border-2); }
+.trouble-q { display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);transition:background .15s;user-select:none; }
+.trouble-q:hover { background:rgba(255,255,255,.02); }
+.tq-icon { width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0; }
+.tq-warn { background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2); }
+.tq-err  { background:rgba(220,50,50,.08);color:#e05555;border:1px solid rgba(220,50,50,.2); }
+.tq-info { background:rgba(100,180,255,.07);color:#6ab4ff;border:1px solid rgba(100,180,255,.18); }
+.tq-chev { margin-left:auto;color:var(--text-3);font-size:.65rem;transition:transform .25s; }
+.trouble-item.open .tq-chev { transform:rotate(180deg); }
+.trouble-ans { max-height:0;overflow:hidden;transition:max-height .3s ease; }
+.trouble-item.open .trouble-ans { max-height:500px; }
+.ta-inner { padding:0 16px 14px 56px;font-size:.78rem;color:var(--text-2);line-height:1.75; }
+.ta-inner strong { color:var(--text); }
+.ta-inner code { font-family:var(--font-mono);font-size:.7rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px; }
+.ta-inner a { color:var(--accent);font-weight:700;text-decoration:none; }
+
+/* RELEASES TAB */
+.release-row { display:flex;align-items:center;gap:16px;padding:13px 18px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;position:relative;overflow:hidden;transition:border-color .2s; }
+.release-row::before { content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s; }
+.release-row.lin-row::before { background:var(--amber); }
+.release-row:hover::before { opacity:1; }
+.release-row:hover { border-color:rgba(255,102,0,.2); }
+.release-row.is-latest { border-color:var(--accent-md); }
+.release-row.is-latest.lin-row { border-color:var(--amber-md); }
+.rel-tag { font-family:var(--font-mono);font-weight:500;font-size:.82rem;color:var(--text);min-width:120px;flex-shrink:0;display:flex;align-items:center;gap:8px; }
+.rel-latest-badge { display:inline-flex;align-items:center;gap:4px;font-size:.57rem;font-weight:800;font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-lo);border:1px solid var(--accent-md);border-radius:20px;padding:2px 8px; }
+.rel-latest-badge.lin { color:var(--amber);background:var(--amber-lo);border-color:var(--amber-md); }
+.rel-date { font-size:.74rem;color:var(--text-3);min-width:100px;flex-shrink:0; }
+.rel-dl { flex:1;display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-2); }
+.rel-dl i { color:var(--accent);font-size:.68rem; }
+.rel-dl.lin i { color:var(--amber); }
+.rel-dl .dl-n { font-weight:700;color:var(--text); }
+.rel-dl-btn { flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 16px;border-radius:8px;border:none;background:var(--accent-lo);color:var(--accent);font-family:var(--font-head);font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .2s;text-decoration:none;box-shadow:inset 0 0 0 1px var(--accent-md); }
+.rel-dl-btn:hover { background:rgba(255,102,0,.2); }
+.rel-dl-btn.lin { background:var(--amber-lo);color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber-md); }
+.rel-dl-btn.lin:hover { background:rgba(245,158,11,.2); }
+.rel-no-asset { font-size:.72rem;color:var(--text-3);font-style:italic;padding:7px 16px; }
+.rel-loading { text-align:center;padding:32px;color:var(--text-3);font-size:.85rem; }
+
+/* CHANGELOG TAB */
+.cl-wrap { max-width:740px; }
+.cl-top { display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:26px; }
+.cl-ver { font-family:var(--font-mono);font-size:.74rem;font-weight:700;color:var(--accent);background:var(--accent-lo);border:1px solid var(--accent-md);padding:3px 12px;border-radius:20px; }
+.cl-date-label { font-family:var(--font-head);font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3); }
+.cl-body { background:var(--bg-1);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px 24px; }
+.cl-title-el { font-family:var(--font-head);font-weight:800;font-size:1rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text);margin:14px 0 4px; }
+.cl-title-el:first-child { margin-top:0; }
+.cl-sub { font-family:var(--font-head);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:9px 0 3px; }
+.cl-item-el { font-size:.81rem;color:var(--text-2);padding-left:14px;position:relative;line-height:1.65;margin:2px 0; }
+.cl-item-el::before { content:'·';position:absolute;left:4px;color:var(--accent); }
+.cl-note-el { font-size:.77rem;color:var(--text-3);font-style:italic;margin:5px 0; }
+.cl-sep { border:none;border-top:1px solid var(--border);margin:13px 0; }
+.cl-loading { color:var(--text-3);font-size:.84rem;padding:14px 0; }
+
+/* FOOTER */
+.footer { border-top:1px solid var(--border);padding:28px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;max-width:1380px;margin:0 auto;position:relative;z-index:1; }
+.footer-brand { display:flex;align-items:center;gap:10px; }
+.footer-logo { height:22px;opacity:.55; }
+.footer-name { font-family:var(--font-head);font-weight:700;font-size:.86rem;letter-spacing:.1em;color:var(--text-3);text-transform:uppercase; }
+.footer-socials { display:flex;align-items:center;gap:7px; }
+.footer-soc { display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);color:var(--text-3);text-decoration:none;font-size:.7rem;font-weight:700;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;transition:all .2s; }
+.footer-soc:hover { color:var(--text);border-color:var(--border-2); }
+.footer-soc.discord:hover { color:#7289da; }
+.footer-soc.patreon:hover { color:#f96854; }
+.footer-soc.linktree:hover { color:#39e09b; }
+.footer-credit { font-size:.74rem;color:var(--text-3); }
+.footer-credit a { color:var(--accent);text-decoration:none;font-weight:700; }
+.tag-wip { display:inline-flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);border-radius:20px;padding:1px 8px; }
+
+/* MOBILE */
+.mobile-tab-bar { display:none; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.fa-spin { animation:spin 1s linear infinite; }
+@media (max-width:1100px) { .qf-grid{grid-template-columns:repeat(2,1fr)} .feat-grid{grid-template-columns:repeat(2,1fr)} .sg5{grid-template-columns:repeat(3,1fr)} .pkgs-grid{grid-template-columns:repeat(2,1fr)} .upc-grid{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:900px) {
+  .hero{grid-template-columns:1fr;gap:28px} .hero-title{font-size:3.4rem} .stats-row{grid-template-columns:repeat(3,1fr)} .nav-tabs{display:none}
+  .mobile-tab-bar{display:flex;overflow-x:auto;gap:2px;background:var(--bg-1);border-bottom:1px solid var(--border);padding:6px 16px;position:sticky;top:56px;z-index:800;}
+  .mobile-tab{flex-shrink:0;font-family:var(--font-head);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);padding:6px 12px;border-radius:6px;border:none;background:transparent;cursor:pointer;white-space:nowrap;transition:color .2s,background .2s;}
+  .mobile-tab.active{color:var(--accent);background:var(--accent-lo);} .soc-btn span{display:none} .soc-btn{padding:6px 9px}
+}
+@media (max-width:680px) {
+  .page-wrap{padding:0 14px} .hero-title{font-size:2.8rem} .hero-actions{flex-direction:column} .dl-btn{width:100%}
+  .stats-row{grid-template-columns:1fr 1fr} .sg5,.sg4,.sg3{grid-template-columns:repeat(2,1fr)} .pkgs-grid{grid-template-columns:1fr}
+  .qf-grid{grid-template-columns:1fr} .feat-grid{grid-template-columns:1fr} .upc-grid{grid-template-columns:1fr}
+  .community-grid{grid-template-columns:1fr} .g-row-3{grid-template-columns:repeat(2,1fr)} .g-row-4{grid-template-columns:repeat(2,1fr)}
+  .release-row{flex-wrap:wrap;gap:8px} .rel-tag{min-width:unset}
+}
+
+/* ═══════ DISCORD BAN POPUP ═══════ */
+.dsc-overlay {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 94vw;
-  max-height: 94vh;
-}
-
-.lightbox-inner img {
-  max-width: 94vw;
-  max-height: 92vh;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,.08);
-  cursor: default;
-  user-select: none;
-  display: block;
-  animation: lbImgIn .2s ease;
-}
-
-@keyframes lbImgIn {
-  from { transform: scale(.96); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
-}
-
-.lightbox-close {
   position: fixed;
-  top: 18px;
-  right: 20px;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.15);
-  color: #fff;
-  font-size: .85rem;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0,0,0,.78);
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background .2s, border-color .2s;
-  z-index: 10000;
+  padding: 20px;
+  animation: dscFadeIn .22s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
-
-.lightbox-close:hover {
-  background: rgba(255,255,255,.18);
-  border-color: rgba(255,255,255,.3);
-}
-
-/* ═══════ NAVBAR ═══════ */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 900;
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px);
-  background: rgba(24,24,24,.92);
-  border-bottom: 1px solid var(--border);
-  height: 56px;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 0;
-}
-
-.nav-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-.nav-logo { height: 28px; filter: drop-shadow(0 0 8px rgba(255,102,0,.5)); }
-
-.nav-wordmark {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: 1.18rem;
-  letter-spacing: .1em;
-  color: var(--text);
-  text-transform: uppercase;
-}
-
-.nav-wordmark span { color: var(--accent); }
-
-.nav-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 32px;
-  flex: 1;
-}
-
-.nav-tab {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .78rem;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  padding: 7px 14px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: color .2s, background .2s;
-  position: relative;
-}
-
-.nav-tab::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 50%; right: 50%;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px 2px 0 0;
-  transition: left .25s, right .25s;
-}
-
-.nav-tab:hover { color: var(--text); background: var(--bg-2); }
-.nav-tab.active { color: var(--accent); }
-.nav-tab.active::after { left: 12px; right: 12px; }
-
-.nav-socials {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.soc-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 7px;
-  border: 1px solid var(--border);
-  background: var(--bg-2);
-  color: var(--text-2);
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-decoration: none;
-  font-family: var(--font-head);
-  text-transform: uppercase;
-  transition: border-color .2s, color .2s, background .2s, box-shadow .2s;
-}
-
-.soc-btn i { font-size: .8rem; }
-.soc-btn:hover { color: var(--text); border-color: var(--border-2); background: var(--bg-3); }
-.soc-btn.discord:hover { color: #7289da; border-color: rgba(114,137,218,.35); box-shadow: 0 0 12px rgba(114,137,218,.12); }
-.soc-btn.patreon:hover { color: #f96854; border-color: rgba(249,104,84,.35); box-shadow: 0 0 12px rgba(249,104,84,.12); }
-.soc-btn.linktree:hover { color: #39e09b; border-color: rgba(57,224,155,.35); box-shadow: 0 0 12px rgba(57,224,155,.12); }
-
-/* ═══════ WIP BANNER ═══════ */
-.wip-banner {
-  background: rgba(245,158,11,.05);
-  border-bottom: 1px solid rgba(245,158,11,.15);
-  padding: 9px 24px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: .79rem;
-  color: var(--text-2);
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
-}
-
-.wip-icon { color: var(--amber); flex-shrink: 0; margin-top: 2px; }
-
-.wip-content { flex: 1; min-width: 200px; }
-.wip-content strong { color: var(--amber); }
-
-.wip-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
-}
-
-.wip-pill {
-  font-size: .67rem;
-  font-weight: 700;
-  font-family: var(--font-head);
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  padding: 2px 9px;
-  border-radius: 30px;
-  border: 1px solid rgba(245,158,11,.22);
-  background: rgba(245,158,11,.05);
-  color: var(--amber);
-}
-
-.wip-links {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-  font-size: .74rem;
-}
-
-.wip-links a {
-  color: var(--amber);
-  text-decoration: none;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: opacity .2s;
-}
-
-.wip-links a:hover { opacity: .7; }
-
-.wip-dismiss {
-  background: none;
-  border: none;
-  color: var(--text-3);
-  cursor: pointer;
-  font-size: .8rem;
-  padding: 2px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: color .2s;
-}
-.wip-dismiss:hover { color: var(--text-2); }
-
-/* ═══════ LAYOUT ═══════ */
-.page-wrap {
-  max-width: 1380px;
-  margin: 0 auto;
-  padding: 0 24px;
-  position: relative;
-  z-index: 1;
-}
-
-/* ═══════ TAB PANELS ═══════ */
-.tab-panel { display: none; padding: 36px 0 60px; }
-.tab-panel.active { display: block; }
-
-/* ═══════ HOME HERO ═══════ */
-.hero {
-  display: grid;
-  grid-template-columns: 1fr 1.05fr;
-  gap: 44px;
-  align-items: start;
-  padding-bottom: 44px;
-  border-bottom: 1px solid var(--border);
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .7rem;
-  letter-spacing: .15em;
-  text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--accent-md);
-  background: var(--accent-lo);
-  padding: 4px 12px;
-  border-radius: 30px;
-  margin-bottom: 18px;
-}
-
-.hero-badge .dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: blink 2s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,102,0,.5); }
-  50% { opacity: .7; box-shadow: 0 0 0 5px rgba(255,102,0,0); }
-}
-
-.hero-title {
-  font-family: var(--font-head);
-  font-weight: 900;
-  font-size: 4.6rem;
-  line-height: .93;
-  letter-spacing: -.01em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-
-.hero-title .ac { color: var(--accent); }
-.hero-title .dim { color: var(--text-2); }
-
-.hero-sub {
-  font-size: .98rem;
-  color: var(--text-2);
-  line-height: 1.7;
-  margin-bottom: 30px;
-  max-width: 420px;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 30px;
-}
-
-.dl-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 13px 22px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-head);
-  font-weight: 800;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  transition: transform .2s, filter .2s;
-  min-width: 175px;
-}
-
-.dl-btn:hover { transform: translateY(-2px); filter: brightness(1.12); }
-.dl-btn:active { transform: none; }
-
-.dl-btn-win {
-  background: var(--accent);
-  color: #000;
-  box-shadow: 0 0 28px rgba(255,102,0,.32), 0 4px 18px rgba(255,102,0,.22);
-}
-
-.dl-btn-linux {
-  background: var(--amber);
-  color: #000;
-  box-shadow: 0 0 28px rgba(245,158,11,.28), 0 4px 18px rgba(245,158,11,.18);
-}
-
-.btn-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .86rem;
-  color: #000;
-}
-
-.btn-ver {
-  font-size: .78rem;
-  font-weight: 700;
-  font-family: var(--font-body);
-  opacity: 1;
-  letter-spacing: .02em;
-  text-transform: none;
-  margin-top: 2px;
-  color: #000;
-}
-
-.btn-count {
-  font-size: .74rem;
-  font-weight: 600;
-  font-family: var(--font-body);
-  opacity: 1;
-  text-transform: none;
-  color: #000;
-}
-
-/* Stats */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 10px;
-}
-
-.stat-card {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 13px 15px;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  transition: border-color .2s;
-}
-
-.stat-card:hover { border-color: var(--accent-md); }
-
-.stat-icon {
-  width: 34px; height: 34px;
-  border-radius: 9px;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent);
-  font-size: .82rem;
-  flex-shrink: 0;
-}
-
-.stat-icon.amb { background: var(--amber-lo); border-color: var(--amber-md); color: var(--amber); }
-
-.stat-label {
-  font-size: .64rem;
-  font-family: var(--font-head);
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  margin-bottom: 1px;
-}
-
-.stat-value {
-  font-size: 1.18rem;
-  font-weight: 700;
-  font-family: var(--font-head);
-  color: var(--text);
-}
-
-/* Viewer */
-.viewer-frame {
-  border-radius: 12px;
-  border: 1px solid var(--border-2);
-  overflow: hidden;
-  background: #000;
-  aspect-ratio: 16/9;
-  position: relative;
-  box-shadow: 0 0 40px rgba(255,102,0,.1), 0 20px 60px rgba(0,0,0,.5);
-  margin-bottom: 10px;
-}
-
-#vVideo { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
-
-#vImg {
-  position: absolute;
-  inset: 0;
+.dsc-overlay.hidden { display: none; }
+@keyframes dscFadeIn { from{opacity:0} to{opacity:1} }
+.dsc-card {
+  background: #111318;
+  border: 1px solid rgba(88,101,242,.35);
+  border-radius: 16px;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: none;
-  cursor: zoom-in;
-  transition: opacity .15s;
-}
-
-#vImg:hover { opacity: .88; }
-
-.viewer-zoom-hint {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(0,0,0,.65);
-  border: 1px solid rgba(255,255,255,.12);
-  color: rgba(255,255,255,.7);
-  font-family: var(--font-head);
-  font-size: .62rem;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 5px;
-  display: none;
-  align-items: center;
-  gap: 5px;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.viewer-frame:hover .viewer-zoom-hint { display: flex; }
-
-.gallery-label {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .66rem;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.gallery-label i { color: var(--accent); }
-
-.g-row { display: grid; gap: 7px; margin-bottom: 10px; }
-.g-row-3 { grid-template-columns: repeat(3,1fr); }
-.g-row-4 { grid-template-columns: repeat(4,1fr); }
-
-.g-card {
-  border-radius: 7px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  position: relative;
-  transition: border-color .2s, box-shadow .2s, transform .15s;
-  aspect-ratio: 16/9;
-  background: var(--bg-1);
-}
-
-.g-card img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  opacity: .4;
-  transition: opacity .25s;
-  display: block;
-}
-
-.g-card .g-label {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  background: linear-gradient(to top, rgba(0,0,0,.85), transparent);
-  padding: 8px 6px 5px;
-  font-family: var(--font-head);
-  font-size: .62rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--accent);
-  text-align: center;
-}
-
-.g-card:hover { border-color: var(--accent-hi); transform: scale(1.02); }
-.g-card:hover img, .g-card.active img { opacity: 1; }
-.g-card.active { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-hi); }
-
-.gh-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: .74rem;
-  font-weight: 600;
-  color: var(--text-3);
-  text-decoration: none;
-  transition: color .2s;
-  margin-top: 6px;
-}
-.gh-link:hover { color: var(--accent); }
-
-/* ═══════ SECTION DIVIDER ═══════ */
-.sec-div {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 40px 0 22px;
-}
-
-.sec-div-line { flex: 1; height: 1px; background: var(--border); }
-
-.sec-div-title {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .7rem;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sec-div-title i { color: var(--accent); }
-
-/* ═══════ QUICK FEATURES ═══════ */
-.qf-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
-
-.qf-card {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  transition: border-color .2s, transform .2s;
-}
-
-.qf-card:hover { border-color: var(--accent-md); transform: translateY(-2px); }
-
-.qf-icon {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent);
-  font-size: .78rem;
-  flex-shrink: 0;
-}
-
-.qf-title {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .82rem;
-  letter-spacing: .04em;
-  color: var(--text);
-  margin-bottom: 3px;
-  text-transform: uppercase;
-}
-
-.qf-desc { font-size: .74rem; color: var(--text-2); line-height: 1.6; }
-
-/* ═══════ COMMUNITY CARDS ═══════ */
-.community-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-
-.comm-card {
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  text-decoration: none;
-  transition: transform .2s, border-color .2s;
-  border: 1px solid transparent;
-}
-
-.comm-card:hover { transform: translateY(-3px); }
-
-.comm-icon {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .95rem;
-  flex-shrink: 0;
-}
-
-.comm-title {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .92rem;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.comm-desc { font-size: .78rem; color: var(--text-2); line-height: 1.6; }
-
-.comm-discord { background: rgba(114,137,218,.07); border-color: rgba(114,137,218,.2); }
-.comm-discord:hover { border-color: rgba(114,137,218,.45); }
-.comm-discord .comm-icon { background: rgba(114,137,218,.12); color: #7289da; }
-.comm-discord .comm-title { color: #7289da; }
-
-.comm-patreon { background: rgba(249,104,84,.05); border-color: rgba(249,104,84,.18); }
-.comm-patreon:hover { border-color: rgba(249,104,84,.42); }
-.comm-patreon .comm-icon { background: rgba(249,104,84,.1); color: #f96854; }
-.comm-patreon .comm-title { color: #f96854; }
-
-.comm-linktree { background: rgba(57,224,155,.04); border-color: rgba(57,224,155,.15); }
-.comm-linktree:hover { border-color: rgba(57,224,155,.38); }
-.comm-linktree .comm-icon { background: rgba(57,224,155,.08); color: #39e09b; }
-.comm-linktree .comm-title { color: #39e09b; }
-
-/* ═══════ FEATURES TAB ═══════ */
-.tab-heading {
-  font-family: var(--font-head);
-  font-weight: 900;
-  font-size: 3.2rem;
-  text-transform: uppercase;
-  color: var(--text);
-  line-height: 1;
-  margin-bottom: 6px;
-}
-
-.tab-heading span { color: var(--accent); }
-.tab-sub { color: var(--text-2); font-size: .9rem; margin-bottom: 28px; }
-
-.feat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-
-.feat-card {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  max-width: 520px;
   position: relative;
   overflow: hidden;
-  transition: border-color .25s, transform .25s;
+  box-shadow: 0 0 60px rgba(88,101,242,.18), 0 24px 64px rgba(0,0,0,.7);
+  animation: dscCardIn .28s cubic-bezier(.34,1.26,.64,1);
 }
-
-.feat-card::before {
+@keyframes dscCardIn {
+  from { transform: scale(.92) translateY(16px); opacity: 0; }
+  to   { transform: scale(1)   translateY(0);    opacity: 1; }
+}
+.dsc-card::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(to right, var(--accent), transparent);
-  opacity: 0;
-  transition: opacity .25s;
+  height: 3px;
+  background: linear-gradient(to right, #5865f2, #7289da, transparent);
+}
+.dsc-body { padding: 32px 32px 28px; }
+.dsc-icon-row { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+.dsc-icon {
+  width:46px; height:46px; border-radius:12px;
+  background:rgba(88,101,242,.15); border:1px solid rgba(88,101,242,.32);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.dsc-icon i { font-size:1.3rem; color:#7289da; }
+.dsc-label {
+  font-family:var(--font-head); font-size:.62rem; font-weight:800;
+  letter-spacing:.16em; text-transform:uppercase; color:#5865f2;
+  background:rgba(88,101,242,.12); border:1px solid rgba(88,101,242,.25);
+  border-radius:20px; padding:3px 10px;
+}
+.dsc-title {
+  font-family:var(--font-head); font-weight:900; font-size:1.55rem;
+  letter-spacing:.02em; text-transform:uppercase; color:#e8eaf6;
+  line-height:1.1; margin-bottom:14px;
+}
+.dsc-title span { color:#7289da; }
+.dsc-text { font-size:.84rem; color:#888; line-height:1.75; margin-bottom:24px; }
+.dsc-text strong { color:#b0b8f0; font-weight:600; }
+.dsc-bullets { list-style:none; margin:10px 0 0; display:flex; flex-direction:column; gap:6px; }
+.dsc-bullets li { display:flex; align-items:center; gap:9px; font-size:.8rem; color:#777; }
+.dsc-bullets li::before { content:''; width:5px; height:5px; border-radius:50%; background:#5865f2; flex-shrink:0; }
+.dsc-footer {
+  display:flex; align-items:center; gap:10px;
+  padding:20px 32px 24px; border-top:1px solid rgba(255,255,255,.06);
+}
+.dsc-join-btn {
+  flex:1; display:inline-flex; align-items:center; justify-content:center;
+  gap:9px; padding:12px 20px; border-radius:10px; border:none;
+  background:#5865f2; color:#fff; font-family:var(--font-head);
+  font-size:.82rem; font-weight:800; letter-spacing:.08em;
+  text-transform:uppercase; text-decoration:none; cursor:pointer;
+  transition:background .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 4px 18px rgba(88,101,242,.35);
+}
+.dsc-join-btn:hover { background:#4752c4; transform:translateY(-1px); box-shadow:0 6px 24px rgba(88,101,242,.45); }
+.dsc-join-btn:active { transform:none; }
+.dsc-join-btn i { font-size:.95rem; }
+.dsc-close-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  gap:7px; padding:12px 18px; border-radius:10px;
+  border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04);
+  color:#666; font-family:var(--font-head); font-size:.78rem; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; cursor:pointer; flex-shrink:0;
+  transition:background .2s,border-color .2s,color .2s;
+}
+.dsc-close-btn:hover { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#999; }
+@media (max-width:560px) {
+  .dsc-body { padding:24px 20px 20px; }
+  .dsc-footer { flex-direction:column; padding:16px 20px 20px; }
+  .dsc-join-btn, .dsc-close-btn { width:100%; justify-content:center; }
+  .dsc-title { font-size:1.25rem; }
 }
 
-.feat-card:hover { border-color: var(--accent-md); transform: translateY(-3px); }
-.feat-card:hover::before { opacity: 1; }
-
-.feat-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.feat-icon {
-  width: 38px; height: 38px;
-  border-radius: 10px;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent);
-  font-size: .88rem;
-  flex-shrink: 0;
-}
-
-.feat-title {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .9rem;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin-top: 5px;
-}
-
-.feat-desc { font-size: .78rem; color: var(--text-2); line-height: 1.65; }
-
-/* Upcoming */
-.upc-hdr {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 40px 0 18px;
-}
-
-.upc-hdr-line { flex: 1; height: 1px; background: rgba(245,158,11,.15); }
-
-.upc-hdr-title {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .7rem;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--amber);
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.upc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-
-.upc-card {
-  background: var(--amber-lo);
-  border: 1px solid var(--amber-md);
-  border-radius: 12px;
-  padding: 18px;
-  position: relative;
-  overflow: hidden;
-  transition: transform .2s, border-color .2s;
-}
-
-.upc-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(to right, var(--amber), transparent);
-}
-
-.upc-card:hover { transform: translateY(-2px); border-color: rgba(245,158,11,.38); }
-
-.upc-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--font-head);
-  font-size: .6rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--amber);
-  background: rgba(245,158,11,.1);
-  border: 1px solid rgba(245,158,11,.22);
-  border-radius: 20px;
-  padding: 2px 9px;
-  margin-bottom: 11px;
-}
-
-.upc-icon {
-  width: 32px; height: 32px;
-  border-radius: 9px;
-  background: rgba(245,158,11,.08);
-  border: 1px solid rgba(245,158,11,.2);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--amber);
-  font-size: .8rem;
-  margin-bottom: 10px;
-}
-
-.upc-title {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .88rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin-bottom: 5px;
-}
-
-.upc-desc { font-size: .76rem; color: var(--text-2); line-height: 1.65; }
-
-/* ═══════ INSTALL TAB ═══════ */
-.sub-tabs {
-  display: flex;
-  gap: 3px;
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 4px;
-  margin-bottom: 22px;
-  width: fit-content;
-}
-
-.sub-tab {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .74rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  padding: 8px 18px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  transition: color .2s, background .2s;
-}
-
-.sub-tab i { font-size: .78rem; }
-.sub-tab:hover { color: var(--text); background: var(--bg-2); }
-.sub-tab.active { background: var(--accent-lo); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-md); }
-
-.sub-panel { display: none; }
-.sub-panel.active { display: block; }
-
-.os-toggle {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.os-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 20px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-1);
-  color: var(--text-2);
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .73rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.os-btn:hover { color: var(--text); border-color: var(--border-2); }
-.os-btn.win-on { background: var(--accent-lo); color: var(--accent); border-color: var(--accent-md); }
-.os-btn.lin-on { background: var(--amber-lo); color: var(--amber); border-color: var(--amber-md); }
-
-.os-sect { display: none; }
-.os-sect.active { display: block; }
-
-.lin-warn {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  background: var(--amber-lo);
-  border: 1px solid var(--amber-md);
-  border-left: 3px solid var(--amber);
-  border-radius: 8px;
-  padding: 12px 14px;
-  font-size: .79rem;
-  color: var(--text-2);
-  line-height: 1.65;
-  margin-bottom: 16px;
-}
-
-.lin-warn strong { color: var(--amber); }
-.lin-warn a { color: var(--amber); font-weight: 700; text-decoration: none; }
-
-.steps-grid { display: grid; gap: 10px; }
-.sg5 { grid-template-columns: repeat(5,1fr); }
-.sg4 { grid-template-columns: repeat(4,1fr); }
-.sg3 { grid-template-columns: repeat(3,1fr); }
-
-.step-card {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 15px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color .2s;
-}
-
-.step-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity .2s;
-}
-
-.step-card.lin::before { background: var(--amber); }
-.step-card:hover::before { opacity: 1; }
-.step-card:hover { border-color: rgba(255,102,0,.2); }
-.step-card.lin:hover { border-color: rgba(245,158,11,.2); }
-
-.step-num {
-  font-family: var(--font-head);
-  font-size: 2.6rem;
-  font-weight: 900;
-  color: rgba(255,102,0,.1);
-  line-height: 1;
-  margin-bottom: 8px;
-}
-
-.step-num.l { color: rgba(245,158,11,.12); }
-
-.step-icon {
-  width: 30px; height: 30px;
-  border-radius: 8px;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  display: flex; align-items: center; justify-content: center;
-  color: var(--accent);
-  font-size: .76rem;
-  margin-bottom: 9px;
-}
-
-.step-icon.l {
-  background: var(--amber-lo);
-  border-color: var(--amber-md);
-  color: var(--amber);
-}
-
-.step-label {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: .8rem;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin-bottom: 5px;
-}
-
-.step-desc { font-size: .74rem; color: var(--text-2); line-height: 1.65; }
-
-.step-desc code {
-  font-family: var(--font-mono);
-  font-size: .68rem;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  color: var(--accent);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-.step-desc code.l {
-  background: var(--amber-lo);
-  border-color: var(--amber-md);
-  color: var(--amber);
-}
-
-.step-tip {
-  margin-top: 7px;
-  font-size: .69rem;
-  color: var(--text-3);
-  font-style: italic;
-  line-height: 1.5;
-}
-
-.opt-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-head);
-  font-size: .6rem;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  border: 1px solid var(--border-2);
-  background: var(--bg-2);
-  border-radius: 20px;
-  padding: 1px 8px;
-  margin-bottom: 8px;
-}
-
-.pkgs-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
-
-.lin-info {
-  margin-top: 14px;
-  padding: 12px 16px;
-  background: var(--amber-lo);
-  border: 1px solid var(--amber-md);
-  border-left: 3px solid var(--amber);
-  border-radius: 9px;
-  font-size: .77rem;
-  color: var(--text-2);
-  line-height: 1.7;
-}
-
-.lin-info strong { color: var(--amber); }
-.lin-info code {
-  font-family: var(--font-mono);
-  font-size: .7rem;
-  background: var(--amber-lo);
-  border: 1px solid var(--amber-md);
-  color: var(--amber);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-/* Troubleshooting */
-.trouble-list { display: flex; flex-direction: column; gap: 6px; }
-
-.trouble-item {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  transition: border-color .2s;
-}
-
-.trouble-item.open { border-color: var(--border-2); }
-
-.trouble-q {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 16px;
-  cursor: pointer;
-  font-size: .82rem;
-  font-weight: 600;
-  color: var(--text);
-  transition: background .15s;
-  user-select: none;
-}
-
-.trouble-q:hover { background: rgba(255,255,255,.02); }
-
-.tq-icon {
-  width: 28px; height: 28px;
-  border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .72rem;
-  flex-shrink: 0;
-}
-
-.tq-warn { background: rgba(245,158,11,.1); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
-.tq-err  { background: rgba(220,50,50,.08); color: #e05555; border: 1px solid rgba(220,50,50,.2); }
-.tq-info { background: rgba(100,180,255,.07); color: #6ab4ff; border: 1px solid rgba(100,180,255,.18); }
-
-.tq-chev {
-  margin-left: auto;
-  color: var(--text-3);
-  font-size: .65rem;
-  transition: transform .25s;
-}
-
-.trouble-item.open .tq-chev { transform: rotate(180deg); }
-
-.trouble-ans {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height .3s ease;
-}
-
-.trouble-item.open .trouble-ans { max-height: 500px; }
-
-.ta-inner {
-  padding: 0 16px 14px 56px;
-  font-size: .78rem;
-  color: var(--text-2);
-  line-height: 1.75;
-}
-
-.ta-inner strong { color: var(--text); }
-.ta-inner code {
-  font-family: var(--font-mono);
-  font-size: .7rem;
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  color: var(--accent);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-.ta-inner a { color: var(--accent); font-weight: 700; text-decoration: none; }
-
-/* ═══════ RELEASES TAB ═══════ */
-.release-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 13px 18px;
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 6px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color .2s;
-}
-
-.release-row::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity .2s;
-}
-
-.release-row.lin-row::before { background: var(--amber); }
-.release-row:hover::before { opacity: 1; }
-.release-row:hover { border-color: rgba(255,102,0,.2); }
-.release-row.is-latest { border-color: var(--accent-md); }
-.release-row.is-latest.lin-row { border-color: var(--amber-md); }
-
-.rel-tag {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: .82rem;
-  color: var(--text);
-  min-width: 120px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.rel-latest-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: .57rem;
-  font-weight: 800;
-  font-family: var(--font-head);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  border-radius: 20px;
-  padding: 2px 8px;
-}
-
-.rel-latest-badge.lin { color: var(--amber); background: var(--amber-lo); border-color: var(--amber-md); }
-
-.rel-date { font-size: .74rem; color: var(--text-3); min-width: 100px; flex-shrink: 0; }
-
-.rel-dl {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: .78rem;
-  color: var(--text-2);
-}
-
-.rel-dl i { color: var(--accent); font-size: .68rem; }
-.rel-dl.lin i { color: var(--amber); }
-.rel-dl .dl-n { font-weight: 700; color: var(--text); }
-
-.rel-dl-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 16px;
-  border-radius: 8px;
-  border: none;
-  background: var(--accent-lo);
-  color: var(--accent);
-  font-family: var(--font-head);
-  font-size: .72rem;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background .2s;
-  text-decoration: none;
-  box-shadow: inset 0 0 0 1px var(--accent-md);
-}
-
-.rel-dl-btn:hover { background: rgba(255,102,0,.2); }
-.rel-dl-btn.lin { background: var(--amber-lo); color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-md); }
-.rel-dl-btn.lin:hover { background: rgba(245,158,11,.2); }
-
-.rel-no-asset { font-size: .72rem; color: var(--text-3); font-style: italic; padding: 7px 16px; }
-.rel-loading { text-align: center; padding: 32px; color: var(--text-3); font-size: .85rem; }
-
-/* ═══════ CHANGELOG TAB ═══════ */
-.cl-wrap { max-width: 740px; }
-
-.cl-top {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 26px;
-}
-
-.cl-ver {
-  font-family: var(--font-mono);
-  font-size: .74rem;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-lo);
-  border: 1px solid var(--accent-md);
-  padding: 3px 12px;
-  border-radius: 20px;
-}
-
-.cl-date-label {
-  font-family: var(--font-head);
-  font-size: .7rem;
-  font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
-.cl-body {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 12px;
-  padding: 22px 24px;
-}
-
-.cl-title-el {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: 1rem;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color: var(--text);
-  margin: 14px 0 4px;
-}
-
-.cl-title-el:first-child { margin-top: 0; }
-
-.cl-sub {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .8rem;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin: 9px 0 3px;
-}
-
-.cl-item-el {
-  font-size: .81rem;
-  color: var(--text-2);
-  padding-left: 14px;
-  position: relative;
-  line-height: 1.65;
-  margin: 2px 0;
-}
-
-.cl-item-el::before { content: '·'; position: absolute; left: 4px; color: var(--accent); }
-
-.cl-note-el { font-size: .77rem; color: var(--text-3); font-style: italic; margin: 5px 0; }
-.cl-sep { border: none; border-top: 1px solid var(--border); margin: 13px 0; }
-.cl-loading { color: var(--text-3); font-size: .84rem; padding: 14px 0; }
-
-/* ═══════ FOOTER ═══════ */
-.footer {
-  border-top: 1px solid var(--border);
-  padding: 28px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  max-width: 1380px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-}
-
-.footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.footer-logo { height: 22px; opacity: .55; }
-
-.footer-name {
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: .86rem;
-  letter-spacing: .1em;
-  color: var(--text-3);
-  text-transform: uppercase;
-}
-
-.footer-socials { display: flex; align-items: center; gap: 7px; }
-
-.footer-soc {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: 7px;
-  border: 1px solid var(--border);
-  color: var(--text-3);
-  text-decoration: none;
-  font-size: .7rem;
-  font-weight: 700;
-  font-family: var(--font-head);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  transition: all .2s;
-}
-
-.footer-soc:hover { color: var(--text); border-color: var(--border-2); }
-.footer-soc.discord:hover { color: #7289da; }
-.footer-soc.patreon:hover { color: #f96854; }
-.footer-soc.linktree:hover { color: #39e09b; }
-
-.footer-credit { font-size: .74rem; color: var(--text-3); }
-.footer-credit a { color: var(--accent); text-decoration: none; font-weight: 700; }
-
-/* tag */
-.tag-wip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-head);
-  font-size: .6rem;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--amber);
-  background: var(--amber-lo);
-  border: 1px solid var(--amber-md);
-  border-radius: 20px;
-  padding: 1px 8px;
-}
-
-/* ═══════ MOBILE ═══════ */
-.mobile-tab-bar { display: none; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-.fa-spin { animation: spin 1s linear infinite; }
-
-@media (max-width: 1100px) {
-  .qf-grid { grid-template-columns: repeat(2,1fr); }
-  .feat-grid { grid-template-columns: repeat(2,1fr); }
-  .sg5 { grid-template-columns: repeat(3,1fr); }
-  .pkgs-grid { grid-template-columns: repeat(2,1fr); }
-  .upc-grid { grid-template-columns: repeat(2,1fr); }
-}
-
-@media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; gap: 28px; }
-  .hero-title { font-size: 3.4rem; }
-  .stats-row { grid-template-columns: repeat(3,1fr); }
-  .nav-tabs { display: none; }
-  .mobile-tab-bar {
-    display: flex;
-    overflow-x: auto;
-    gap: 2px;
-    background: var(--bg-1);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 16px;
-    position: sticky;
-    top: 56px;
-    z-index: 800;
-  }
-
-  .mobile-tab {
-    flex-shrink: 0;
-    font-family: var(--font-head);
-    font-size: .72rem;
-    font-weight: 700;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--text-2);
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: color .2s, background .2s;
-  }
-
-  .mobile-tab.active { color: var(--accent); background: var(--accent-lo); }
-  .soc-btn span { display: none; }
-  .soc-btn { padding: 6px 9px; }
-}
-
-@media (max-width: 680px) {
-  .page-wrap { padding: 0 14px; }
-  .hero-title { font-size: 2.8rem; }
-  .hero-actions { flex-direction: column; }
-  .dl-btn { width: 100%; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  .sg5, .sg4, .sg3 { grid-template-columns: repeat(2,1fr); }
-  .pkgs-grid { grid-template-columns: 1fr; }
-  .qf-grid { grid-template-columns: 1fr; }
-  .feat-grid { grid-template-columns: 1fr; }
-  .upc-grid { grid-template-columns: 1fr; }
-  .community-grid { grid-template-columns: 1fr; }
-  .g-row-3 { grid-template-columns: repeat(2,1fr); }
-  .g-row-4 { grid-template-columns: repeat(2,1fr); }
-  .release-row { flex-wrap: wrap; gap: 8px; }
-  .rel-tag { min-width: unset; }
-}
 </style>
 </head>
 <body>
@@ -1518,7 +462,6 @@ body::after {
     <img src="beamSkin_studio_logo.png" alt="" class="nav-logo">
     <span class="nav-wordmark">BeamSkin <span>Studio</span></span>
   </a>
-
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="switchTab('home',this)">Home</button>
     <button class="nav-tab" onclick="switchTab('features',this)">Features</button>
@@ -1526,20 +469,11 @@ body::after {
     <button class="nav-tab" onclick="switchTab('releases',this)">Releases</button>
     <button class="nav-tab" onclick="switchTab('changelog',this)">Changelog</button>
   </div>
-
   <div class="nav-socials">
-    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord">
-      <i class="fab fa-discord"></i><span>Discord</span>
-    </a>
-    <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon">
-      <i class="fab fa-patreon"></i><span>Patreon</span>
-    </a>
-    <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree">
-      <i class="fas fa-seedling"></i><span>Linktree</span>
-    </a>
-    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="soc-btn">
-      <i class="fab fa-github"></i><span>GitHub</span>
-    </a>
+    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+    <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+    <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
   </div>
 </nav>
 
@@ -1574,23 +508,13 @@ body::after {
 <!-- MAIN -->
 <div class="page-wrap">
 
-  <!-- ── HOME ── -->
+  <!-- HOME -->
   <div class="tab-panel active" id="panel-home">
-
     <div class="hero">
-      <!-- Left -->
       <div>
         <div class="hero-badge"><span class="dot"></span> Skin modding tool for BeamNG.drive</div>
-
-        <h1 class="hero-title">
-          CRAFT<br>
-          <span class="ac">YOUR</span><br>
-          BEAMNG<br>
-          <span class="dim">SKINS</span>
-        </h1>
-
+        <h1 class="hero-title">CRAFT<br><span class="ac">YOUR</span><br>BEAMNG<br><span class="dim">SKINS</span></h1>
         <p class="hero-sub">A desktop application that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</p>
-
         <div class="hero-actions">
           <button class="dl-btn dl-btn-win" id="winBtn">
             <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
@@ -1603,53 +527,25 @@ body::after {
             <span id="linCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
           </button>
         </div>
-
         <div class="stats-row">
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fas fa-download"></i></div>
-            <div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal">—</div></div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon"><i class="fab fa-windows"></i></div>
-            <div><div class="stat-label">Windows</div><div class="stat-value" id="statWin">—</div></div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon amb"><i class="fab fa-linux"></i></div>
-            <div><div class="stat-label">Linux</div><div class="stat-value" id="statLin">—</div></div>
-          </div>
+          <div class="stat-card"><div class="stat-icon"><i class="fas fa-download"></i></div><div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="fab fa-windows"></i></div><div><div class="stat-label">Windows</div><div class="stat-value" id="statWin">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon amb"><i class="fab fa-linux"></i></div><div><div class="stat-label">Linux</div><div class="stat-value" id="statLin">—</div></div></div>
         </div>
-
-        <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="gh-link">
-          <i class="fab fa-github"></i> View all repositories on GitHub
-        </a>
+        <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="gh-link"><i class="fab fa-github"></i> View all repositories on GitHub</a>
       </div>
-
-      <!-- Right: Media Viewer -->
       <div>
         <div class="viewer-frame" id="viewerFrame">
           <iframe id="vVideo" src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
           <img id="vImg" src="" alt="Screenshot" onclick="openLightbox()">
-          <div class="viewer-zoom-hint" id="zoomHint">
-            <i class="fas fa-magnifying-glass-plus"></i> Click to enlarge
-          </div>
+          <div class="viewer-zoom-hint" id="zoomHint"><i class="fas fa-magnifying-glass-plus"></i> Click to enlarge</div>
         </div>
-
         <div class="gallery-label"><i class="fab fa-youtube"></i> Videos</div>
         <div class="g-row g-row-3" style="margin-bottom:10px;">
-          <div class="g-card active" onclick="showVideo('b9bhjc8zTok',this)">
-            <img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg" alt="">
-            <span class="g-label">Video 2</span>
-          </div>
-          <div class="g-card" onclick="showVideo('N1M8Tsnlodw',this)">
-            <img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg" alt="">
-            <span class="g-label">Preview</span>
-          </div>
-          <div class="g-card" onclick="showVideo('Ik4mn3TPTeQ',this)">
-            <img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg" alt="">
-            <span class="g-label">Video 3</span>
-          </div>
+          <div class="g-card active" onclick="showVideo('b9bhjc8zTok',this)"><img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg" alt=""><span class="g-label">Video 2</span></div>
+          <div class="g-card" onclick="showVideo('N1M8Tsnlodw',this)"><img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg" alt=""><span class="g-label">Preview</span></div>
+          <div class="g-card" onclick="showVideo('Ik4mn3TPTeQ',this)"><img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg" alt=""><span class="g-label">Video 3</span></div>
         </div>
-
         <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
         <div class="g-row g-row-4">
           <div class="g-card" onclick="showImage('image1.png',this)"><img src="image1.png" alt=""><span class="g-label">Project Tab</span></div>
@@ -1662,14 +558,7 @@ body::after {
         </div>
       </div>
     </div>
-
-    <!-- Quick Features -->
-    <div class="sec-div">
-      <div class="sec-div-line"></div>
-      <div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div>
-      <div class="sec-div-line"></div>
-    </div>
-
+    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div><div class="sec-div-line"></div></div>
     <div class="qf-grid">
       <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on every startup and notifies you instantly.</div></div></div>
       <div class="qf-card"><div class="qf-icon"><i class="fas fa-palette"></i></div><div><div class="qf-title">Colorable Skins</div><div class="qf-desc">Select a base color PNG and palette map — BeamSkin handles the blending automatically.</div></div></div>
@@ -1678,41 +567,20 @@ body::after {
       <div class="qf-card"><div class="qf-icon"><i class="fas fa-puzzle-piece"></i></div><div><div class="qf-title">Mod Support</div><div class="qf-desc">Skin custom vehicles from supported mods — coverage expanding with each release.</div></div></div>
       <div class="qf-card"><div class="qf-icon"><i class="fas fa-sliders"></i></div><div><div class="qf-title">Saved Configurations</div><div class="qf-desc">Bundle an in-game vehicle configuration into your mod, with optional preview image.</div></div></div>
       <div class="qf-card"><div class="qf-icon"><i class="fas fa-floppy-disk"></i></div><div><div class="qf-title">Save / Load Projects</div><div class="qf-desc">Save your skin setup as a project file and reload it exactly where you left off.</div></div></div>
-      <div class="qf-card" style="cursor:pointer;" onclick="switchTab('features',document.querySelectorAll('.nav-tab')[1])">
-        <div class="qf-icon"><i class="fas fa-arrow-right"></i></div>
-        <div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming in v0.8.0 Beta.</div></div>
-      </div>
+      <div class="qf-card" style="cursor:pointer;" onclick="switchTab('features',document.querySelectorAll('.nav-tab')[1])"><div class="qf-icon"><i class="fas fa-arrow-right"></i></div><div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming in v0.8.0 Beta.</div></div></div>
     </div>
-
-    <!-- Community -->
-    <div class="sec-div">
-      <div class="sec-div-line"></div>
-      <div class="sec-div-title"><i class="fas fa-users"></i> Community</div>
-      <div class="sec-div-line"></div>
-    </div>
-
+    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-users"></i> Community</div><div class="sec-div-line"></div></div>
     <div class="community-grid">
-      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord">
-        <div class="comm-icon"><i class="fab fa-discord"></i></div>
-        <div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div>
-      </a>
-      <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon">
-        <div class="comm-icon"><i class="fab fa-patreon"></i></div>
-        <div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of BeamSkin Studio — every bit helps keep the project going.</div></div>
-      </a>
-      <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree">
-        <div class="comm-icon"><i class="fas fa-seedling"></i></div>
-        <div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div>
-      </a>
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord"><div class="comm-icon"><i class="fab fa-discord"></i></div><div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div></a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon"><div class="comm-icon"><i class="fab fa-patreon"></i></div><div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of BeamSkin Studio — every bit helps keep the project going.</div></div></a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree"><div class="comm-icon"><i class="fas fa-seedling"></i></div><div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div></a>
     </div>
+  </div>
 
-  </div><!-- /home -->
-
-  <!-- ── FEATURES ── -->
+  <!-- FEATURES -->
   <div class="tab-panel" id="panel-features">
     <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
     <p class="tab-sub">Everything available in the current release of BeamSkin Studio.</p>
-
     <div class="feat-grid">
       <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup BeamSkin Studio checks GitHub for a newer version and notifies you if one is available.</div></div>
       <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Mod Support</div></div><div class="feat-desc">Basic mod support is included, allowing custom vehicle skins from supported mods — coverage is still expanding.</div></div>
@@ -1729,27 +597,22 @@ body::after {
       <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Auto Add Mods</div></div><div class="feat-desc">BeamSkin Studio can automatically add your mods and find the correct files — no more manually hunting through mod folders for the right files.</div></div>
       <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-tree"></i></div><div class="feat-title">Smart Config Browsing</div></div><div class="feat-desc">When browsing for <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.pc</code> and <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div></div>
     </div>
+  </div>
 
-  </div><!-- /features -->
-
-  <!-- ── INSTALL ── -->
+  <!-- INSTALL -->
   <div class="tab-panel" id="panel-install">
     <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
     <p class="tab-sub">Get BeamSkin Studio running in minutes on Windows or Linux.</p>
-
     <div class="sub-tabs">
       <button class="sub-tab active" onclick="switchSub('inst',this)"><i class="fas fa-download"></i> Installation</button>
       <button class="sub-tab" onclick="switchSub('manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
       <button class="sub-tab" onclick="switchSub('trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
     </div>
-
-    <!-- Installation -->
     <div class="sub-panel active" id="sub-inst">
       <div class="os-toggle">
         <button class="os-btn win-on" id="instW" onclick="switchInstOS('windows')"><i class="fab fa-windows"></i> Windows</button>
         <button class="os-btn" id="instL" onclick="switchInstOS('linux')"><i class="fab fa-linux"></i> Linux</button>
       </div>
-
       <div class="os-sect active" id="inst-windows">
         <div class="steps-grid sg5">
           <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Windows Download</strong> button on the Home tab to grab the latest release ZIP from GitHub.</div></div>
@@ -1759,142 +622,74 @@ body::after {
           <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Use <code>BeamSkin Studio.bat</code> from now on — it skips the installer for a faster startup.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
         </div>
       </div>
-
       <div class="os-sect" id="inst-linux">
-        <div class="lin-warn">
-          <i class="fab fa-linux" style="color:var(--amber);font-size:.9rem;margin-top:2px;flex-shrink:0;"></i>
-          <div><strong>Linux — heads up:</strong> The Linux version is <strong>untested</strong> and may have issues. Report them on the <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">Linux GitHub Issues</a> page. Supports <strong>Ubuntu/Debian, Fedora/RHEL, Arch/Manjaro, and openSUSE</strong>.</div>
-        </div>
+        <div class="lin-warn"><i class="fab fa-linux" style="color:var(--amber);font-size:.9rem;margin-top:2px;flex-shrink:0;"></i><div><strong>Linux — heads up:</strong> The Linux version is <strong>untested</strong> and may have issues. Report them on the <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">Linux GitHub Issues</a> page. Supports <strong>Ubuntu/Debian, Fedora/RHEL, Arch/Manjaro, and openSUSE</strong>.</div></div>
         <div class="steps-grid sg4">
           <div class="step-card lin"><div class="step-num l">01</div><div class="step-icon l"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Linux Download</strong> button on the Home tab.</div></div>
           <div class="step-card lin"><div class="step-num l">02</div><div class="step-icon l"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Use your file manager or:<br><br><code class="l">unzip BeamSkin-Studio-Linux-*.zip</code></div></div>
           <div class="step-card lin"><div class="step-num l">03</div><div class="step-icon l"><i class="fas fa-terminal"></i></div><div class="step-label">Run Installer</div><div class="step-desc">Open a terminal in the extracted folder:<br><br><code class="l">chmod +x install_linux.sh</code><br><code class="l">./install_linux.sh</code><br><br>Installs Python 3, pip, tkinter, and all required packages.</div><div class="step-tip">⚠️ May prompt for your <strong>sudo password</strong> — this is expected.</div></div>
           <div class="step-card lin"><div class="step-num l">04</div><div class="step-icon l"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">The installer will ask to launch immediately. Type <strong>y</strong> and Enter, or run anytime with:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
         </div>
-
-        <div class="upc-hdr" style="margin-top:24px;">
-          <div class="upc-hdr-line"></div>
-          <div class="upc-hdr-title"><i class="fas fa-desktop"></i> Optional — Desktop Shortcut</div>
-          <div class="upc-hdr-line"></div>
-        </div>
-
+        <div class="upc-hdr" style="margin-top:24px;"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-desktop"></i> Optional — Desktop Shortcut</div><div class="upc-hdr-line"></div></div>
         <div class="steps-grid sg3">
           <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-file-code"></i></div><div class="step-label">Edit .desktop File</div><div class="step-desc">Open <code class="l">beamskin-studio.desktop</code> in a text editor. Replace both <code class="l">/path/to/BeamSkin-Studio</code> placeholders with your actual path.</div><div class="step-tip">💡 Run <code style="color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);font-family:var(--font-mono);font-size:.68rem;padding:1px 5px;border-radius:4px;">pwd</code> inside the folder to see it.</div></div>
           <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-copy"></i></div><div class="step-label">Install Shortcut</div><div class="step-desc">Copy it so it appears in your app launcher:<br><br><code class="l">cp beamskin-studio.desktop ~/.local/share/applications/</code></div></div>
           <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your launcher, or use:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
         </div>
       </div>
-    </div><!-- /sub-inst -->
-
-    <!-- Manual -->
+    </div>
     <div class="sub-panel" id="sub-manual">
       <div class="steps-grid sg3" style="margin-bottom:24px;">
         <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
         <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong> (Linux: your terminal). Navigate to the BeamSkin Studio folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
         <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
       </div>
-
-      <div class="upc-hdr">
-        <div class="upc-hdr-line"></div>
-        <div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div>
-        <div class="upc-hdr-line"></div>
-      </div>
-
+      <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div><div class="upc-hdr-line"></div></div>
       <div class="pkgs-grid">
         <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 6.5.0</span></div></div></div><div class="feat-desc">Qt-based GUI framework powering the entire interface.</div></div>
         <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div><div class="feat-title">Pillow <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 10.0.0</span></div></div></div><div class="feat-desc">Image processing library for skin texture manipulation and colorable skin generation.</div></div>
         <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 2.31.0</span></div></div></div><div class="feat-desc">HTTP library for the update checker and online features.</div></div>
         <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-windows"></i></div><div><div class="feat-title">pywin32 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 306</span></div></div></div><div class="feat-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped on Linux.</div></div>
       </div>
-
-      <div class="lin-info">
-        <strong><i class="fab fa-linux"></i> Linux note —</strong>
-        PySide6 bundles its own Qt libraries so no system Qt is needed. You may need <code>libGL</code> for rendering:
-        &nbsp;<code>sudo apt install libgl1</code> (Debian/Ubuntu)
-        &nbsp;·&nbsp;<code>sudo dnf install mesa-libGL</code> (Fedora)
-        &nbsp;·&nbsp;<code>sudo pacman -S mesa</code> (Arch)
-      </div>
-    </div><!-- /sub-manual -->
-
-    <!-- Troubleshooting -->
+      <div class="lin-info"><strong><i class="fab fa-linux"></i> Linux note —</strong> PySide6 bundles its own Qt libraries so no system Qt is needed. You may need <code>libGL</code> for rendering: &nbsp;<code>sudo apt install libgl1</code> (Debian/Ubuntu) &nbsp;·&nbsp; <code>sudo dnf install mesa-libGL</code> (Fedora) &nbsp;·&nbsp; <code>sudo pacman -S mesa</code> (Arch)</div>
+    </div>
     <div class="sub-panel" id="sub-trouble">
       <div class="trouble-list">
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and third-party antivirus may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.</div></div>
-        </div>
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly.<br><br>• <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish. Launch via <code>BeamSkin Studio.bat</code>, not <code>main.py</code>.<br>• <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for errors. Or install manually: <code>pip install --user &lt;package-name&gt;</code>.</div></div>
-        </div>
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: tkinter not found / GUI fails to open<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">tkinter must be installed separately on Linux:<br><br>• <strong>Ubuntu/Debian:</strong> <code>sudo apt install python3-tk</code><br>• <strong>Fedora/RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>• <strong>Arch/Manjaro:</strong> <code>sudo pacman -S tk</code><br>• <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code></div></div>
-        </div>
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: permission denied when running scripts<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">The shell scripts need execute permission before they can run:<br><br><code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.</div></div>
-        </div>
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div>
-        </div>
-
-        <div class="trouble-item" onclick="toggleT(this)">
-          <div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div>
-          <div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div>
-        </div>
-
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and third-party antivirus may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.</div></div></div>
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly.<br><br>• <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish. Launch via <code>BeamSkin Studio.bat</code>, not <code>main.py</code>.<br>• <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for errors. Or install manually: <code>pip install --user &lt;package-name&gt;</code>.</div></div></div>
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: tkinter not found / GUI fails to open<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">tkinter must be installed separately on Linux:<br><br>• <strong>Ubuntu/Debian:</strong> <code>sudo apt install python3-tk</code><br>• <strong>Fedora/RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>• <strong>Arch/Manjaro:</strong> <code>sudo pacman -S tk</code><br>• <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code></div></div></div>
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: permission denied when running scripts<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">The shell scripts need execute permission before they can run:<br><br><code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.</div></div></div>
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div></div>
+        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div></div>
       </div>
-    </div><!-- /sub-trouble -->
+    </div>
+  </div>
 
-  </div><!-- /install -->
-
-  <!-- ── RELEASES ── -->
+  <!-- RELEASES -->
   <div class="tab-panel" id="panel-releases">
     <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
     <p class="tab-sub">Complete release history for Windows and Linux builds.</p>
-
     <div class="os-toggle" style="margin-bottom:20px;">
       <button class="os-btn win-on" id="relW" onclick="switchRelOS('windows')"><i class="fab fa-windows"></i> Windows</button>
       <button class="os-btn" id="relL" onclick="switchRelOS('linux')"><i class="fab fa-linux"></i> Linux</button>
     </div>
+    <div class="os-sect active" id="rel-windows"><div id="rlw"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
+    <div class="os-sect" id="rel-linux"><div id="rll"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
+  </div>
 
-    <div class="os-sect active" id="rel-windows">
-      <div id="rlw"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
-    </div>
-    <div class="os-sect" id="rel-linux">
-      <div id="rll"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
-    </div>
-  </div><!-- /releases -->
-
-  <!-- ── CHANGELOG ── -->
+  <!-- CHANGELOG -->
   <div class="tab-panel" id="panel-changelog">
     <div class="cl-wrap">
-      <div class="cl-top">
-        <h2 class="tab-heading">CHANGE<span>LOG</span></h2>
-        <span id="clVer" class="cl-ver">Loading…</span>
-        <span id="clDate" class="cl-date-label"></span>
-      </div>
-      <div class="cl-body" id="clBody">
-        <div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div>
-      </div>
+      <div class="cl-top"><h2 class="tab-heading">CHANGE<span>LOG</span></h2><span id="clVer" class="cl-ver">Loading…</span><span id="clDate" class="cl-date-label"></span></div>
+      <div class="cl-body" id="clBody"><div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div></div>
     </div>
-  </div><!-- /changelog -->
+  </div>
 
-</div><!-- /page-wrap -->
+</div>
 
 <!-- FOOTER -->
 <footer class="footer">
-  <div class="footer-brand">
-    <img src="beamSkin_studio_logo.png" alt="" class="footer-logo">
-    <span class="footer-name">BeamSkin Studio</span>
-  </div>
+  <div class="footer-brand"><img src="beamSkin_studio_logo.png" alt="" class="footer-logo"><span class="footer-name">BeamSkin Studio</span></div>
   <div class="footer-socials">
     <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
     <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
@@ -1904,58 +699,40 @@ body::after {
   <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
 </footer>
 
-<!-- LIGHTBOX OVERLAY -->
+<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close fullscreen">
-    <i class="fas fa-xmark"></i>
-  </button>
-  <div class="lightbox-inner" onclick="event.stopPropagation()">
-    <img id="lightboxImg" src="" alt="Screenshot fullscreen">
-  </div>
+  <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close fullscreen"><i class="fas fa-xmark"></i></button>
+  <div class="lightbox-inner" onclick="event.stopPropagation()"><img id="lightboxImg" src="" alt="Screenshot fullscreen"></div>
 </div>
 
 <script>
-const WIN_REPO   = 'BeamSkin-Studio/BeamSkin-Studio-Beta';
-const LINUX_REPO = 'BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
-let winUrl   = `https://github.com/${WIN_REPO}/releases/latest`;
-let linuxUrl = `https://github.com/${LINUX_REPO}/releases/latest`;
+const WIN_REPO='BeamSkin-Studio/BeamSkin-Studio-Beta';
+const LINUX_REPO='BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
+let winUrl=`https://github.com/${WIN_REPO}/releases/latest`;
+let linuxUrl=`https://github.com/${LINUX_REPO}/releases/latest`;
 
-/* ── GitHub data ── */
-async function initData() {
-  try {
-    const [wR, lR] = await Promise.all([
+async function initData(){
+  try{
+    const [wR,lR]=await Promise.all([
       fetch(`https://api.github.com/repos/${WIN_REPO}/releases`).then(r=>r.json()),
       fetch(`https://api.github.com/repos/${LINUX_REPO}/releases`).then(r=>r.json())
     ]);
-
     let wT=0,lT=0,wL=0,lL=0;
     wR.forEach((r,i)=>r.assets.forEach(a=>{wT+=a.download_count;if(i===0)wL+=a.download_count;}));
     lR.forEach((r,i)=>r.assets.forEach(a=>{lT+=a.download_count;if(i===0)lL+=a.download_count;}));
-
-    if(wR.length){
-      document.getElementById('winVer').textContent=wR[0].tag_name;
-      if(wR[0].assets.length) winUrl=wR[0].assets[0].browser_download_url;
-    }
-    if(lR.length){
-      document.getElementById('linVer').textContent=lR[0].tag_name;
-      if(lR[0].assets.length) linuxUrl=lR[0].assets[0].browser_download_url;
-    }
-
+    if(wR.length){document.getElementById('winVer').textContent=wR[0].tag_name;if(wR[0].assets.length)winUrl=wR[0].assets[0].browser_download_url;}
+    if(lR.length){document.getElementById('linVer').textContent=lR[0].tag_name;if(lR[0].assets.length)linuxUrl=lR[0].assets[0].browser_download_url;}
     document.getElementById('winCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${wL.toLocaleString()} (latest)`;
     document.getElementById('linCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${lL.toLocaleString()} (latest)`;
     document.getElementById('statTotal').textContent=(wT+lT).toLocaleString();
     document.getElementById('statWin').textContent=wT.toLocaleString();
     document.getElementById('statLin').textContent=lT.toLocaleString();
-
     buildRelList(wR,'rlw',false);
     buildRelList(lR,'rll',true);
-  } catch(e) {
-    console.error(e);
-    ['winVer','linVer'].forEach(id=>document.getElementById(id).textContent='Unavailable');
-  }
+  }catch(e){console.error(e);['winVer','linVer'].forEach(id=>document.getElementById(id).textContent='Unavailable');}
 }
 
-function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDate(iso){return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
 
 function buildRelList(rels,id,lin){
   const c=document.getElementById(id);
@@ -1968,34 +745,23 @@ function buildRelList(rels,id,lin){
     const row=document.createElement('div');
     row.className='release-row'+(lin?' lin-row':'')+(isL?' is-latest':'');
     const badge=isL?`<span class="rel-latest-badge ${lin?'lin':''}"><i class="fas fa-circle-check"></i> LATEST</span>`:'';
-    const btn=url
-      ?`<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>`
-      :`<span class="rel-no-asset">No asset</span>`;
-    row.innerHTML=`
-      <div class="rel-tag">${r.tag_name}${badge}</div>
-      <div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div>
-      <div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>
-      ${btn}
-    `;
+    const btn=url?`<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>`:`<span class="rel-no-asset">No asset</span>`;
+    row.innerHTML=`<div class="rel-tag">${r.tag_name}${badge}</div><div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div><div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>${btn}`;
     c.appendChild(row);
   });
 }
 
-/* ── Changelog ── */
 async function fetchChangelog(){
   try{
     const res=await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
-    if(!res.ok) throw new Error('fetch');
+    if(!res.ok)throw new Error('fetch');
     const text=await res.text();
     const ls=text.indexOf('CHANGELOGS = [');
-    if(ls===-1) throw new Error('no list');
+    if(ls===-1)throw new Error('no list');
     const cont=text.slice(ls);
     let d=0,s=-1,e=-1;
-    for(let i=0;i<cont.length;i++){
-      if(cont[i]==='{'){if(d===0)s=i;d++;}
-      else if(cont[i]==='}'){d--;if(d===0){e=i;break;}}
-    }
-    if(s===-1||e===-1) throw new Error('parse');
+    for(let i=0;i<cont.length;i++){if(cont[i]==='{'){if(d===0)s=i;d++;}else if(cont[i]==='}'){d--;if(d===0){e=i;break;}}}
+    if(s===-1||e===-1)throw new Error('parse');
     const blk=cont.slice(s,e+1);
     const ver=(blk.match(/"version":\s*"([^"]+)"/))||[];
     const dat=(blk.match(/"date":\s*"([^"]+)"/))||[];
@@ -2004,16 +770,10 @@ async function fetchChangelog(){
     const entries=[];
     const re=/(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
     let m;
-    while((m=re.exec(blk))!==null) entries.push({type:m[1],text:m[2]||''});
+    while((m=re.exec(blk))!==null)entries.push({type:m[1],text:m[2]||''});
     const body=document.getElementById('clBody');
     body.innerHTML='';
-
-    const safe = t => t
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/\\n/g,'<br>');
-
+    const safe=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
     for(const en of entries){
       if(en.type==='separator'){const hr=document.createElement('hr');hr.className='cl-sep';body.appendChild(hr);continue;}
       const div=document.createElement('div');
@@ -2023,90 +783,29 @@ async function fetchChangelog(){
       else if(en.type==='note'){div.className='cl-note-el';div.innerHTML='💡 '+safe(en.text);}
       body.appendChild(div);
     }
-  } catch(e){
-    console.error(e);
-    document.getElementById('clBody').innerHTML='<div class="cl-loading">Could not load changelog.</div>';
-    document.getElementById('clVer').textContent='';
-  }
+  }catch(e){console.error(e);document.getElementById('clBody').innerHTML='<div class="cl-loading">Could not load changelog.</div>';document.getElementById('clVer').textContent='';}
 }
 
-/* ── Lightbox ── */
-function openLightbox() {
-  const img = document.getElementById('vImg');
-  if (!img.src || img.style.display === 'none') return;
-  document.getElementById('lightboxImg').src = img.src;
-  document.getElementById('lightbox').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
+function openLightbox(){const img=document.getElementById('vImg');if(!img.src||img.style.display==='none')return;document.getElementById('lightboxImg').src=img.src;document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightbox();});
 
-function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('open');
-  document.body.style.overflow = '';
-}
+function clearG(){document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active'));}
+function showVideo(id,card){document.getElementById('vVideo').src=`https://www.youtube.com/embed/${id}`;document.getElementById('vVideo').style.display='block';document.getElementById('vImg').style.display='none';document.getElementById('zoomHint').style.display='none';clearG();if(card)card.classList.add('active');}
+function showImage(src,card){document.getElementById('vImg').src=src;document.getElementById('vVideo').style.display='none';document.getElementById('vImg').style.display='block';clearG();if(card)card.classList.add('active');}
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeLightbox();
-});
-
-/* ── Media viewer ── */
-function clearG(){ document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active')); }
-
-function showVideo(id, card) {
-  document.getElementById('vVideo').src = `https://www.youtube.com/embed/${id}`;
-  document.getElementById('vVideo').style.display = 'block';
-  document.getElementById('vImg').style.display = 'none';
-  document.getElementById('zoomHint').style.display = 'none';
-  clearG();
-  if (card) card.classList.add('active');
-}
-
-function showImage(src, card) {
-  document.getElementById('vImg').src = src;
-  document.getElementById('vVideo').style.display = 'none';
-  document.getElementById('vImg').style.display = 'block';
-  clearG();
-  if (card) card.classList.add('active');
-}
-
-/* ── Navigation ── */
 const TABS=['home','features','install','releases','changelog'];
-
 function switchTab(name,btn,isMobile){
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
   const idx=TABS.indexOf(name);
-  if(!isMobile){
-    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-    document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  } else {
-    document.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));
-    if(btn) btn.classList.add('active');
-    document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
-  }
+  if(!isMobile){document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));}
+  else{document.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));if(btn)btn.classList.add('active');document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));}
 }
-
-function switchSub(name,btn){
-  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('sub-'+name).classList.add('active');
-}
-
-function switchInstOS(os){
-  document.querySelectorAll('#sub-inst .os-sect').forEach(s=>s.classList.remove('active'));
-  document.getElementById('inst-'+os).classList.add('active');
-  document.getElementById('instW').className='os-btn'+(os==='windows'?' win-on':'');
-  document.getElementById('instL').className='os-btn'+(os==='linux'?' lin-on':'');
-}
-
-function switchRelOS(os){
-  document.querySelectorAll('#panel-releases .os-sect').forEach(s=>s.classList.remove('active'));
-  document.getElementById('rel-'+os).classList.add('active');
-  document.getElementById('relW').className='os-btn'+(os==='windows'?' win-on':'');
-  document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');
-}
-
-function toggleT(item){ item.classList.toggle('open'); }
+function switchSub(name,btn){document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById('sub-'+name).classList.add('active');}
+function switchInstOS(os){document.querySelectorAll('#sub-inst .os-sect').forEach(s=>s.classList.remove('active'));document.getElementById('inst-'+os).classList.add('active');document.getElementById('instW').className='os-btn'+(os==='windows'?' win-on':'');document.getElementById('instL').className='os-btn'+(os==='linux'?' lin-on':'');}
+function switchRelOS(os){document.querySelectorAll('#panel-releases .os-sect').forEach(s=>s.classList.remove('active'));document.getElementById('rel-'+os).classList.add('active');document.getElementById('relW').className='os-btn'+(os==='windows'?' win-on':'');document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');}
+function toggleT(item){item.classList.toggle('open');}
 
 document.getElementById('winBtn').onclick=()=>window.location.href=winUrl;
 document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
@@ -2114,5 +813,62 @@ document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
 initData();
 fetchChangelog();
 </script>
+
+<!-- Discord Ban Popup -->
+<div class="dsc-overlay" id="dscOverlay">
+  <div class="dsc-card">
+    <div class="dsc-body">
+      <div class="dsc-icon-row">
+        <div class="dsc-icon"><i class="fab fa-discord"></i></div>
+        <span class="dsc-label">Important Notice</span>
+      </div>
+      <div class="dsc-title">I've Been<br><span>Wrongfully Banned</span></div>
+      <div class="dsc-text">
+        I have been <strong>wrongfully banned</strong> from the official
+        <strong>BeamNG.Drive Discord server</strong>. Because of this, I am no longer
+        able to provide support, share development updates, or stay in contact with
+        the community through that server.
+        <br><br>
+        If you want to stay up to date with BeamSkin Studio and be able to reach me
+        for issues, questions, or anything else — please join my dedicated Discord
+        server below. It is the only place where I can guarantee support and direct
+        communication going forward.
+        <br><br>
+        By joining you get access to:
+        <ul class="dsc-bullets">
+          <li>Development updates &amp; announcements</li>
+          <li>Direct support from me</li>
+          <li>Bug reports &amp; feature requests</li>
+          <li>Skin sharing &amp; community chat</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dsc-footer">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="dsc-join-btn">
+        <i class="fab fa-discord"></i> Join BeamSkin Studio Discord
+      </a>
+      <button class="dsc-close-btn" onclick="closeDscPopup()">
+        <i class="fas fa-xmark"></i> Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function closeDscPopup() {
+  var el = document.getElementById('dscOverlay');
+  if (!el) return;
+  el.style.transition = 'opacity .2s ease';
+  el.style.opacity = '0';
+  setTimeout(function () { el.classList.add('hidden'); el.style.opacity = ''; }, 210);
+}
+document.getElementById('dscOverlay').addEventListener('click', function (e) {
+  if (e.target === this) closeDscPopup();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeDscPopup();
+});
+</script>
+
 </body>
 </html>
