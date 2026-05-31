@@ -43,8 +43,25 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
-        "version": "0.8.1.Beta",
-        "date": "08-21-2026",
+        "version": "0.8.2.Beta",
+        "date": "31-05-2026",
+        "entries": [
+            title("⚙️ Improvements"),
+            subtitle("Auto add vehicle mod"),
+            item("ZIPs: You can now add multiple mods att the same time"),
+            subtitle("Mod scanner"),
+            item("I have made some improvements on the mod scanner, less chance that it will fail\n\nNOTE:\nPlease remove all your added vehicles and re add them"),
+            separator(),
+            title("🐛 Bug Fixes"),
+            subtitle("Colorable Skin (at position 1) Issue"),
+            item("This issue has hopefully been fully fixed now"),
+        ]
+    },
+
+
+    {
+        "version": "0.8.0.Beta",
+        "date": "08-15-2026",
         "entries": [
             title("🚀 New Features"),
             subtitle("Body variant support"),
@@ -54,7 +71,7 @@ CHANGELOGS = [
             subtitle("Unpack toggle"),
             item("You can now export your mod to the unpacked folder as a plain mod folder, no need to extract your mod manually any more"),
             subtitle("Auto add mods"),
-            item("BeamSkin Studio can now add you mods for you and find the correct files, no more finding the correct files manually"),
+            item("BeamSkin Studio can now add you mods for you amd find the correct files, no more finding the correct files manually"),
             separator(),
             title("⚙️ Improvements"),
             subtitle("PySide6 Migration"),

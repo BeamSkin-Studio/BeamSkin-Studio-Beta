@@ -17,8 +17,15 @@ def sanitize_skin_id(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9\-]", "", name)
 
 
+# Characters that are illegal in Windows file/folder names: \ / : * ? " < > |
+_ILLEGAL_WIN_CHARS = re.compile(r'[\\/:*?"<>|]')
+
 def sanitize_folder_name(name: str) -> str:
-    return name.replace(" ", "_")
+    name = name.replace(" ", "_")
+    name = _ILLEGAL_WIN_CHARS.sub("", name)
+    # Collapse any runs of underscores left behind (e.g. "Police_|_Sedan" → "Police__Sedan" → "Police_Sedan")
+    name = re.sub(r"_+", "_", name)
+    return name.strip("_")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,15 +119,30 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
             content = re.sub(r'_skin_SKINNAME\w*', f'_skin_{skin_id}',
                              content, flags=re.IGNORECASE)
             content = re.sub(r'("globalSkin"\s*:\s*")SKINNAME\w*(")',
-                             f'\\1{skin_id}\\2', content, flags=re.IGNORECASE)
+                             lambda m: m.group(1) + skin_id + m.group(2),
+                             content, flags=re.IGNORECASE)
+            # Bug C fix: skinName values were not replaced in the colorable path.
+            content = re.sub(r'("skinName"\s*:\s*")SKINNAME\w*(")',
+                             lambda m: m.group(1) + skin_id + m.group(2),
+                             content, flags=re.IGNORECASE)
 
-            if skin_name:
-                content = content.replace('"YOUR SKIN NAME"', f'"{skin_name}"')
+            # Bug B fix: replace authors/name regardless of placeholder text.
+            # The old code only matched the literal strings "YOU" / "YOUR SKIN NAME",
+            # missing templates that use "Your Name Here", "Skin Name", etc.
             if author_name:
-                content = re.sub(r'("authors"\s*:\s*)"YOU"', f'\\1"{author_name}"',
-                                 content, flags=re.IGNORECASE)
+                content = re.sub(r'("authors"\s*:\s*")[^"]*"',
+                                 rf'\g<1>{author_name}"', content)
             else:
-                print(f"[WARNING] author_name not provided — 'YOU' left in {file_path}")
+                print(f"[WARNING] author_name not provided — author left unchanged in {file_path}")
+            if skin_name:
+                # Negative lookahead (?![^"]*\.skin\.) skips material-reference
+                # name values (e.g. "us_semi.skin.1TESTING") that were already
+                # handled by the regexes at lines 110-118. Without this guard
+                # the blanket replacement would overwrite those correct values.
+                content = re.sub(
+                    r'("name"\s*:\s*")(?![^"]*\.skin\.)[^"]*"',
+                    rf'\g<1>{skin_name}"', content,
+                )
 
             if vehicle_id:
                 content = re.sub(r'(?<![a-zA-Z0-9])carid', vehicle_id,
@@ -203,10 +225,7 @@ def _process_json_files(
                         if idx == 0:
                             stages[idx]["colorPaletteMapUseUV"] = None
                         else:
-                            # diffuseMapUseUV is not a valid BeamNG property and causes the
-                            # skin layer to never blend.  Remove it from any template that
-                            # carries it before writing the output.
-                            stages[idx].pop("diffuseMapUseUV", None)
+                            stages[idx]["diffuseMapUseUV"]      = 1
                             stages[idx]["colorPaletteMap"]      = palette_path
                             stages[idx]["colorPaletteMapUseUV"] = 1
                 content = json.dumps(data, indent=2)
@@ -227,7 +246,7 @@ def _process_json_files_variant(
     folder_path, vehicle_id, skin_folder_name,
     car_data_filename,   car_palette_filename,   # PNGs 1 & 2  → car body
     var_data_filename,   var_palette_filename,   # PNGs 3 & 4  → variant body
-    skin_id,
+    skin_id, variant_suffix,
 ):
     """
     Variant colorable skin: route each material entry to its own PNG pair.
@@ -288,8 +307,7 @@ def _process_json_files_variant(
                             stages[idx]["colorPaletteMapUseUV"] = None
                             print(f"[DEBUG]     Stage 0 baseColorMap = {d_path}")
                         else:
-                            # diffuseMapUseUV is not a valid BeamNG property — strip it.
-                            stages[idx].pop("diffuseMapUseUV", None)
+                            stages[idx]["diffuseMapUseUV"]      = 1
                             stages[idx]["colorPaletteMap"]      = p_path
                             stages[idx]["colorPaletteMapUseUV"] = 1
                             print(f"[DEBUG]     Stage 1 baseColorMap = {d_path}")
@@ -463,7 +481,7 @@ def generate_colorable_skin_variant(
     )
     _process_json_files_variant(
         dest_skin_folder, vehicle_id, skin_folder,
-        car_dm, car_pm, var_dm, var_pm, skin_id,
+        car_dm, car_pm, var_dm, var_pm, skin_id, variant_suffix,
     )
     if material_properties:
         if not _process_material_properties(dest_skin_folder, material_properties, skin_id):

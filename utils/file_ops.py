@@ -1,4 +1,4 @@
-# file_ops.py
+# utils/file_ops.py
 # edits the attached files in Add vehicles tab
 
 import os
@@ -217,13 +217,19 @@ def remove_variant_from_json(carid: str, suffix_lower: str) -> bool:
 def fix_stage_two_material_properties(stage2, carid, prefix):
     print(f"[DEBUG] Fixing Stage 2 material properties for prefix: {prefix}...")
 
+    # Remove every field that must NOT appear in a skin Stage[1].
+    # diffuseMapUseUV, roughnessFactor, and metallicFactor were previously
+    # injected here by mistake — they cause the skin to break in-game.
     properties_to_remove = [
         "instanceDiffuse",
         "baseColorFactor",
         "colorPaletteMap",
         "colorPaletteMapUseUV",
         "metallicMap",
-        "metallicMapUseUV"
+        "metallicMapUseUV",
+        "diffuseMapUseUV",   # must NOT be in a skin Stage[1]
+        "roughnessFactor",   # must NOT be in a skin Stage[1]
+        "metallicFactor",    # must NOT be in a skin Stage[1]
     ]
 
     removed_count = 0
@@ -233,30 +239,14 @@ def fix_stage_two_material_properties(stage2, carid, prefix):
             removed_count += 1
             print(f"[DEBUG]   ✓ Removed incorrect property: {prop}")
 
-    required_properties = {
-        "baseColorMap": "vehicles/carid/skinname/carid_skin_skinname.dds",
-        "diffuseMapUseUV": 1,
-        "metallicFactor": 0.5,
-        "roughnessFactor": 0.5
-    }
-
-    added_count = 0
-    for prop, value in required_properties.items():
-        if prop not in stage2:
-            stage2[prop] = value
-            added_count += 1
-            print(f"[DEBUG]   ✓ Added missing property: {prop} = {value}")
-        elif prop == "baseColorMap":
-            old_value = stage2[prop]
-            stage2[prop] = value
-            print(f"[DEBUG]   ✓ Replaced baseColorMap:")
-            print(f"[DEBUG]     Old: {old_value}")
-            print(f"[DEBUG]     New: {value}")
+    # Always (re)set baseColorMap to the placeholder path — it will be
+    # substituted with the real DDS path later by process_json_files.
+    old_bcm = stage2.get("baseColorMap", "<not set>")
+    stage2["baseColorMap"] = "vehicles/carid/skinname/carid_skin_skinname.dds"
+    print(f"[DEBUG]   ✓ Replaced baseColorMap: {old_bcm} → vehicles/carid/skinname/carid_skin_skinname.dds")
 
     if removed_count > 0:
         print(f"[DEBUG] Removed {removed_count} incorrect properties from Stage 2")
-    if added_count > 0:
-        print(f"[DEBUG] Added {added_count} missing properties to Stage 2")
 
     return stage2
 
@@ -394,6 +384,12 @@ def edit_material_json(source_json_path, target_folder, carid):
                             if field in stage:
                                 del stage[field]
                                 print(f"[DEBUG] Removed {field} from {normalized_key} Stage {stage_idx}")
+
+                # Stages[2+] must be empty objects — null-filled stages break
+                # BeamNG skin loading. The working template uses {} for these.
+                for i in range(2, len(new_value["Stages"])):
+                    new_value["Stages"][i] = {}
+                    print(f"[DEBUG] Cleared Stage {i} to empty object in {normalized_key}")
 
                 print(f"[DEBUG] Kept all {len(new_value['Stages'])} stages in {normalized_key}")
 

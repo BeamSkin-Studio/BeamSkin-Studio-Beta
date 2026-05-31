@@ -74,6 +74,13 @@ set "ABS_WORKDIR=%CD%"
 :: Resolve actual python.exe path from whichever command was selected
 for /f "delims=" %%P in ('%PYEXE% -c "import sys; print(sys.executable)"') do set "RESOLVED_PYEXE=%%P"
 
+:: Swap python.exe → pythonw.exe so the VBScript launch never allocates a
+:: console window (pythonw is the GUI-subsystem twin; it runs identically but
+:: has no console association, so window-style 0 actually stays hidden).
+if /i "!RESOLVED_PYEXE:~-10!" == "python.exe" (
+    set "RESOLVED_PYEXE=!RESOLVED_PYEXE:~0,-10!pythonw.exe"
+)
+
 set "VBS=%TEMP%\BeamSkinStudio_launch.vbs"
 
 > "%VBS%" (

@@ -54,6 +54,27 @@ def _mods_start_dir() -> str:
     return p if p and os.path.isdir(p) else ""
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Duplicate-carid guard
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _carid_exists(carid: str) -> bool:
+    """Return True if carid is already taken — either as a built-in vehicle
+    or as a previously-added custom vehicle.  Used to block duplicates before
+    any file system work begins."""
+    # 1. Built-in vehicles shipped with BeamSkin Studio
+    builtin = state.vehicle_ids  # populated from core.config.VEHICLE_IDS
+    if carid in builtin:
+        return True
+    # 2. Custom vehicles the user has already imported
+    if _BACKEND_OK:
+        added = load_added_vehicles_json()
+        if carid in added:
+            return True
+    return False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UV-map copy helper (used by smart import)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -438,7 +459,7 @@ class _ScanWorker(QThread):
     """Runs scan_mod on a background thread so the UI stays responsive."""
 
     finished = Signal(list, list, object)   # vehicles, variants, temp_dir
-    failed   = Signal(str)                  # error message
+    failed   = Signal(str, str)             # error message, path
 
     def __init__(self, path: str, known_carids, parent=None):
         super().__init__(parent)
@@ -450,7 +471,74 @@ class _ScanWorker(QThread):
             vehicles, variants, tmp = scan_mod(self._path, known_carids=self._known)
             self.finished.emit(vehicles, variants, tmp)
         except Exception as e:
-            self.failed.emit(str(e))
+            self.failed.emit(str(e), self._path)
+
+
+
+class _ImportWorker(QThread):
+    """
+    Runs process_custom_vehicle / process_custom_variant for each checked row
+    on a background thread so the UI stays responsive during bulk imports.
+    """
+
+    # (row_index, ok)
+    item_done    = Signal(int, bool)
+    all_finished = Signal(int, int)   # added, skipped
+
+    def __init__(self, tasks: list, mode: str, parent=None):
+        """
+        tasks : list of (row_index, item, display_name) tuples
+        mode  : "vehicles" or "variants"
+        """
+        super().__init__(parent)
+        self._tasks = tasks
+        self._mode  = mode
+
+    def run(self):
+        added = skipped = 0
+        for idx, item, display_name in self._tasks:
+            ok = self._process(item, display_name)
+            self.item_done.emit(idx, ok)
+            if ok:
+                added += 1
+            else:
+                skipped += 1
+        self.all_finished.emit(added, skipped)
+
+    def _process(self, item, display_name: str) -> bool:
+        try:
+            if self._mode == "vehicles":
+                if _carid_exists(item.carid):
+                    return False
+                ok = process_custom_vehicle(
+                    carid      = item.carid,
+                    carname    = display_name,
+                    json_path  = item.json_path,
+                    jbeam_path = item.jbeam_path,
+                    image_path = item.image_path,
+                )
+                if ok:
+                    _copy_uv_maps_to_images(item.carid, getattr(item, "uv_map_paths", []))
+                return ok
+            else:
+                existing = load_added_variants_json() if _BACKEND_OK else {}
+                if f"{item.carid}__{item.suffix.lower()}" in existing:
+                    return False
+                ok = process_custom_variant(
+                    carid          = item.carid,
+                    variant_suffix = item.suffix,
+                    json_path      = item.json_path,
+                    jbeam_path     = item.jbeam_path,
+                    image_path     = item.image_path,
+                )
+                if ok:
+                    _copy_uv_maps_to_images(item.carid, getattr(item, "uv_map_paths", []))
+                return ok
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] _ImportWorker._process failed: {e}")
+            traceback.print_exc()
+            return False
 
 
 class _SmartImportCard(QFrame):
@@ -468,11 +556,13 @@ class _SmartImportCard(QFrame):
                "variants"  → scans for variants of existing vehicles
         """
         super().__init__(parent)
-        self._notify   = notify_fn
-        self._mode     = mode          # "vehicles" or "variants"
-        self._temp_dir: Optional[str] = None
-        self._rows:     list = []      # _DiscoveredVehicleRow | _DiscoveredVariantRow
-        self._worker:   Optional[_ScanWorker] = None
+        self._notify    = notify_fn
+        self._mode      = mode          # "vehicles" or "variants"
+        self._temp_dirs: List[str] = []  # one entry per scanned source
+        self._rows:      list = []       # _DiscoveredVehicleRow | _DiscoveredVariantRow
+        self._worker:    Optional[_ScanWorker] = None
+        self._pending_paths: List[str] = []   # queue for sequential multi-scan
+        self._import_worker: Optional[_ImportWorker] = None
 
         # Animated dots timer for the "Scanning…" label
         self._dot_timer = QTimer(self)
@@ -534,17 +624,54 @@ class _SmartImportCard(QFrame):
         browse_row.addStretch()
         root.addLayout(browse_row)
 
-        # ── Path display ─────────────────────────────────────────────────────
-        self._path_lbl = QLabel("")
-        self._path_lbl.setFont(font(10))
-        self._path_lbl.setWordWrap(True)
-        self._path_lbl.setStyleSheet(
-            f"color:{COLORS['text_muted']};background:transparent;"
+        # ── Scan progress panel ───────────────────────────────────────────────
+        # Active scan row: "🔍 Scanning filename.zip..."
+        self._active_scan_frame = QFrame()
+        self._active_scan_frame.setStyleSheet(
+            f"background:{COLORS['frame_bg']};border:none;border-radius:8px;"
         )
-        self._path_lbl.setVisible(False)
-        root.addWidget(self._path_lbl)
+        self._active_scan_frame.setVisible(False)
+        active_row = QHBoxLayout(self._active_scan_frame)
+        active_row.setContentsMargins(10, 7, 10, 7)
+        active_row.setSpacing(8)
+        self._active_scan_icon = QLabel("🔍")
+        self._active_scan_icon.setFont(font(13))
+        self._active_scan_icon.setStyleSheet("background:transparent;")
+        active_row.addWidget(self._active_scan_icon)
+        self._active_scan_name = QLabel("")
+        self._active_scan_name.setFont(font(12, "bold"))
+        self._active_scan_name.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        active_row.addWidget(self._active_scan_name, 1)
+        self._active_scan_dots = QLabel("")
+        self._active_scan_dots.setFont(font(11))
+        self._active_scan_dots.setStyleSheet(f"color:{COLORS['accent']};background:transparent;")
+        self._active_scan_dots.setFixedWidth(30)
+        active_row.addWidget(self._active_scan_dots)
+        root.addWidget(self._active_scan_frame)
 
-        # ── Scan status ──────────────────────────────────────────────────────
+        # Queue list: file status rows (shown for any scan, single or multi)
+        self._queue_frame = QFrame()
+        self._queue_frame.setStyleSheet("background:transparent;border:none;")
+        _queue_outer = QVBoxLayout(self._queue_frame)
+        _queue_outer.setContentsMargins(0, 0, 0, 0)
+        _queue_outer.setSpacing(4)
+
+        # No inner scroll — the outer _VehiclesTab QScrollArea handles overflow.
+        _queue_inner = QWidget()
+        _queue_inner.setStyleSheet("background:transparent;")
+        self._queue_col = QVBoxLayout(_queue_inner)
+        self._queue_col.setContentsMargins(0, 2, 0, 2)
+        self._queue_col.setSpacing(4)
+        self._queue_col.addStretch()      # keeps rows pinned to the top
+        _queue_outer.addWidget(_queue_inner)
+
+        self._queue_frame.setVisible(False)
+        root.addWidget(self._queue_frame)
+        # Dict: path → QFrame row widget (so we can update chips)
+        self._queue_rows: dict = {}
+        self._queue_hdr: Optional[QLabel] = None
+
+        # Summary / result status label
         self._status_lbl = QLabel("")
         self._status_lbl.setFont(font(11))
         self._status_lbl.setWordWrap(True)
@@ -553,6 +680,7 @@ class _SmartImportCard(QFrame):
         root.addWidget(self._status_lbl)
 
         # ── Discovered list ──────────────────────────────────────────────────
+        # No inner scroll — the outer _VehiclesTab QScrollArea handles overflow.
         self._list_frame = QFrame()
         self._list_frame.setStyleSheet("background:transparent;")
         self._list_col   = QVBoxLayout(self._list_frame)
@@ -584,31 +712,146 @@ class _SmartImportCard(QFrame):
     # ── Browse ───────────────────────────────────────────────────────────────
 
     def _browse_folder(self):
+        # Use the native dialog (most reliable on Windows).
+        # Native dialogs only support single-folder selection, which is fine.
         path = QFileDialog.getExistingDirectory(
-            self, t("add_vehicles.browse_folder_dialog", default="Select Mod Folder"),
+            self,
+            t("add_vehicles.browse_folder_dialog", default="Select Mod Folder"),
             _mods_start_dir(),
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
         )
-        if path:
-            self._run_scan(path)
+        if path and os.path.isdir(path):
+            self._queue_scans([path])
 
     def _browse_zip(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, t("add_vehicles.browse_zip_dialog", default="Select Mod ZIP"), _mods_start_dir(),
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            t("add_vehicles.browse_zip_dialog", default="Select Mod ZIP(s)"),
+            _mods_start_dir(),
             "ZIP Archives (*.zip);;All Files (*)",
         )
-        if path:
-            self._run_scan(path)
+        if paths:
+            self._queue_scans(paths)
+
+    # ── Queue panel helpers ───────────────────────────────────────────────────
+
+    def _make_queue_row(self, path: str, status: str = "queued") -> QFrame:
+        """Build one row in the queue panel for a given source path."""
+        frame = QFrame()
+        frame.setStyleSheet(
+            f"background:{COLORS['frame_bg']};border:none;border-radius:7px;"
+        )
+        frame.setFixedHeight(34)
+        hl = QHBoxLayout(frame)
+        hl.setContentsMargins(10, 0, 10, 0)
+        hl.setSpacing(8)
+
+        name_lbl = QLabel(os.path.basename(path))
+        name_lbl.setFont(font(11))
+        name_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        name_lbl.setToolTip(path)
+        hl.addWidget(name_lbl, 1)
+
+        chip = QLabel()
+        chip.setFont(font(10, "bold"))
+        chip.setFixedHeight(20)
+        chip.setContentsMargins(6, 1, 6, 1)
+        chip.setAlignment(Qt.AlignCenter)
+        frame._chip = chip   # type: ignore[attr-defined]
+        hl.addWidget(chip)
+
+        self._set_queue_chip(frame, status)
+        return frame
+
+    def _set_queue_chip(self, frame: QFrame, status: str):
+        """Update the status chip on a queue row."""
+        chip = frame._chip  # type: ignore[attr-defined]
+        if status == "queued":
+            chip.setText("queued")
+            chip.setStyleSheet(
+                f"color:{COLORS['text_muted']};background:{COLORS['border']};"
+                f"border:none;border-radius:4px;"
+            )
+        elif status == "scanning":
+            chip.setText("scanning")
+            chip.setStyleSheet(
+                f"color:{COLORS['accent']};background:{COLORS.get('accent_dim', COLORS['frame_bg'])};"
+                f"border:none;border-radius:4px;"
+            )
+        elif status == "done":
+            chip.setText("done")
+            chip.setStyleSheet(
+                f"color:{COLORS.get('success', '#4ade80')};"
+                f"background:{COLORS.get('success_dim', '#166534')};"
+                f"border:none;border-radius:4px;"
+            )
+        elif status == "failed":
+            chip.setText("failed")
+            chip.setStyleSheet(
+                f"color:{COLORS.get('error', '#f87171')};"
+                f"background:{COLORS.get('error_dim', '#7f1d1d')};"
+                f"border:none;border-radius:4px;"
+            )
+        elif status == "empty":
+            chip.setText("empty")
+            chip.setStyleSheet(
+                f"color:{COLORS.get('warning', '#facc15')};"
+                f"background:{COLORS.get('warning_dim', COLORS['border'])};"
+                f"border:none;border-radius:4px;"
+            )
+
+    def _build_queue_panel(self, paths: List[str]):
+        """Populate the queue panel for a fresh batch of paths."""
+        # Clear old rows
+        for w in list(self._queue_rows.values()):
+            w.setParent(None)
+            w.deleteLater()
+        self._queue_rows.clear()
+
+        if not paths:
+            self._queue_frame.setVisible(False)
+            return
+
+        # Header label — lives above the inner layout in the outer frame.
+        # Remove any stale header from a previous batch before inserting a fresh one.
+        if self._queue_hdr is not None:
+            self._queue_hdr.setParent(None)
+            self._queue_hdr.deleteLater()
+            self._queue_hdr = None
+        self._queue_hdr = QLabel("Queue")
+        self._queue_hdr.setFont(font(10, "bold"))
+        self._queue_hdr.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
+        self._queue_frame.layout().insertWidget(0, self._queue_hdr)
+
+        for p in paths:
+            row = self._make_queue_row(p, "queued")
+            # Insert before the trailing stretch so rows stay pinned to the top
+            self._queue_col.insertWidget(self._queue_col.count() - 1, row)
+            self._queue_rows[p] = row
+
+        self._queue_frame.setVisible(True)
 
     # ── Scan ─────────────────────────────────────────────────────────────────
+
+    def _queue_scans(self, paths: List[str]):
+        """Enqueue one or more paths, build the queue panel, and kick off first scan."""
+        # Clear any previous results/state before a fresh batch
+        self._clear_results()
+        self._pending_paths = list(paths)
+        self._build_queue_panel(paths)
+        self._run_next_scan()
+
+    def _run_next_scan(self):
+        """Pop the next path from the queue and scan it, or stop if empty."""
+        if not self._pending_paths:
+            return
+        path = self._pending_paths.pop(0)
+        self._run_scan(path)
 
     def _run_scan(self, path: str):
         if not _SCANNER_OK:
             self._notify(t("add_vehicles.scanner_unavailable", default="Mod scanner not available."), "error")
             return
 
-        # Clean up any previous temp extraction / worker
-        self._cleanup_temp()
         if self._worker and self._worker.isRunning():
             self._worker.quit()
             self._worker.wait(500)
@@ -624,86 +867,102 @@ class _SmartImportCard(QFrame):
             except Exception:
                 known = set()
 
-        # ── Show loading state ────────────────────────────────────────────────
-        self._path_lbl.setText(f"📂 {path}")
-        self._path_lbl.setVisible(True)
+        # ── Active scan panel ─────────────────────────────────────────────────
+        name = os.path.basename(path)
+        self._active_scan_name.setText(f"Scanning  {name}")
+        self._active_scan_dots.setText("")
+        self._active_scan_frame.setVisible(True)
         self._set_scanning(True)
 
-        # Clear old rows
-        for row in self._rows:
-            row.setParent(None)
-            row.deleteLater()
-        self._rows.clear()
-        self._list_frame.setVisible(False)
-        self._add_btn.setVisible(False)
-        self._select_all_btn.setVisible(False)
+        # Mark this path as "scanning" in the queue panel
+        if path in self._queue_rows:
+            self._set_queue_chip(self._queue_rows[path], "scanning")
 
         # ── Launch background worker ──────────────────────────────────────────
         self._worker = _ScanWorker(path, known, parent=self)
         self._worker.finished.connect(
             lambda veh, var, tmp, p=path: self._on_scan_finished(veh, var, tmp, p)
         )
-        self._worker.failed.connect(self._on_scan_failed)
+        self._worker.failed.connect(lambda err, pth, p=path: self._on_scan_failed(err, p))
+        # Auto-cleanup: disconnect signals and schedule deletion once the
+        # thread finishes so no stale connections fire on reuse.
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._worker.failed.connect(self._worker.deleteLater)
         self._worker.start()
 
     def _set_scanning(self, active: bool):
-        """Show/hide the animated scanning label and disable/enable browse buttons."""
+        """Enable/disable browse buttons and drive the animated dots."""
         self._btn_folder.setEnabled(not active)
         self._btn_zip.setEnabled(not active)
         if active:
             self._dot_count = 0
-            self._status_lbl.setText(t("add_vehicles.scanning", default="🔍  Scanning"))
-            self._status_lbl.setStyleSheet(
-                f"color:{COLORS['accent']};background:transparent;"
-            )
-            self._status_lbl.setVisible(True)
+            self._active_scan_dots.setText(".")
             self._dot_timer.start()
         else:
             self._dot_timer.stop()
-            self._status_lbl.setStyleSheet(
-                f"color:{COLORS['text_secondary']};background:transparent;"
-            )
+            self._active_scan_dots.setText("")
 
     def _tick_dots(self):
-        """Animate trailing dots on the scanning label."""
         self._dot_count = (self._dot_count + 1) % 4
-        self._status_lbl.setText(t("add_vehicles.scanning", default="🔍  Scanning") + "." * self._dot_count)
+        self._active_scan_dots.setText("." * max(1, self._dot_count))
 
     def _on_scan_finished(self, vehicles, variants, tmp, path: str):
         self._set_scanning(False)
-        self._temp_dir = tmp
+        if tmp:
+            self._temp_dirs.append(tmp)
 
         items     = vehicles if self._mode == "vehicles" else variants
         mod_label = os.path.basename(path)
+        found     = len(items)
+
+        # Mark finished row as "done" in the queue panel (keep it visible)
+        if path in self._queue_rows:
+            self._set_queue_chip(self._queue_rows[path], "done")
+
+        # Update active scan label to show result before hiding/moving on
+        if found:
+            self._active_scan_name.setText(
+                f"✓  {mod_label}  —  {found} item(s) found"
+            )
+        else:
+            self._active_scan_name.setText(f"—  {mod_label}  —  nothing found")
 
         if not items:
-            status = (
-                t("add_vehicles.no_vehicles_found", mod=mod_label,
-                  default=f"No vehicles found in \"{mod_label}\".")
-                if self._mode == "vehicles"
-                else t("add_vehicles.no_variants_found", mod=mod_label,
-                       default=f"No variants found in \"{mod_label}\".")
-            )
-            self._status_lbl.setText(status)
-            self._status_lbl.setVisible(True)
+            if not self._rows:
+                self._status_lbl.setText(
+                    t("add_vehicles.no_vehicles_found", mod=mod_label,
+                      default=f"No vehicles found in \"{mod_label}\".")
+                    if self._mode == "vehicles"
+                    else t("add_vehicles.no_variants_found", mod=mod_label,
+                           default=f"No variants found in \"{mod_label}\".")
+                )
+                self._status_lbl.setVisible(True)
+            self._run_next_scan()
             return
 
-        # ── Build rows ────────────────────────────────────────────────────────
-        count = len(items)
-        ready = sum(1 for i in items if i.ready)
-        self._status_lbl.setText(
-            t("add_vehicles.found_items", count=count, mod=mod_label, ready=ready,
-              default=f"Found {count} item(s) in \"{mod_label}\" ({ready} ready to import).")
-        )
-        self._status_lbl.setVisible(True)
-        self._list_frame.setVisible(True)
-        self._add_btn.setVisible(True)
-        self._select_all_btn.setVisible(count > 1)
-        self._add_btn.setText(
-            t("add_vehicles.add_checked_count_btn", count=ready, default=f"Add Checked ({ready})")
-        )
-
+        # ── Filter out already-existing vehicles ──────────────────────────────
+        # Skip any item whose carid already exists as a built-in or
+        # previously-imported vehicle so duplicates never appear in the list.
+        new_items: list = []
+        skipped_existing: int = 0
         for item in items:
+            if self._mode == "vehicles" and _carid_exists(item.carid):
+                skipped_existing += 1
+                print(f"[add_vehicles] Skipping already-existing vehicle: {item.carid}")
+            else:
+                new_items.append(item)
+
+        if skipped_existing and not new_items:
+            # Everything was filtered — silently move on
+            print(f"[add_vehicles] All vehicles in \"{mod_label}\" already exist, skipping.")
+            if not self._pending_paths:
+                self._active_scan_frame.setVisible(False)
+                self._queue_frame.setVisible(False)
+            self._run_next_scan()
+            return
+
+        # ── Append rows ───────────────────────────────────────────────────────
+        for item in new_items:
             if self._mode == "vehicles":
                 row = _DiscoveredVehicleRow(item, self._list_frame)
             else:
@@ -712,32 +971,106 @@ class _SmartImportCard(QFrame):
             self._rows.append(row)
             fade_in(row, 120)
 
-    def _on_scan_failed(self, error: str):
+        total = len(self._rows)
+        ready = sum(1 for r in self._rows if self._row_item(r).ready)
+
+        # Hide active scan and queue panels once the whole queue is exhausted
+        if not self._pending_paths:
+            self._active_scan_frame.setVisible(False)
+            self._queue_frame.setVisible(False)
+
+        if skipped_existing:
+            print(f"[add_vehicles] {skipped_existing} already-existing vehicle(s) hidden from results.")
+        self._status_lbl.setText(
+            t("add_vehicles.found_items", count=total, ready=ready,
+              default=f"Found {total} item(s) — {ready} ready to import.")
+        )
+        self._status_lbl.setVisible(True)
+        self._list_frame.setVisible(True)
+        self._add_btn.setVisible(True)
+        self._select_all_btn.setVisible(total > 1)
+        self._add_btn.setText(
+            t("add_vehicles.add_checked_count_btn", count=ready,
+              default=f"Add Checked ({ready})")
+        )
+
+        self._run_next_scan()
+
+    def _on_scan_failed(self, error: str, path: str = ""):
         self._set_scanning(False)
+        if path in self._queue_rows:
+            self._set_queue_chip(self._queue_rows[path], "failed")
+        name = os.path.basename(path) if path else "unknown"
+        self._active_scan_name.setText(f"✗  {name}  —  scan failed")
         self._notify(t("add_vehicles.scan_failed", error=error, default=f"Scan failed: {error}"), "error")
+        if not self._pending_paths:
+            self._active_scan_frame.setVisible(False)
+        self._run_next_scan()
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _row_item(row):
+        """Return the DiscoveredVehicle or DiscoveredVariant attached to a row."""
+        return row.vehicle if hasattr(row, "vehicle") else row.variant
 
     # ── Actions ──────────────────────────────────────────────────────────────
 
     def _select_all(self):
-        for row in self._rows:
-            if row.vehicle.ready if hasattr(row, 'vehicle') else row.variant.ready:
-                row._chk.setChecked(True)
+        """Toggle between Select All and Deselect All."""
+        ready_rows = [r for r in self._rows if self._row_item(r).ready]
+        all_checked = all(r.is_checked for r in ready_rows)
+        for row in ready_rows:
+            row._chk.setChecked(not all_checked)
+        self._select_all_btn.setText(
+            t("add_vehicles.deselect_all_btn", default="Deselect All")
+            if not all_checked
+            else t("add_vehicles.select_all_btn", default="Select All")
+        )
 
     def _on_add_checked(self):
+        if not _BACKEND_OK:
+            self._notify(t("add_vehicles.scanner_unavailable", default="Backend not available."), "error")
+            return
         checked = [r for r in self._rows if r.is_checked]
         if not checked:
             self._notify(t("add_vehicles.no_items_selected", default="No items selected."), "warning")
             return
 
-        added   = 0
-        skipped = 0
+        # Build task list: (original row index, item, display_name)
+        tasks = [
+            (self._rows.index(r), self._row_item(r), r.display_name)
+            for r in checked
+        ]
 
-        for row in checked:
-            ok = self._add_one(row)
-            if ok:
-                added += 1
-            else:
-                skipped += 1
+        # Lock UI during import
+        self._add_btn.setEnabled(False)
+        self._add_btn.setText(
+            t("add_vehicles.importing_btn", count=len(tasks),
+              default=f"Importing {len(tasks)}…")
+        )
+        self._select_all_btn.setEnabled(False)
+        self._btn_folder.setEnabled(False)
+        self._btn_zip.setEnabled(False)
+
+        self._import_worker = _ImportWorker(tasks, self._mode, parent=self)
+        self._import_worker.item_done.connect(self._on_item_imported)
+        self._import_worker.all_finished.connect(self._on_import_finished)
+        self._import_worker.finished.connect(self._import_worker.deleteLater)
+        self._import_worker.start()
+
+    def _on_item_imported(self, row_index: int, ok: bool):
+        """Called on the main thread after each item finishes importing."""
+        if ok and row_index < len(self._rows):
+            row = self._rows[row_index]
+            # Grey the row out visually so it's clear it's done
+            row.setEnabled(False)
+            row.setStyleSheet(row.styleSheet() + " opacity: 0.4;")
+
+    def _on_import_finished(self, added: int, skipped: int):
+        """Called on the main thread once all items have been processed."""
+        self._btn_folder.setEnabled(True)
+        self._btn_zip.setEnabled(True)
 
         if added:
             self._notify(
@@ -746,8 +1079,7 @@ class _SmartImportCard(QFrame):
                 "success",
             )
             self.items_added.emit()
-            # Clear results after successful import
-            self._clear_results()
+
         if skipped:
             self._notify(
                 t("add_vehicles.import_failed_count", count=skipped,
@@ -755,43 +1087,7 @@ class _SmartImportCard(QFrame):
                 "error",
             )
 
-    def _add_one(self, row) -> bool:
-        if not _BACKEND_OK:
-            return False
-        try:
-            if self._mode == "vehicles":
-                v  = row.vehicle
-                ok = process_custom_vehicle(
-                    carid      = v.carid,
-                    carname    = row.display_name,
-                    json_path  = v.json_path,
-                    jbeam_path = v.jbeam_path,
-                    image_path = v.image_path,
-                )
-                # Copy any UV-layout images found during scanning so that
-                # CarListTab can show the "Get UV Map" button offline.
-                if ok:
-                    _copy_uv_maps_to_images(v.carid, getattr(v, "uv_map_paths", []))
-                return ok
-            else:
-                v  = row.variant
-                ok = process_custom_variant(
-                    carid          = v.carid,
-                    variant_suffix = v.suffix,
-                    json_path      = v.json_path,
-                    jbeam_path     = v.jbeam_path,
-                    image_path     = v.image_path,
-                )
-                # Copy any UV-layout images so CarListTab can offer
-                # "Get UV Map" for the parent vehicle without BeamNG installed.
-                if ok:
-                    _copy_uv_maps_to_images(v.carid, getattr(v, "uv_map_paths", []))
-                return ok
-        except Exception as e:
-            import traceback
-            print(f"[ERROR] _add_one failed: {type(e).__name__}: {e}")
-            traceback.print_exc()
-            return False
+        self._clear_results()
 
     def _clear_results(self):
         for row in self._rows:
@@ -802,16 +1098,35 @@ class _SmartImportCard(QFrame):
         self._add_btn.setVisible(False)
         self._select_all_btn.setVisible(False)
         self._status_lbl.setVisible(False)
-        self._path_lbl.setVisible(False)
+        self._active_scan_frame.setVisible(False)
+        # Tear down queue panel rows
+        for w in list(self._queue_rows.values()):
+            w.setParent(None)
+            w.deleteLater()
+        self._queue_rows.clear()
+        # Remove the header label from the outer frame layout
+        if self._queue_hdr is not None:
+            self._queue_hdr.setParent(None)
+            self._queue_hdr.deleteLater()
+            self._queue_hdr = None
+        # Remove row widgets from the inner layout.
+        # Count-1 keeps the trailing stretch in place so the layout stays valid.
+        while self._queue_col.count() > 1:
+            item = self._queue_col.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+        self._queue_frame.setVisible(False)
+        self._pending_paths.clear()
         self._cleanup_temp()
 
     def _cleanup_temp(self):
-        if self._temp_dir and os.path.isdir(self._temp_dir):
-            try:
-                shutil.rmtree(self._temp_dir, ignore_errors=True)
-            except Exception:
-                pass
-        self._temp_dir = None
+        for td in self._temp_dirs:
+            if td and os.path.isdir(td):
+                try:
+                    shutil.rmtree(td, ignore_errors=True)
+                except Exception:
+                    pass
+        self._temp_dirs.clear()
 
     def __del__(self):
         self._cleanup_temp()
@@ -1286,8 +1601,7 @@ class _VehiclesTab(QWidget):
             self._notify(t("add_vehicles.notification.select_jbeam", default="Select a JBEAM file."), "warning")
             return
 
-        existing = load_added_vehicles_json() if _BACKEND_OK else {}
-        if carid in existing:
+        if _carid_exists(carid):
             self._notify(
                 t("add_vehicles.notification.vehicle_already_exists",
                   carid=carid, default=f"Vehicle '{carid}' already exists."),

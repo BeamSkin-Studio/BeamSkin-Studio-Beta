@@ -320,7 +320,7 @@ def show_wip_warning(parent: QWidget) -> None:
 ### Discord notice dialog
 
 DISCORD_URL = "https://discord.gg/mbr3YxZzrr"
-_OK_DELAY_MS = 15_000   # 15 seconds before OK becomes clickable
+_OK_DELAY_MS = 20_000   # 20 seconds before OK becomes clickable
 
 
 def show_discord_notice(parent: QWidget) -> None:
@@ -363,13 +363,13 @@ def show_discord_notice(parent: QWidget) -> None:
 
     # ── Icon + title row ──────────────────────────────────────────────────────
     icon_lbl = QLabel("📢")
-    icon_lbl.setFont(font(44))
+    icon_lbl.setFont(font(84))
     icon_lbl.setAlignment(Qt.AlignCenter)
     icon_lbl.setStyleSheet("background: transparent; border: none;")
     root.addWidget(icon_lbl)
 
     title_lbl = QLabel("Important Notice from the Developer")
-    title_lbl.setFont(font(17, "bold"))
+    title_lbl.setFont(font(24, "bold"))
     title_lbl.setAlignment(Qt.AlignCenter)
     title_lbl.setWordWrap(True)
     title_lbl.setStyleSheet(

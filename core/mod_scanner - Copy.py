@@ -204,8 +204,13 @@ def _scan_folder(
 
 
 def _find_vehicles_dir(root: str) -> Optional[str]:
-    """Search the full tree for the first vehicles/ directory."""
-    for dirpath, _dirnames, _ in os.walk(root):
+    """Search up to 3 levels deep for a vehicles/ directory."""
+    for dirpath, dirnames, _ in os.walk(root):
+        rel = os.path.relpath(dirpath, root)
+        depth = 0 if rel == "." else len(rel.split(os.sep))
+        if depth > 3:
+            dirnames.clear()
+            continue
         if os.path.basename(dirpath).lower() == "vehicles":
             return dirpath
     return None
@@ -282,13 +287,29 @@ def _scan_for_variants(carid: str, car_dir: str) -> List[DiscoveredVariant]:
 
 
 def _list_vehicle_files(car_dir: str, suffix: str) -> List[str]:
-    """Return files matching suffix anywhere under car_dir (full recursive walk)."""
+    """Return files matching suffix in car_dir and one level of subdirectories."""
     results: List[str] = []
     suffix_lower = suffix.lower()
-    for dirpath, _dirs, filenames in os.walk(car_dir):
-        for fn in sorted(filenames):
-            if fn.lower().endswith(suffix_lower):
-                results.append(os.path.join(dirpath, fn))
+    try:
+        entries = sorted(os.scandir(car_dir), key=lambda e: e.name.lower())
+    except OSError:
+        return results
+
+    subdirs: List[str] = []
+    for e in entries:
+        if e.is_file(follow_symlinks=False) and e.name.lower().endswith(suffix_lower):
+            results.append(e.path)
+        elif e.is_dir(follow_symlinks=False):
+            subdirs.append(e.path)
+
+    for sd in subdirs:
+        try:
+            for e in sorted(os.scandir(sd), key=lambda e: e.name.lower()):
+                if e.is_file(follow_symlinks=False) and e.name.lower().endswith(suffix_lower):
+                    results.append(e.path)
+        except OSError:
+            pass
+
     return results
 
 

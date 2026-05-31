@@ -233,6 +233,13 @@ def _split_project_key(key: str):
     return key, ""
 
 
+_ILLEGAL_NAME_CHARS = set('\\/:*?"<>|')
+
+def _find_illegal_chars(name: str):
+    """Return a sorted list of illegal filename characters found in *name*."""
+    return sorted({c for c in name if c in _ILLEGAL_NAME_CHARS})
+
+
 #  GENERATOR TAB
 
 
@@ -1332,6 +1339,15 @@ class GeneratorTab(QWidget):
             )
             return
 
+        _bad = _find_illegal_chars(skin_name)
+        if _bad:
+            self.show_notification(
+                f"Skin name contains invalid character(s): {' '.join(_bad)}\n"
+                f'Avoid: \\ / : * ? " < > |',
+                "error", 6000,
+            )
+            return
+
         is_colorable = self._colorable_toggle.isChecked()
         is_var       = self._is_variant()
 
@@ -1601,6 +1617,15 @@ class GeneratorTab(QWidget):
 
         if not skin_name:
             self.show_notification(t("project.notification.skin_name_required"), "error")
+            return
+
+        _bad = _find_illegal_chars(skin_name)
+        if _bad:
+            self.show_notification(
+                f"Skin name contains invalid character(s): {' '.join(_bad)}\n"
+                f'Avoid: \\ / : * ? " < > |',
+                "error", 6000,
+            )
             return
 
         skins = self.project_data["cars"][self.selected_car_for_skin]["skins"]
