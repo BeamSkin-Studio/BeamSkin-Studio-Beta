@@ -48,7 +48,7 @@ CHANGELOGS = [
         "entries": [
             title("⚙️ Improvements"),
             subtitle("Auto add vehicle mod"),
-            item("ZIPs: You can now add multiple mods att the same time"),
+            item("ZIPs: You can now add multiple mods at the same time"),
             subtitle("Mod scanner"),
             item("I have made some improvements on the mod scanner, less chance that it will fail\n\nNOTE:\nPlease remove all your added vehicles and re add them"),
             separator(),
