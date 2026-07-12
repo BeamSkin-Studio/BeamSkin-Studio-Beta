@@ -3,11 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BeamSkin Studio</title>
+<title>Burzt_YT — Projects</title>
+<meta name="description" content="BeamNG.drive and Euro Truck Simulator 2 tools by Burzt_YT — BeamSkin Studio, UV-Exporter, and HaulHUD.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,700&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+/* ============================================
+   BURZT_YT — Shared Design System
+   Used across hub + all project pages
+   ============================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -30,6 +35,32 @@
   --font-head: 'Barlow Condensed', sans-serif;
   --font-body: 'Barlow', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* Per-project accent overrides (set on <body data-page="...">) */
+  --proj-accent: var(--accent);
+  --proj-accent-lo: var(--accent-lo);
+  --proj-accent-md: var(--accent-md);
+  --proj-accent-hi: var(--accent-hi);
+}
+
+/* Project accent themes */
+body[data-page="beamskin"], body[data-page="hub"] {
+  --proj-accent: #ff6600;
+  --proj-accent-lo: rgba(255,102,0,.08);
+  --proj-accent-md: rgba(255,102,0,.18);
+  --proj-accent-hi: rgba(255,102,0,.55);
+}
+body[data-page="uvexporter"] {
+  --proj-accent: #3ba9ff;
+  --proj-accent-lo: rgba(59,169,255,.08);
+  --proj-accent-md: rgba(59,169,255,.18);
+  --proj-accent-hi: rgba(59,169,255,.55);
+}
+body[data-page="haulhud"] {
+  --proj-accent: #4ade80;
+  --proj-accent-lo: rgba(74,222,128,.08);
+  --proj-accent-md: rgba(74,222,128,.18);
+  --proj-accent-hi: rgba(74,222,128,.55);
 }
 
 html { scroll-behavior: smooth; }
@@ -52,12 +83,14 @@ body::after {
   transform: translateX(-50%);
   width: 900px;
   height: 400px;
-  background: radial-gradient(ellipse, rgba(255,102,0,.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, var(--proj-accent-lo) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* LIGHTBOX */
+a { color: inherit; }
+
+/* ============ LIGHTBOX ============ */
 .lightbox {
   display: none;
   position: fixed;
@@ -77,17 +110,19 @@ body::after {
 .lightbox-close { position:fixed;top:18px;right:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:.85rem;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s,border-color .2s;z-index:10000; }
 .lightbox-close:hover { background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3); }
 
-/* NAVBAR */
+/* ============ NAVBAR ============ */
 .navbar { position:sticky;top:0;z-index:900;backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px);background:rgba(24,24,24,.92);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 24px;gap:0; }
 .nav-brand { display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0; }
-.nav-logo { height:28px;filter:drop-shadow(0 0 8px rgba(255,102,0,.5)); }
-.nav-wordmark { font-family:var(--font-head);font-weight:800;font-size:1.18rem;letter-spacing:.1em;color:var(--text);text-transform:uppercase; }
-.nav-wordmark span { color:var(--accent); }
+.nav-logo-mark { height:28px;width:28px;border-radius:7px;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);display:flex;align-items:center;justify-content:center;color:var(--proj-accent);font-size:.85rem;flex-shrink:0; }
+.nav-wordmark { font-family:var(--font-head);font-weight:800;font-size:1.18rem;letter-spacing:.1em;color:var(--text);text-transform:uppercase;white-space:nowrap; }
+.nav-wordmark span { color:var(--proj-accent); }
+.nav-crumb { display:flex;align-items:center;gap:8px;margin-left:14px;padding-left:14px;border-left:1px solid var(--border);color:var(--text-3);font-family:var(--font-head);font-weight:700;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap; }
+.nav-crumb i { font-size:.65rem; }
 .nav-tabs { display:flex;align-items:center;gap:2px;margin-left:32px;flex:1; }
 .nav-tab { font-family:var(--font-head);font-weight:700;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);padding:7px 14px;border-radius:6px;border:none;background:transparent;cursor:pointer;transition:color .2s,background .2s;position:relative; }
-.nav-tab::after { content:'';position:absolute;bottom:0;left:50%;right:50%;height:2px;background:var(--accent);border-radius:2px 2px 0 0;transition:left .25s,right .25s; }
+.nav-tab::after { content:'';position:absolute;bottom:0;left:50%;right:50%;height:2px;background:var(--proj-accent);border-radius:2px 2px 0 0;transition:left .25s,right .25s; }
 .nav-tab:hover { color:var(--text);background:var(--bg-2); }
-.nav-tab.active { color:var(--accent); }
+.nav-tab.active { color:var(--proj-accent); }
 .nav-tab.active::after { left:12px;right:12px; }
 .nav-socials { display:flex;align-items:center;gap:6px;margin-left:auto; }
 .soc-btn { display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg-2);color:var(--text-2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-decoration:none;font-family:var(--font-head);text-transform:uppercase;transition:border-color .2s,color .2s,background .2s,box-shadow .2s; }
@@ -97,7 +132,7 @@ body::after {
 .soc-btn.patreon:hover { color:#f96854;border-color:rgba(249,104,84,.35);box-shadow:0 0 12px rgba(249,104,84,.12); }
 .soc-btn.linktree:hover { color:#39e09b;border-color:rgba(57,224,155,.35);box-shadow:0 0 12px rgba(57,224,155,.12); }
 
-/* WIP BANNER */
+/* ============ WIP BANNER ============ */
 .wip-banner { background:rgba(245,158,11,.05);border-bottom:1px solid rgba(245,158,11,.15);padding:9px 24px;display:flex;align-items:flex-start;gap:10px;font-size:.79rem;color:var(--text-2);flex-wrap:wrap;position:relative;z-index:1; }
 .wip-icon { color:var(--amber);flex-shrink:0;margin-top:2px; }
 .wip-content { flex:1;min-width:200px; }
@@ -110,73 +145,76 @@ body::after {
 .wip-dismiss { background:none;border:none;color:var(--text-3);cursor:pointer;font-size:.8rem;padding:2px;flex-shrink:0;margin-top:1px;transition:color .2s; }
 .wip-dismiss:hover { color:var(--text-2); }
 
-/* LAYOUT */
+/* ============ LAYOUT ============ */
 .page-wrap { max-width:1380px;margin:0 auto;padding:0 24px;position:relative;z-index:1; }
 .tab-panel { display:none;padding:36px 0 60px; }
 .tab-panel.active { display:block; }
 
-/* HERO */
+/* ============ HERO (project pages) ============ */
 .hero { display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:start;padding-bottom:44px;border-bottom:1px solid var(--border); }
-.hero-badge { display:inline-flex;align-items:center;gap:7px;font-family:var(--font-head);font-weight:700;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-md);background:var(--accent-lo);padding:4px 12px;border-radius:30px;margin-bottom:18px; }
-.hero-badge .dot { width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite; }
-@keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,102,0,.5)} 50%{opacity:.7;box-shadow:0 0 0 5px rgba(255,102,0,0)} }
+.hero-badge { display:inline-flex;align-items:center;gap:7px;font-family:var(--font-head);font-weight:700;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--proj-accent);border:1px solid var(--proj-accent-md);background:var(--proj-accent-lo);padding:4px 12px;border-radius:30px;margin-bottom:18px; }
+.hero-badge .dot { width:6px;height:6px;border-radius:50%;background:var(--proj-accent);animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.5} }
 .hero-title { font-family:var(--font-head);font-weight:900;font-size:4.6rem;line-height:.93;letter-spacing:-.01em;text-transform:uppercase;color:var(--text);margin-bottom:6px; }
-.hero-title .ac { color:var(--accent); }
+.hero-title .ac { color:var(--proj-accent); }
 .hero-title .dim { color:var(--text-2); }
 .hero-sub { font-size:.98rem;color:var(--text-2);line-height:1.7;margin-bottom:30px;max-width:420px; }
 .hero-actions { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px; }
 .dl-btn { display:flex;flex-direction:column;align-items:center;padding:13px 22px;border-radius:10px;border:none;cursor:pointer;font-family:var(--font-head);font-weight:800;letter-spacing:.07em;text-transform:uppercase;transition:transform .2s,filter .2s;min-width:175px; }
 .dl-btn:hover { transform:translateY(-2px);filter:brightness(1.12); }
 .dl-btn:active { transform:none; }
-.dl-btn-win { background:var(--accent);color:#000;box-shadow:0 0 28px rgba(255,102,0,.32),0 4px 18px rgba(255,102,0,.22); }
+.dl-btn-win { background:var(--proj-accent);color:#000;box-shadow:0 0 28px var(--proj-accent-hi),0 4px 18px var(--proj-accent-md); }
 .dl-btn-linux { background:var(--amber);color:#000;box-shadow:0 0 28px rgba(245,158,11,.28),0 4px 18px rgba(245,158,11,.18); }
 .btn-label { display:flex;align-items:center;gap:8px;font-size:.86rem;color:#000; }
 .btn-ver { font-size:.78rem;font-weight:700;font-family:var(--font-body);letter-spacing:.02em;text-transform:none;margin-top:2px;color:#000; }
 .btn-count { font-size:.74rem;font-weight:600;font-family:var(--font-body);text-transform:none;color:#000; }
 .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:10px; }
 .stat-card { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:13px 15px;display:flex;align-items:center;gap:11px;transition:border-color .2s; }
-.stat-card:hover { border-color:var(--accent-md); }
-.stat-icon { width:34px;height:34px;border-radius:9px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.82rem;flex-shrink:0; }
+.stat-card:hover { border-color:var(--proj-accent-md); }
+.stat-icon { width:34px;height:34px;border-radius:9px;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);display:flex;align-items:center;justify-content:center;color:var(--proj-accent);font-size:.82rem;flex-shrink:0; }
 .stat-icon.amb { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
 .stat-label { font-size:.64rem;font-family:var(--font-head);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:1px; }
 .stat-value { font-size:1.18rem;font-weight:700;font-family:var(--font-head);color:var(--text); }
 
-/* VIEWER */
-.viewer-frame { border-radius:12px;border:1px solid var(--border-2);overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;box-shadow:0 0 40px rgba(255,102,0,.1),0 20px 60px rgba(0,0,0,.5);margin-bottom:10px; }
+/* ============ VIEWER / GALLERY ============ */
+.viewer-frame { border-radius:12px;border:1px solid var(--border-2);overflow:hidden;background:#000;aspect-ratio:16/9;position:relative;box-shadow:0 0 40px var(--proj-accent-lo),0 20px 60px rgba(0,0,0,.5);margin-bottom:10px; }
 #vVideo { position:absolute;inset:0;width:100%;height:100%;border:none;display:block; }
 #vImg { position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none;cursor:zoom-in;transition:opacity .15s; }
 #vImg:hover { opacity:.88; }
+.viewer-placeholder { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-3);background:var(--bg-1); }
+.viewer-placeholder i { font-size:2rem;color:var(--proj-accent-md); }
+.viewer-placeholder span { font-family:var(--font-head);font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase; }
 .viewer-zoom-hint { position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-family:var(--font-head);font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:5px;display:none;align-items:center;gap:5px;pointer-events:none;z-index:2; }
 .viewer-frame:hover .viewer-zoom-hint { display:flex; }
 .gallery-label { font-family:var(--font-head);font-weight:700;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px;display:flex;align-items:center;gap:6px; }
-.gallery-label i { color:var(--accent); }
+.gallery-label i { color:var(--proj-accent); }
 .g-row { display:grid;gap:7px;margin-bottom:10px; }
 .g-row-3 { grid-template-columns:repeat(3,1fr); }
 .g-row-4 { grid-template-columns:repeat(4,1fr); }
 .g-card { border-radius:7px;overflow:hidden;cursor:pointer;border:1px solid var(--border);position:relative;transition:border-color .2s,box-shadow .2s,transform .15s;aspect-ratio:16/9;background:var(--bg-1); }
 .g-card img { width:100%;height:100%;object-fit:cover;opacity:.4;transition:opacity .25s;display:block; }
-.g-card .g-label { position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent);padding:8px 6px 5px;font-family:var(--font-head);font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);text-align:center; }
-.g-card:hover { border-color:var(--accent-hi);transform:scale(1.02); }
+.g-card .g-label { position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.85),transparent);padding:8px 6px 5px;font-family:var(--font-head);font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--proj-accent);text-align:center; }
+.g-card:hover { border-color:var(--proj-accent-hi);transform:scale(1.02); }
 .g-card:hover img,.g-card.active img { opacity:1; }
-.g-card.active { border-color:var(--accent);box-shadow:0 0 12px var(--accent-hi); }
+.g-card.active { border-color:var(--proj-accent);box-shadow:0 0 12px var(--proj-accent-hi); }
 .gh-link { display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;color:var(--text-3);text-decoration:none;transition:color .2s;margin-top:6px; }
-.gh-link:hover { color:var(--accent); }
+.gh-link:hover { color:var(--proj-accent); }
 
-/* SECTION DIVIDER */
+/* ============ SECTION DIVIDER ============ */
 .sec-div { display:flex;align-items:center;gap:14px;margin:40px 0 22px; }
 .sec-div-line { flex:1;height:1px;background:var(--border); }
 .sec-div-title { font-family:var(--font-head);font-weight:800;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--text-3);white-space:nowrap;display:flex;align-items:center;gap:8px; }
-.sec-div-title i { color:var(--accent); }
+.sec-div-title i { color:var(--proj-accent); }
 
-/* QUICK FEATURES */
+/* ============ QUICK FEATURES ============ */
 .qf-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px; }
 .qf-card { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start;transition:border-color .2s,transform .2s; }
-.qf-card:hover { border-color:var(--accent-md);transform:translateY(-2px); }
-.qf-icon { width:32px;height:32px;border-radius:8px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.78rem;flex-shrink:0; }
+.qf-card:hover { border-color:var(--proj-accent-md);transform:translateY(-2px); }
+.qf-icon { width:32px;height:32px;border-radius:8px;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);display:flex;align-items:center;justify-content:center;color:var(--proj-accent);font-size:.78rem;flex-shrink:0; }
 .qf-title { font-family:var(--font-head);font-weight:700;font-size:.82rem;letter-spacing:.04em;color:var(--text);margin-bottom:3px;text-transform:uppercase; }
 .qf-desc { font-size:.74rem;color:var(--text-2);line-height:1.6; }
 
-/* COMMUNITY */
+/* ============ COMMUNITY ============ */
 .community-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
 .comm-card { border-radius:12px;padding:20px;display:flex;gap:14px;align-items:flex-start;text-decoration:none;transition:transform .2s,border-color .2s;border:1px solid transparent; }
 .comm-card:hover { transform:translateY(-3px); }
@@ -196,21 +234,22 @@ body::after {
 .comm-linktree .comm-icon { background:rgba(57,224,155,.08);color:#39e09b; }
 .comm-linktree .comm-title { color:#39e09b; }
 
-/* FEATURES TAB */
+/* ============ FEATURES TAB ============ */
 .tab-heading { font-family:var(--font-head);font-weight:900;font-size:3.2rem;text-transform:uppercase;color:var(--text);line-height:1;margin-bottom:6px; }
-.tab-heading span { color:var(--accent); }
+.tab-heading span { color:var(--proj-accent); }
 .tab-sub { color:var(--text-2);font-size:.9rem;margin-bottom:28px; }
 .feat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
 .feat-card { background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:border-color .25s,transform .25s; }
-.feat-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--accent),transparent);opacity:0;transition:opacity .25s; }
-.feat-card:hover { border-color:var(--accent-md);transform:translateY(-3px); }
+.feat-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--proj-accent),transparent);opacity:0;transition:opacity .25s; }
+.feat-card:hover { border-color:var(--proj-accent-md);transform:translateY(-3px); }
 .feat-card:hover::before { opacity:1; }
 .feat-head { display:flex;align-items:flex-start;gap:12px;margin-bottom:10px; }
-.feat-icon { width:38px;height:38px;border-radius:10px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.88rem;flex-shrink:0; }
+.feat-icon { width:38px;height:38px;border-radius:10px;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);display:flex;align-items:center;justify-content:center;color:var(--proj-accent);font-size:.88rem;flex-shrink:0; }
 .feat-title { font-family:var(--font-head);font-weight:800;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text);margin-top:5px; }
 .feat-desc { font-size:.78rem;color:var(--text-2);line-height:1.65; }
+.feat-desc code { font-family:var(--font-mono);font-size:.68rem;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);color:var(--proj-accent);padding:1px 5px;border-radius:4px; }
 
-/* UPCOMING */
+/* ============ UPCOMING ============ */
 .upc-hdr { display:flex;align-items:center;gap:12px;margin:40px 0 18px; }
 .upc-hdr-line { flex:1;height:1px;background:rgba(245,158,11,.15); }
 .upc-hdr-title { font-family:var(--font-head);font-weight:800;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);white-space:nowrap;display:flex;align-items:center;gap:7px; }
@@ -223,18 +262,18 @@ body::after {
 .upc-title { font-family:var(--font-head);font-weight:800;font-size:.88rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin-bottom:5px; }
 .upc-desc { font-size:.76rem;color:var(--text-2);line-height:1.65; }
 
-/* INSTALL TAB */
+/* ============ INSTALL TAB ============ */
 .sub-tabs { display:flex;gap:3px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:22px;width:fit-content; }
 .sub-tab { font-family:var(--font-head);font-weight:700;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);padding:8px 18px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;gap:7px;transition:color .2s,background .2s; }
 .sub-tab i { font-size:.78rem; }
 .sub-tab:hover { color:var(--text);background:var(--bg-2); }
-.sub-tab.active { background:var(--accent-lo);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-md); }
+.sub-tab.active { background:var(--proj-accent-lo);color:var(--proj-accent);box-shadow:inset 0 0 0 1px var(--proj-accent-md); }
 .sub-panel { display:none; }
 .sub-panel.active { display:block; }
 .os-toggle { display:flex;gap:8px;margin-bottom:20px; }
 .os-btn { display:flex;align-items:center;gap:8px;padding:8px 20px;border-radius:8px;border:1px solid var(--border);background:var(--bg-1);color:var(--text-2);font-family:var(--font-head);font-weight:700;font-size:.73rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s; }
 .os-btn:hover { color:var(--text);border-color:var(--border-2); }
-.os-btn.win-on { background:var(--accent-lo);color:var(--accent);border-color:var(--accent-md); }
+.os-btn.win-on { background:var(--proj-accent-lo);color:var(--proj-accent);border-color:var(--proj-accent-md); }
 .os-btn.lin-on { background:var(--amber-lo);color:var(--amber);border-color:var(--amber-md); }
 .os-sect { display:none; }
 .os-sect.active { display:block; }
@@ -246,18 +285,18 @@ body::after {
 .sg4 { grid-template-columns:repeat(4,1fr); }
 .sg3 { grid-template-columns:repeat(3,1fr); }
 .step-card { background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:16px 15px;position:relative;overflow:hidden;transition:border-color .2s; }
-.step-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:0;transition:opacity .2s; }
+.step-card::before { content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--proj-accent);opacity:0;transition:opacity .2s; }
 .step-card.lin::before { background:var(--amber); }
 .step-card:hover::before { opacity:1; }
-.step-card:hover { border-color:rgba(255,102,0,.2); }
+.step-card:hover { border-color:var(--proj-accent-md); }
 .step-card.lin:hover { border-color:rgba(245,158,11,.2); }
-.step-num { font-family:var(--font-head);font-size:2.6rem;font-weight:900;color:rgba(255,102,0,.1);line-height:1;margin-bottom:8px; }
+.step-num { font-family:var(--font-head);font-size:2.6rem;font-weight:900;color:var(--proj-accent-lo);line-height:1;margin-bottom:8px; }
 .step-num.l { color:rgba(245,158,11,.12); }
-.step-icon { width:30px;height:30px;border-radius:8px;background:var(--accent-lo);border:1px solid var(--accent-md);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.76rem;margin-bottom:9px; }
+.step-icon { width:30px;height:30px;border-radius:8px;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);display:flex;align-items:center;justify-content:center;color:var(--proj-accent);font-size:.76rem;margin-bottom:9px; }
 .step-icon.l { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
 .step-label { font-family:var(--font-head);font-weight:800;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text);margin-bottom:5px; }
 .step-desc { font-size:.74rem;color:var(--text-2);line-height:1.65; }
-.step-desc code { font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px; }
+.step-desc code { font-family:var(--font-mono);font-size:.68rem;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);color:var(--proj-accent);padding:1px 5px;border-radius:4px; }
 .step-desc code.l { background:var(--amber-lo);border-color:var(--amber-md);color:var(--amber); }
 .step-tip { margin-top:7px;font-size:.69rem;color:var(--text-3);font-style:italic;line-height:1.5; }
 .opt-badge { display:inline-flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-2);background:var(--bg-2);border-radius:20px;padding:1px 8px;margin-bottom:8px; }
@@ -266,7 +305,7 @@ body::after {
 .lin-info strong { color:var(--amber); }
 .lin-info code { font-family:var(--font-mono);font-size:.7rem;background:var(--amber-lo);border:1px solid var(--amber-md);color:var(--amber);padding:1px 5px;border-radius:4px; }
 
-/* TROUBLESHOOTING */
+/* ============ TROUBLESHOOTING ============ */
 .trouble-list { display:flex;flex-direction:column;gap:6px; }
 .trouble-item { background:var(--bg-1);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s; }
 .trouble-item.open { border-color:var(--border-2); }
@@ -282,51 +321,51 @@ body::after {
 .trouble-item.open .trouble-ans { max-height:500px; }
 .ta-inner { padding:0 16px 14px 56px;font-size:.78rem;color:var(--text-2);line-height:1.75; }
 .ta-inner strong { color:var(--text); }
-.ta-inner code { font-family:var(--font-mono);font-size:.7rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px; }
-.ta-inner a { color:var(--accent);font-weight:700;text-decoration:none; }
+.ta-inner code { font-family:var(--font-mono);font-size:.7rem;background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);color:var(--proj-accent);padding:1px 5px;border-radius:4px; }
+.ta-inner a { color:var(--proj-accent);font-weight:700;text-decoration:none; }
 
-/* RELEASES TAB */
+/* ============ RELEASES TAB ============ */
 .release-row { display:flex;align-items:center;gap:16px;padding:13px 18px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;position:relative;overflow:hidden;transition:border-color .2s; }
-.release-row::before { content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .2s; }
+.release-row::before { content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--proj-accent);opacity:0;transition:opacity .2s; }
 .release-row.lin-row::before { background:var(--amber); }
 .release-row:hover::before { opacity:1; }
-.release-row:hover { border-color:rgba(255,102,0,.2); }
-.release-row.is-latest { border-color:var(--accent-md); }
+.release-row:hover { border-color:var(--proj-accent-md); }
+.release-row.is-latest { border-color:var(--proj-accent-md); }
 .release-row.is-latest.lin-row { border-color:var(--amber-md); }
 .rel-tag { font-family:var(--font-mono);font-weight:500;font-size:.82rem;color:var(--text);min-width:120px;flex-shrink:0;display:flex;align-items:center;gap:8px; }
-.rel-latest-badge { display:inline-flex;align-items:center;gap:4px;font-size:.57rem;font-weight:800;font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-lo);border:1px solid var(--accent-md);border-radius:20px;padding:2px 8px; }
+.rel-latest-badge { display:inline-flex;align-items:center;gap:4px;font-size:.57rem;font-weight:800;font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;color:var(--proj-accent);background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);border-radius:20px;padding:2px 8px; }
 .rel-latest-badge.lin { color:var(--amber);background:var(--amber-lo);border-color:var(--amber-md); }
 .rel-date { font-size:.74rem;color:var(--text-3);min-width:100px;flex-shrink:0; }
 .rel-dl { flex:1;display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-2); }
-.rel-dl i { color:var(--accent);font-size:.68rem; }
+.rel-dl i { color:var(--proj-accent);font-size:.68rem; }
 .rel-dl.lin i { color:var(--amber); }
 .rel-dl .dl-n { font-weight:700;color:var(--text); }
-.rel-dl-btn { flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 16px;border-radius:8px;border:none;background:var(--accent-lo);color:var(--accent);font-family:var(--font-head);font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .2s;text-decoration:none;box-shadow:inset 0 0 0 1px var(--accent-md); }
-.rel-dl-btn:hover { background:rgba(255,102,0,.2); }
+.rel-dl-btn { flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 16px;border-radius:8px;border:none;background:var(--proj-accent-lo);color:var(--proj-accent);font-family:var(--font-head);font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .2s;text-decoration:none;box-shadow:inset 0 0 0 1px var(--proj-accent-md); }
+.rel-dl-btn:hover { background:var(--proj-accent-md); }
 .rel-dl-btn.lin { background:var(--amber-lo);color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber-md); }
 .rel-dl-btn.lin:hover { background:rgba(245,158,11,.2); }
 .rel-no-asset { font-size:.72rem;color:var(--text-3);font-style:italic;padding:7px 16px; }
 .rel-loading { text-align:center;padding:32px;color:var(--text-3);font-size:.85rem; }
 
-/* CHANGELOG TAB */
+/* ============ CHANGELOG TAB ============ */
 .cl-wrap { max-width:740px; }
 .cl-top { display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:26px; }
-.cl-ver { font-family:var(--font-mono);font-size:.74rem;font-weight:700;color:var(--accent);background:var(--accent-lo);border:1px solid var(--accent-md);padding:3px 12px;border-radius:20px; }
+.cl-ver { font-family:var(--font-mono);font-size:.74rem;font-weight:700;color:var(--proj-accent);background:var(--proj-accent-lo);border:1px solid var(--proj-accent-md);padding:3px 12px;border-radius:20px; }
 .cl-date-label { font-family:var(--font-head);font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3); }
-.cl-body { background:var(--bg-1);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px 24px; }
+.cl-body { background:var(--bg-1);border:1px solid var(--border);border-left:3px solid var(--proj-accent);border-radius:12px;padding:22px 24px; }
 .cl-title-el { font-family:var(--font-head);font-weight:800;font-size:1rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text);margin:14px 0 4px; }
 .cl-title-el:first-child { margin-top:0; }
-.cl-sub { font-family:var(--font-head);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:9px 0 3px; }
+.cl-sub { font-family:var(--font-head);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--proj-accent);margin:9px 0 3px; }
 .cl-item-el { font-size:.81rem;color:var(--text-2);padding-left:14px;position:relative;line-height:1.65;margin:2px 0; }
-.cl-item-el::before { content:'·';position:absolute;left:4px;color:var(--accent); }
+.cl-item-el::before { content:'·';position:absolute;left:4px;color:var(--proj-accent); }
 .cl-note-el { font-size:.77rem;color:var(--text-3);font-style:italic;margin:5px 0; }
 .cl-sep { border:none;border-top:1px solid var(--border);margin:13px 0; }
 .cl-loading { color:var(--text-3);font-size:.84rem;padding:14px 0; }
 
-/* FOOTER */
+/* ============ FOOTER ============ */
 .footer { border-top:1px solid var(--border);padding:28px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;max-width:1380px;margin:0 auto;position:relative;z-index:1; }
 .footer-brand { display:flex;align-items:center;gap:10px; }
-.footer-logo { height:22px;opacity:.55; }
+.footer-logo-mark { height:22px;width:22px;border-radius:5px;background:var(--bg-2);border:1px solid var(--border-2);opacity:.55;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--text-2); }
 .footer-name { font-family:var(--font-head);font-weight:700;font-size:.86rem;letter-spacing:.1em;color:var(--text-3);text-transform:uppercase; }
 .footer-socials { display:flex;align-items:center;gap:7px; }
 .footer-soc { display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);color:var(--text-3);text-decoration:none;font-size:.7rem;font-weight:700;font-family:var(--font-head);text-transform:uppercase;letter-spacing:.06em;transition:all .2s; }
@@ -335,19 +374,21 @@ body::after {
 .footer-soc.patreon:hover { color:#f96854; }
 .footer-soc.linktree:hover { color:#39e09b; }
 .footer-credit { font-size:.74rem;color:var(--text-3); }
-.footer-credit a { color:var(--accent);text-decoration:none;font-weight:700; }
+.footer-credit a { color:var(--proj-accent);text-decoration:none;font-weight:700; }
 .tag-wip { display:inline-flex;align-items:center;gap:4px;font-family:var(--font-head);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);border-radius:20px;padding:1px 8px; }
 
-/* MOBILE */
+/* ============ MOBILE / SHARED ============ */
 .mobile-tab-bar { display:none; }
 @keyframes spin { to{transform:rotate(360deg)} }
 .fa-spin { animation:spin 1s linear infinite; }
+
 @media (max-width:1100px) { .qf-grid{grid-template-columns:repeat(2,1fr)} .feat-grid{grid-template-columns:repeat(2,1fr)} .sg5{grid-template-columns:repeat(3,1fr)} .pkgs-grid{grid-template-columns:repeat(2,1fr)} .upc-grid{grid-template-columns:repeat(2,1fr)} }
 @media (max-width:900px) {
   .hero{grid-template-columns:1fr;gap:28px} .hero-title{font-size:3.4rem} .stats-row{grid-template-columns:repeat(3,1fr)} .nav-tabs{display:none}
   .mobile-tab-bar{display:flex;overflow-x:auto;gap:2px;background:var(--bg-1);border-bottom:1px solid var(--border);padding:6px 16px;position:sticky;top:56px;z-index:800;}
   .mobile-tab{flex-shrink:0;font-family:var(--font-head);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-2);padding:6px 12px;border-radius:6px;border:none;background:transparent;cursor:pointer;white-space:nowrap;transition:color .2s,background .2s;}
-  .mobile-tab.active{color:var(--accent);background:var(--accent-lo);} .soc-btn span{display:none} .soc-btn{padding:6px 9px}
+  .mobile-tab.active{color:var(--proj-accent);background:var(--proj-accent-lo);} .soc-btn span{display:none} .soc-btn{padding:6px 9px}
+  .nav-crumb span.crumb-text{display:none}
 }
 @media (max-width:680px) {
   .page-wrap{padding:0 14px} .hero-title{font-size:2.8rem} .hero-actions{flex-direction:column} .dl-btn{width:100%}
@@ -357,366 +398,1218 @@ body::after {
   .release-row{flex-wrap:wrap;gap:8px} .rel-tag{min-width:unset}
 }
 
+/* ============ SINGLE-PAGE APP ROUTING ============ */
+.spa-page { display: none; }
+.spa-page.active { display: block; }
+
+/* Per-project single-OS stat/hero layout (was inline on uv-exporter.html / haulhud.html) */
+.stats-row.two { grid-template-columns: repeat(2,1fr); }
+.hero-actions.single { max-width: 220px; }
+
+/* ===== Hub-only styles ===== */
+
+.hub-hero { padding:64px 0 52px; text-align:left; max-width:760px; }
+.hub-eyebrow { display:inline-flex;align-items:center;gap:7px;font-family:var(--font-head);font-weight:700;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-md);background:var(--accent-lo);padding:4px 12px;border-radius:30px;margin-bottom:20px; }
+.hub-eyebrow .dot { width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite; }
+.hub-title { font-family:var(--font-head);font-weight:900;font-size:4.2rem;line-height:.95;letter-spacing:-.01em;text-transform:uppercase;color:var(--text);margin-bottom:18px; }
+.hub-title .ac { color:var(--accent); }
+.hub-sub { font-size:1.02rem;color:var(--text-2);line-height:1.75;max-width:600px;margin-bottom:26px; }
+.hub-socials { display:flex;gap:10px;flex-wrap:wrap; }
+
+.repo-count-strip { display:flex;align-items:center;gap:10px;margin:44px 0 22px;color:var(--text-3);font-family:var(--font-head);font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase; }
+.repo-count-strip .line { flex:1;height:1px;background:var(--border); }
+.repo-count-strip i { color:var(--accent); }
+
+/* Project grid */
+.proj-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px; }
+.proj-card {
+  position:relative;
+  background:var(--bg-1);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:0;
+  overflow:hidden;
+  text-decoration:none;
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+  transition:transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, box-shadow .25s;
+}
+.proj-card:hover { transform:translateY(-5px); }
+.proj-card[data-accent="orange"] { --card-ac:#ff6600; --card-ac-lo:rgba(255,102,0,.1); --card-ac-md:rgba(255,102,0,.24); --card-ac-hi:rgba(255,102,0,.5); }
+.proj-card[data-accent="blue"]   { --card-ac:#3ba9ff; --card-ac-lo:rgba(59,169,255,.1); --card-ac-md:rgba(59,169,255,.24); --card-ac-hi:rgba(59,169,255,.5); }
+.proj-card[data-accent="green"]  { --card-ac:#4ade80; --card-ac-lo:rgba(74,222,128,.1); --card-ac-md:rgba(74,222,128,.24); --card-ac-hi:rgba(74,222,128,.5); }
+.proj-card:hover { border-color:var(--card-ac-md); box-shadow:0 16px 40px rgba(0,0,0,.4), 0 0 0 1px var(--card-ac-md) inset; }
+
+.proj-card-top {
+  height:132px;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(circle at 30% 20%, var(--card-ac-lo) 0%, transparent 60%),
+    linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  border-bottom:1px solid var(--border);
+  overflow:hidden;
+}
+.proj-card-top::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background-image: linear-gradient(var(--card-ac-lo) 1px, transparent 1px), linear-gradient(90deg, var(--card-ac-lo) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity:.35;
+  mask-image: radial-gradient(circle at 30% 30%, black, transparent 75%);
+}
+.proj-card-icon {
+  width:56px;height:56px;border-radius:14px;
+  background:var(--card-ac-lo);
+  border:1px solid var(--card-ac-md);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--card-ac);
+  font-size:1.4rem;
+  position:relative;
+  z-index:1;
+  box-shadow:0 0 32px var(--card-ac-lo);
+  transition:transform .25s;
+}
+.proj-card:hover .proj-card-icon { transform:scale(1.08) rotate(-3deg); }
+.proj-card-status {
+  position:absolute; top:12px; right:12px;
+  font-family:var(--font-head); font-size:.6rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  padding:3px 9px; border-radius:20px; z-index:1;
+}
+.proj-card-status.active { color:var(--card-ac); background:var(--card-ac-lo); border:1px solid var(--card-ac-md); }
+.proj-card-status.wip { color:var(--amber); background:var(--amber-lo); border:1px solid var(--amber-md); }
+
+.proj-card-body { padding:20px 20px 18px; display:flex; flex-direction:column; flex:1; }
+.proj-card-cat { font-family:var(--font-head); font-size:.63rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--card-ac); margin-bottom:6px; }
+.proj-card-title { font-family:var(--font-head); font-weight:800; font-size:1.5rem; letter-spacing:.02em; text-transform:uppercase; color:var(--text); margin-bottom:9px; line-height:1.05; }
+.proj-card-desc { font-size:.83rem; color:var(--text-2); line-height:1.65; margin-bottom:18px; flex:1; }
+.proj-card-stack { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:16px; }
+.proj-card-tag { font-family:var(--font-mono); font-size:.64rem; color:var(--text-2); background:var(--bg-2); border:1px solid var(--border); padding:2px 8px; border-radius:5px; }
+.proj-card-foot { display:flex; align-items:center; justify-content:space-between; padding-top:14px; border-top:1px solid var(--border); }
+.proj-card-stat { display:flex; align-items:center; gap:5px; font-size:.73rem; color:var(--text-3); font-weight:600; }
+.proj-card-stat i { color:var(--card-ac); font-size:.68rem; }
+.proj-card-arrow { width:28px; height:28px; border-radius:8px; background:var(--card-ac-lo); border:1px solid var(--card-ac-md); display:flex; align-items:center; justify-content:center; color:var(--card-ac); font-size:.7rem; transition:transform .2s; }
+.proj-card:hover .proj-card-arrow { transform:translateX(3px); }
+
+/* About strip */
+.about-strip { display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center; background:var(--bg-1); border:1px solid var(--border); border-radius:16px; padding:28px 30px; margin-top:12px; }
+.about-avatar { width:76px; height:76px; border-radius:16px; background:linear-gradient(160deg, var(--accent-lo), var(--bg-2)); border:1px solid var(--accent-md); display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:1.7rem; flex-shrink:0; }
+.about-text-title { font-family:var(--font-head); font-weight:800; font-size:1.15rem; letter-spacing:.03em; text-transform:uppercase; color:var(--text); margin-bottom:6px; }
+.about-text-desc { font-size:.85rem; color:var(--text-2); line-height:1.7; max-width:640px; }
+
+@media (max-width:1100px) { .proj-grid{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:900px) { .hub-title{font-size:3.2rem} }
+@media (max-width:680px) {
+  .proj-grid{grid-template-columns:1fr} .hub-title{font-size:2.5rem}
+  .about-strip{grid-template-columns:1fr;text-align:center} .about-avatar{margin:0 auto}
+}
+
 </style>
 </head>
-<body>
+<body data-page="hub">
 
-<!-- NAVBAR -->
-<nav class="navbar">
-  <a class="nav-brand" href="#">
-    <img src="beamSkin_studio_logo.png" alt="" class="nav-logo">
-    <span class="nav-wordmark">BeamSkin <span>Studio</span></span>
-  </a>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="switchTab('home',this)">Home</button>
-    <button class="nav-tab" onclick="switchTab('features',this)">Features</button>
-    <button class="nav-tab" onclick="switchTab('install',this)">Install</button>
-    <button class="nav-tab" onclick="switchTab('releases',this)">Releases</button>
-    <button class="nav-tab" onclick="switchTab('changelog',this)">Changelog</button>
-  </div>
-  <div class="nav-socials">
-    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
-    <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
-    <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
-    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
-  </div>
-</nav>
+<div id="page-hub" class="spa-page active">
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="nav-brand" href="#hub">
+      <span class="nav-logo-mark"><i class="fas fa-code-branch"></i></span>
+      <span class="nav-wordmark">BURZT_<span>YT</span></span>
+    </a>
+    <div class="nav-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+      <a href="https://github.com/Burzt-YT" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
+    </div>
+  </nav>
 
-<!-- Mobile tab bar -->
-<div class="mobile-tab-bar">
-  <button class="mobile-tab active" onclick="switchTab('home',this,true)">Home</button>
-  <button class="mobile-tab" onclick="switchTab('features',this,true)">Features</button>
-  <button class="mobile-tab" onclick="switchTab('install',this,true)">Install</button>
-  <button class="mobile-tab" onclick="switchTab('releases',this,true)">Releases</button>
-  <button class="mobile-tab" onclick="switchTab('changelog',this,true)">Changelog</button>
+  <div class="page-wrap">
+
+    <div class="hub-hero">
+      <div class="hub-eyebrow"><span class="dot"></span> Sim-racing &amp; trucking tools</div>
+      <h1 class="hub-title">TOOLS FOR<br><span class="ac">BEAMNG</span> &amp; <span class="ac">ETS2</span></h1>
+      <p class="hub-sub">Desktop apps and mods for BeamNG.drive and Euro Truck Simulator 2 — skin creation, UV mapping, and telemetry overlays, built in Python and shared with the community.</p>
+      <div class="hub-socials">
+        <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+        <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+        <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+      </div>
+    </div>
+
+    <div class="repo-count-strip"><div class="line"></div><span><i class="fab fa-github"></i> 3 Projects</span><div class="line"></div></div>
+
+    <div class="proj-grid">
+      <a href="#beamskin" class="proj-card" data-accent="orange">
+        <div class="proj-card-top">
+          <span class="proj-card-status active">Active</span>
+          <div class="proj-card-icon"><i class="fas fa-palette"></i></div>
+        </div>
+        <div class="proj-card-body">
+          <div class="proj-card-cat">BeamNG.drive · Desktop App</div>
+          <div class="proj-card-title">BeamSkin Studio</div>
+          <div class="proj-card-desc">A skin modding tool that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</div>
+          <div class="proj-card-stack">
+            <span class="proj-card-tag">Python</span>
+            <span class="proj-card-tag">PySide6</span>
+            <span class="proj-card-tag">Pillow</span>
+          </div>
+          <div class="proj-card-foot">
+            <span class="proj-card-stat" id="hub-bs-downloads"><i class="fas fa-download"></i> —</span>
+            <span class="proj-card-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>
+      </a>
+
+      <a href="#uvexporter" class="proj-card" data-accent="blue">
+        <div class="proj-card-top">
+          <span class="proj-card-status active">Active</span>
+          <div class="proj-card-icon"><i class="fas fa-draw-polygon"></i></div>
+        </div>
+        <div class="proj-card-body">
+          <div class="proj-card-cat">BeamNG.drive · Desktop App</div>
+          <div class="proj-card-title">UV-Exporter</div>
+          <div class="proj-card-desc">Generates ready-to-paint UV templates straight from a vehicle's model file — pick the vehicle, select the parts you need, and export a clean template for skinning.</div>
+          <div class="proj-card-stack">
+            <span class="proj-card-tag">Python</span>
+            <span class="proj-card-tag">PySide6</span>
+            <span class="proj-card-tag">.cdae parser</span>
+          </div>
+          <div class="proj-card-foot">
+            <span class="proj-card-stat" id="hub-uv-downloads"><i class="fas fa-download"></i> —</span>
+            <span class="proj-card-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>
+      </a>
+
+      <a href="#haulhud" class="proj-card" data-accent="green">
+        <div class="proj-card-top">
+          <span class="proj-card-status active">Active</span>
+          <div class="proj-card-icon"><i class="fas fa-truck-fast"></i></div>
+        </div>
+        <div class="proj-card-body">
+          <div class="proj-card-cat">Euro Truck Simulator 2 / ATS · Overlay</div>
+          <div class="proj-card-title">HaulHUD</div>
+          <div class="proj-card-desc">A lightweight telemetry overlay for ETS2 and ATS — a C++ plugin feeds live truck data to a floating PySide6 HUD, with a real-world fatigue reminder built in.</div>
+          <div class="proj-card-stack">
+            <span class="proj-card-tag">Python</span>
+            <span class="proj-card-tag">C++</span>
+            <span class="proj-card-tag">Shared Memory</span>
+          </div>
+          <div class="proj-card-foot">
+            <span class="proj-card-stat" id="hub-hh-downloads"><i class="fas fa-download"></i> —</span>
+            <span class="proj-card-arrow"><i class="fas fa-arrow-right"></i></span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="about-strip">
+      <div class="about-avatar"><i class="fas fa-user-astronaut"></i></div>
+      <div>
+        <div class="about-text-title">About @Burzt_YT</div>
+        <div class="about-text-desc">Independent developer building tools for the BeamNG.drive and Euro Truck Simulator 2 communities. Everything here is open on GitHub — bug reports, feature requests, and pull requests are always welcome. Come say hi on Discord or follow along on Patreon.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-brand"><span class="footer-logo-mark"><i class="fas fa-code-branch"></i></span><span class="footer-name">Burzt_YT</span></div>
+    <div class="footer-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+      <a href="https://github.com/Burzt-YT" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
+    </div>
+    <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
+  </footer>
 </div>
 
-<!-- WIP Banner -->
-<div class="wip-banner" id="wipBanner">
-  <i class="fas fa-triangle-exclamation wip-icon"></i>
-  <div class="wip-content">
-    <strong>Work in Progress —</strong> BeamSkin Studio is usable but actively developed. Known limitations:
-    <div class="wip-pills">
-      <span class="wip-pill">Rare crashes possible</span>
-      <span class="wip-pill">Game updates may break textures</span>
-      <span class="wip-pill">Limited mod support</span>
-      <span class="wip-pill">Linux build untested</span>
+<div id="page-beamskin" class="spa-page">
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="nav-brand" href="#hub">
+      <span class="nav-logo-mark"><i class="fas fa-code-branch"></i></span>
+      <span class="nav-wordmark">BURZT_<span>YT</span></span>
+    </a>
+    <div class="nav-crumb"><i class="fas fa-chevron-right"></i><span class="crumb-text">BeamSkin Studio</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('beamskin','home',this)">Home</button>
+      <button class="nav-tab" onclick="switchTab('beamskin','features',this)">Features</button>
+      <button class="nav-tab" onclick="switchTab('beamskin','install',this)">Install</button>
+      <button class="nav-tab" onclick="switchTab('beamskin','releases',this)">Releases</button>
+      <button class="nav-tab" onclick="switchTab('beamskin','changelog',this)">Changelog</button>
     </div>
+    <div class="nav-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+      <a href="https://github.com/Burzt-YT/BeamSkin-Studio" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
+    </div>
+  </nav>
+
+  <div class="mobile-tab-bar">
+    <button class="mobile-tab active" onclick="switchTab('beamskin','home',this,true)">Home</button>
+    <button class="mobile-tab" onclick="switchTab('beamskin','features',this,true)">Features</button>
+    <button class="mobile-tab" onclick="switchTab('beamskin','install',this,true)">Install</button>
+    <button class="mobile-tab" onclick="switchTab('beamskin','releases',this,true)">Releases</button>
+    <button class="mobile-tab" onclick="switchTab('beamskin','changelog',this,true)">Changelog</button>
   </div>
-  <div class="wip-links">
-    <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a>
-    <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank"><i class="fab fa-github"></i> Linux Issues</a>
+
+  <!-- WIP Banner -->
+  <div class="wip-banner" id="wipBanner-beamskin">
+    <i class="fas fa-triangle-exclamation wip-icon"></i>
+    <div class="wip-content">
+      <strong>Work in Progress —</strong> BeamSkin Studio is usable but actively developed. Known limitations:
+      <div class="wip-pills">
+        <span class="wip-pill">Rare crashes possible</span>
+        <span class="wip-pill">Game updates may break textures</span>
+        <span class="wip-pill">Limited mod support</span>
+        <span class="wip-pill">Linux build untested</span>
+      </div>
+    </div>
+    <div class="wip-links">
+      <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a>
+      <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank"><i class="fab fa-github"></i> Linux Issues</a>
+    </div>
+    <button class="wip-dismiss" onclick="dismissWip(this)"><i class="fas fa-xmark"></i></button>
   </div>
-  <button class="wip-dismiss" onclick="document.getElementById('wipBanner').style.display='none'"><i class="fas fa-xmark"></i></button>
+
+  <div class="page-wrap">
+
+    <!-- HOME -->
+    <div class="tab-panel active" id="panel-home-beamskin">
+      <div class="hero">
+        <div>
+          <div class="hero-badge"><span class="dot"></span> Skin modding tool for BeamNG.drive</div>
+          <h1 class="hero-title">CRAFT<br><span class="ac">YOUR</span><br>BEAMNG<br><span class="dim">SKINS</span></h1>
+          <p class="hero-sub">A desktop application that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</p>
+          <div class="hero-actions">
+            <button class="dl-btn dl-btn-win" id="winBtn-beamskin">
+              <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
+              <span id="winVer-beamskin" class="btn-ver">Checking…</span>
+              <span id="winCount-beamskin" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+            </button>
+            <button class="dl-btn dl-btn-linux" id="linBtn-beamskin">
+              <span class="btn-label"><i class="fab fa-linux"></i> Linux Download</span>
+              <span id="linVer-beamskin" class="btn-ver">Checking…</span>
+              <span id="linCount-beamskin" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+            </button>
+          </div>
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-icon"><i class="fas fa-download"></i></div><div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal-beamskin">—</div></div></div>
+            <div class="stat-card"><div class="stat-icon"><i class="fab fa-windows"></i></div><div><div class="stat-label">Windows</div><div class="stat-value" id="statWin-beamskin">—</div></div></div>
+            <div class="stat-card"><div class="stat-icon amb"><i class="fab fa-linux"></i></div><div><div class="stat-label">Linux</div><div class="stat-value" id="statLin-beamskin">—</div></div></div>
+          </div>
+          <a href="https://github.com/Burzt-YT/BeamSkin-Studio" target="_blank" class="gh-link"><i class="fab fa-github"></i> View repository on GitHub</a>
+        </div>
+        <div>
+          <div class="viewer-frame" id="viewerFrame-beamskin">
+            <iframe id="vVideo-beamskin" src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
+            <img id="vImg-beamskin" src="" alt="Screenshot" onclick="openLightbox('beamskin')">
+            <div class="viewer-zoom-hint" id="zoomHint-beamskin"><i class="fas fa-magnifying-glass-plus"></i> Click to enlarge</div>
+          </div>
+          <div class="gallery-label"><i class="fab fa-youtube"></i> Videos</div>
+          <div class="g-row g-row-3" style="margin-bottom:10px;">
+            <div class="g-card active" onclick="showVideo('beamskin','b9bhjc8zTok',this)"><img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg" alt=""><span class="g-label">Video 2</span></div>
+            <div class="g-card" onclick="showVideo('beamskin','N1M8Tsnlodw',this)"><img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg" alt=""><span class="g-label">Preview</span></div>
+            <div class="g-card" onclick="showVideo('beamskin','Ik4mn3TPTeQ',this)"><img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg" alt=""><span class="g-label">Video 3</span></div>
+          </div>
+          <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
+          <div class="g-row g-row-4">
+            <div class="g-card" onclick="showImage('beamskin','image1.png',this)"><img src="image1.png" alt=""><span class="g-label">Project Tab</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image2.png',this)"><img src="image2.png" alt=""><span class="g-label">Skin Editor</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image3.png',this)"><img src="image3.png" alt=""><span class="g-label">How To Use</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image4.png',this)"><img src="image4.png" alt=""><span class="g-label">Car List</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image5.png',this)"><img src="image5.png" alt=""><span class="g-label">Add Vehicles</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image6.png',this)"><img src="image6.png" alt=""><span class="g-label">Settings</span></div>
+            <div class="g-card" onclick="showImage('beamskin','image7.png',this)"><img src="image7.png" alt=""><span class="g-label">About</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div><div class="sec-div-line"></div></div>
+      <div class="qf-grid">
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on every startup and notifies you instantly.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-palette"></i></div><div><div class="qf-title">Colorable Skins</div><div class="qf-desc">Select a base color PNG and palette map — BeamSkin handles the blending automatically.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-file-pen"></i></div><div><div class="qf-title">Material Editing</div><div class="qf-desc">Adjust metallic, clearcoat, and surface properties through a clean interface.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-language"></i></div><div><div class="qf-title">Multi-Language</div><div class="qf-desc">Switch UI language at any time from the settings — no restart required.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-puzzle-piece"></i></div><div><div class="qf-title">Mod Support</div><div class="qf-desc">Skin custom vehicles from supported mods — coverage expanding with each release.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-sliders"></i></div><div><div class="qf-title">Saved Configurations</div><div class="qf-desc">Bundle an in-game vehicle configuration into your mod, with optional preview image.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-floppy-disk"></i></div><div><div class="qf-title">Save / Load Projects</div><div class="qf-desc">Save your skin setup as a project file and reload it exactly where you left off.</div></div></div>
+        <div class="qf-card" style="cursor:pointer;" onclick="switchTab('beamskin','features')"><div class="qf-icon"><i class="fas fa-arrow-right"></i></div><div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming next.</div></div></div>
+      </div>
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-users"></i> Community</div><div class="sec-div-line"></div></div>
+      <div class="community-grid">
+        <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord"><div class="comm-icon"><i class="fab fa-discord"></i></div><div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div></a>
+        <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon"><div class="comm-icon"><i class="fab fa-patreon"></i></div><div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of BeamSkin Studio — every bit helps keep the project going.</div></div></a>
+        <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree"><div class="comm-icon"><i class="fas fa-seedling"></i></div><div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div></a>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="tab-panel" id="panel-features-beamskin">
+      <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
+      <p class="tab-sub">Everything available in the current release of BeamSkin Studio.</p>
+      <div class="feat-grid">
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup BeamSkin Studio checks GitHub for a newer version and notifies you if one is available.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Mod Support</div></div><div class="feat-desc">Basic mod support is included, allowing custom vehicle skins from supported mods — coverage is still expanding.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-palette"></i></div><div class="feat-title">Colorable Skins</div></div><div class="feat-desc">When enabled, select a base color PNG and a color palette map — BeamSkin Studio takes care of the rest automatically.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-file-pen"></i></div><div class="feat-title">Material File Editing</div></div><div class="feat-desc">Adjust material values such as metallic, clearcoat, and other surface properties through a simple interface.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sliders"></i></div><div class="feat-title">Saved Configurations</div></div><div class="feat-desc">Bundle a saved in-game vehicle configuration into your mod, optionally with a preview image.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-language"></i></div><div class="feat-title">Multiple Languages</div></div><div class="feat-desc">The interface supports multiple languages — switch at any time from the settings panel without restarting.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-floppy-disk"></i></div><div class="feat-title">Save / Load Projects</div></div><div class="feat-desc">Save your current skin setup as a project file and reload it later to pick up exactly where you left off.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-desktop"></i></div><div class="feat-title">PySide6 Interface</div></div><div class="feat-desc">Built on Qt via PySide6, providing a modern, responsive interface with better cross-platform compatibility.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-linux"></i></div><div class="feat-title">Linux Support</div></div><div class="feat-desc">A Linux build is available alongside the Windows version. <span class="tag-wip"><i class="fas fa-flask"></i> Untested</span></div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sun"></i></div><div class="feat-title">Reflective Map Support</div></div><div class="feat-desc">Add a reflectivity map to your skin, making specific areas reflective — perfect for police car decals, chrome accents, and other shiny surfaces.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-truck-moving"></i></div><div class="feat-title">Body Variant Support</div></div><div class="feat-desc">Create skins for vehicle body variants including bus, cargo, box truck, and ambulance configurations.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-open"></i></div><div class="feat-title">Unpacked Mod Export</div></div><div class="feat-desc">Export your mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly without extracting it first.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Auto Add Mods</div></div><div class="feat-desc">BeamSkin Studio can automatically add your mods and find the correct files — no more manually hunting through mod folders for the right files.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-tree"></i></div><div class="feat-title">Smart Config Browsing</div></div><div class="feat-desc">When browsing for <code>.pc</code> and <code>.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div></div>
+      </div>
+    </div>
+
+    <!-- INSTALL -->
+    <div class="tab-panel" id="panel-install-beamskin">
+      <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
+      <p class="tab-sub">Get BeamSkin Studio running in minutes on Windows or Linux.</p>
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchSub('beamskin','inst',this)"><i class="fas fa-download"></i> Installation</button>
+        <button class="sub-tab" onclick="switchSub('beamskin','manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
+        <button class="sub-tab" onclick="switchSub('beamskin','trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
+      </div>
+      <div class="sub-panel active" id="sub-inst-beamskin">
+        <div class="os-toggle">
+          <button class="os-btn win-on" id="instW-beamskin" onclick="switchInstOS('beamskin','windows')"><i class="fab fa-windows"></i> Windows</button>
+          <button class="os-btn" id="instL-beamskin" onclick="switchInstOS('beamskin','linux')"><i class="fab fa-linux"></i> Linux</button>
+        </div>
+        <div class="os-sect active" id="inst-windows-beamskin">
+          <div class="steps-grid sg5">
+            <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Windows Download</strong> button on the Home tab to grab the latest release ZIP from GitHub.</div></div>
+            <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder.</div><div class="step-tip">💡 Avoid paths with spaces — <code>C:\Tools\BeamSkin</code> works great.</div></div>
+            <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Run Install.bat</div><div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It installs all required dependencies automatically.</div><div class="step-tip">⚠️ If SmartScreen appears, click <strong>More info → Run anyway</strong>. False positive — common with Python apps.</div></div>
+            <div class="step-card"><div class="step-num">04</div><div class="step-icon"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">Once installation finishes, BeamSkin Studio launches automatically for the first time.</div></div>
+            <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Use <code>BeamSkin Studio.bat</code> from now on — it skips the installer for a faster startup.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
+          </div>
+        </div>
+        <div class="os-sect" id="inst-linux-beamskin">
+          <div class="lin-warn"><i class="fab fa-linux" style="color:var(--amber);font-size:.9rem;margin-top:2px;flex-shrink:0;"></i><div><strong>Linux — heads up:</strong> The Linux version is <strong>untested</strong> and may have issues. Report them on the <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">Linux GitHub Issues</a> page. Supports <strong>Ubuntu/Debian, Fedora/RHEL, Arch/Manjaro, and openSUSE</strong>.</div></div>
+          <div class="steps-grid sg4">
+            <div class="step-card lin"><div class="step-num l">01</div><div class="step-icon l"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Linux Download</strong> button on the Home tab.</div></div>
+            <div class="step-card lin"><div class="step-num l">02</div><div class="step-icon l"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Use your file manager or:<br><br><code class="l">unzip BeamSkin-Studio-Linux-*.zip</code></div></div>
+            <div class="step-card lin"><div class="step-num l">03</div><div class="step-icon l"><i class="fas fa-terminal"></i></div><div class="step-label">Run Installer</div><div class="step-desc">Open a terminal in the extracted folder:<br><br><code class="l">chmod +x install_linux.sh</code><br><code class="l">./install_linux.sh</code><br><br>Installs Python 3, pip, tkinter, and all required packages.</div><div class="step-tip">⚠️ May prompt for your <strong>sudo password</strong> — this is expected.</div></div>
+            <div class="step-card lin"><div class="step-num l">04</div><div class="step-icon l"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">The installer will ask to launch immediately. Type <strong>y</strong> and Enter, or run anytime with:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+          </div>
+          <div class="upc-hdr" style="margin-top:24px;"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-desktop"></i> Optional — Desktop Shortcut</div><div class="upc-hdr-line"></div></div>
+          <div class="steps-grid sg3">
+            <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-file-code"></i></div><div class="step-label">Edit .desktop File</div><div class="step-desc">Open <code class="l">beamskin-studio.desktop</code> in a text editor. Replace both <code class="l">/path/to/BeamSkin-Studio</code> placeholders with your actual path.</div><div class="step-tip">💡 Run <code style="color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);font-family:var(--font-mono);font-size:.68rem;padding:1px 5px;border-radius:4px;">pwd</code> inside the folder to see it.</div></div>
+            <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-copy"></i></div><div class="step-label">Install Shortcut</div><div class="step-desc">Copy it so it appears in your app launcher:<br><br><code class="l">cp beamskin-studio.desktop ~/.local/share/applications/</code></div></div>
+            <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your launcher, or use:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sub-panel" id="sub-manual-beamskin">
+        <div class="steps-grid sg3" style="margin-bottom:24px;">
+          <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--proj-accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong> (Linux: your terminal). Navigate to the BeamSkin Studio folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
+          <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
+        </div>
+        <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div><div class="upc-hdr-line"></div></div>
+        <div class="pkgs-grid">
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 6.5.0</span></div></div></div><div class="feat-desc">Qt-based GUI framework powering the entire interface.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div><div class="feat-title">Pillow <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 10.0.0</span></div></div></div><div class="feat-desc">Image processing library for skin texture manipulation and colorable skin generation.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 2.31.0</span></div></div></div><div class="feat-desc">HTTP library for the update checker and online features.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-windows"></i></div><div><div class="feat-title">pywin32 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 306</span></div></div></div><div class="feat-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped on Linux.</div></div>
+        </div>
+        <div class="lin-info"><strong><i class="fab fa-linux"></i> Linux note —</strong> PySide6 bundles its own Qt libraries so no system Qt is needed. You may need <code>libGL</code> for rendering: &nbsp;<code>sudo apt install libgl1</code> (Debian/Ubuntu) &nbsp;·&nbsp; <code>sudo dnf install mesa-libGL</code> (Fedora) &nbsp;·&nbsp; <code>sudo pacman -S mesa</code> (Arch)</div>
+      </div>
+      <div class="sub-panel" id="sub-trouble-beamskin">
+        <div class="trouble-list">
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and third-party antivirus may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly.<br><br>• <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish. Launch via <code>BeamSkin Studio.bat</code>, not <code>main.py</code>.<br>• <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for errors. Or install manually: <code>pip install --user &lt;package-name&gt;</code>.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: tkinter not found / GUI fails to open<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">tkinter must be installed separately on Linux:<br><br>• <strong>Ubuntu/Debian:</strong> <code>sudo apt install python3-tk</code><br>• <strong>Fedora/RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>• <strong>Arch/Manjaro:</strong> <code>sudo pacman -S tk</code><br>• <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code></div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: permission denied when running scripts<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">The shell scripts need execute permission before they can run:<br><br><code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELEASES -->
+    <div class="tab-panel" id="panel-releases-beamskin">
+      <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
+      <p class="tab-sub">Complete release history for Windows and Linux builds.</p>
+      <div class="os-toggle" style="margin-bottom:20px;">
+        <button class="os-btn win-on" id="relW-beamskin" onclick="switchRelOS('beamskin','windows')"><i class="fab fa-windows"></i> Windows</button>
+        <button class="os-btn" id="relL-beamskin" onclick="switchRelOS('beamskin','linux')"><i class="fab fa-linux"></i> Linux</button>
+      </div>
+      <div class="os-sect active" id="rel-windows-beamskin"><div id="rlw-beamskin"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
+      <div class="os-sect" id="rel-linux-beamskin"><div id="rll-beamskin"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
+    </div>
+
+    <!-- CHANGELOG -->
+    <div class="tab-panel" id="panel-changelog-beamskin">
+      <div class="cl-wrap">
+        <div class="cl-top"><h2 class="tab-heading">CHANGE<span>LOG</span></h2><span id="clVer-beamskin" class="cl-ver">Loading…</span><span id="clDate-beamskin" class="cl-date-label"></span></div>
+        <div class="cl-body" id="clBody-beamskin"><div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-brand"><span class="footer-logo-mark"><i class="fas fa-palette"></i></span><span class="footer-name">BeamSkin Studio</span></div>
+    <div class="footer-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+      <a href="https://github.com/Burzt-YT/BeamSkin-Studio" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
+    </div>
+    <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a> · <a href="#hub">All Projects</a></div>
+  </footer>
 </div>
 
-<!-- MAIN -->
-<div class="page-wrap">
+<div id="page-uvexporter" class="spa-page">
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="nav-brand" href="#hub">
+      <span class="nav-logo-mark"><i class="fas fa-code-branch"></i></span>
+      <span class="nav-wordmark">BURZT_<span>YT</span></span>
+    </a>
+    <div class="nav-crumb"><i class="fas fa-chevron-right"></i><span class="crumb-text">UV-Exporter</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('uvexporter','home',this)">Home</button>
+      <button class="nav-tab" onclick="switchTab('uvexporter','features',this)">Features</button>
+      <button class="nav-tab" onclick="switchTab('uvexporter','install',this)">Install</button>
+      <button class="nav-tab" onclick="switchTab('uvexporter','releases',this)">Releases</button>
+      <button class="nav-tab" onclick="switchTab('uvexporter','changelog',this)">Changelog</button>
+    </div>
+    <div class="nav-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+      <a href="https://github.com/Burzt-YT/UV-Exporter" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
+    </div>
+  </nav>
 
-  <!-- HOME -->
-  <div class="tab-panel active" id="panel-home">
-    <div class="hero">
-      <div>
-        <div class="hero-badge"><span class="dot"></span> Skin modding tool for BeamNG.drive</div>
-        <h1 class="hero-title">CRAFT<br><span class="ac">YOUR</span><br>BEAMNG<br><span class="dim">SKINS</span></h1>
-        <p class="hero-sub">A desktop application that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</p>
-        <div class="hero-actions">
-          <button class="dl-btn dl-btn-win" id="winBtn">
-            <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
-            <span id="winVer" class="btn-ver">Checking…</span>
-            <span id="winCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
-          </button>
-          <button class="dl-btn dl-btn-linux" id="linBtn">
-            <span class="btn-label"><i class="fab fa-linux"></i> Linux Download</span>
-            <span id="linVer" class="btn-ver">Checking…</span>
-            <span id="linCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
-          </button>
-        </div>
-        <div class="stats-row">
-          <div class="stat-card"><div class="stat-icon"><i class="fas fa-download"></i></div><div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal">—</div></div></div>
-          <div class="stat-card"><div class="stat-icon"><i class="fab fa-windows"></i></div><div><div class="stat-label">Windows</div><div class="stat-value" id="statWin">—</div></div></div>
-          <div class="stat-card"><div class="stat-icon amb"><i class="fab fa-linux"></i></div><div><div class="stat-label">Linux</div><div class="stat-value" id="statLin">—</div></div></div>
-        </div>
-        <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="gh-link"><i class="fab fa-github"></i> View all repositories on GitHub</a>
-      </div>
-      <div>
-        <div class="viewer-frame" id="viewerFrame">
-          <iframe id="vVideo" src="https://www.youtube.com/embed/b9bhjc8zTok" allowfullscreen></iframe>
-          <img id="vImg" src="" alt="Screenshot" onclick="openLightbox()">
-          <div class="viewer-zoom-hint" id="zoomHint"><i class="fas fa-magnifying-glass-plus"></i> Click to enlarge</div>
-        </div>
-        <div class="gallery-label"><i class="fab fa-youtube"></i> Videos</div>
-        <div class="g-row g-row-3" style="margin-bottom:10px;">
-          <div class="g-card active" onclick="showVideo('b9bhjc8zTok',this)"><img src="https://img.youtube.com/vi/b9bhjc8zTok/0.jpg" alt=""><span class="g-label">Video 2</span></div>
-          <div class="g-card" onclick="showVideo('N1M8Tsnlodw',this)"><img src="https://img.youtube.com/vi/N1M8Tsnlodw/0.jpg" alt=""><span class="g-label">Preview</span></div>
-          <div class="g-card" onclick="showVideo('Ik4mn3TPTeQ',this)"><img src="https://img.youtube.com/vi/Ik4mn3TPTeQ/0.jpg" alt=""><span class="g-label">Video 3</span></div>
-        </div>
-        <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
-        <div class="g-row g-row-4">
-          <div class="g-card" onclick="showImage('image1.png',this)"><img src="image1.png" alt=""><span class="g-label">Project Tab</span></div>
-          <div class="g-card" onclick="showImage('image2.png',this)"><img src="image2.png" alt=""><span class="g-label">Skin Editor</span></div>
-          <div class="g-card" onclick="showImage('image3.png',this)"><img src="image3.png" alt=""><span class="g-label">How To Use</span></div>
-          <div class="g-card" onclick="showImage('image4.png',this)"><img src="image4.png" alt=""><span class="g-label">Car List</span></div>
-          <div class="g-card" onclick="showImage('image5.png',this)"><img src="image5.png" alt=""><span class="g-label">Add Vehicles</span></div>
-          <div class="g-card" onclick="showImage('image6.png',this)"><img src="image6.png" alt=""><span class="g-label">Settings</span></div>
-          <div class="g-card" onclick="showImage('image7.png',this)"><img src="image7.png" alt=""><span class="g-label">About</span></div>
-        </div>
-      </div>
-    </div>
-    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div><div class="sec-div-line"></div></div>
-    <div class="qf-grid">
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on every startup and notifies you instantly.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-palette"></i></div><div><div class="qf-title">Colorable Skins</div><div class="qf-desc">Select a base color PNG and palette map — BeamSkin handles the blending automatically.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-file-pen"></i></div><div><div class="qf-title">Material Editing</div><div class="qf-desc">Adjust metallic, clearcoat, and surface properties through a clean interface.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-language"></i></div><div><div class="qf-title">Multi-Language</div><div class="qf-desc">Switch UI language at any time from the settings — no restart required.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-puzzle-piece"></i></div><div><div class="qf-title">Mod Support</div><div class="qf-desc">Skin custom vehicles from supported mods — coverage expanding with each release.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-sliders"></i></div><div><div class="qf-title">Saved Configurations</div><div class="qf-desc">Bundle an in-game vehicle configuration into your mod, with optional preview image.</div></div></div>
-      <div class="qf-card"><div class="qf-icon"><i class="fas fa-floppy-disk"></i></div><div><div class="qf-title">Save / Load Projects</div><div class="qf-desc">Save your skin setup as a project file and reload it exactly where you left off.</div></div></div>
-      <div class="qf-card" style="cursor:pointer;" onclick="switchTab('features',document.querySelectorAll('.nav-tab')[1])"><div class="qf-icon"><i class="fas fa-arrow-right"></i></div><div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming in v0.8.0 Beta.</div></div></div>
-    </div>
-    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-users"></i> Community</div><div class="sec-div-line"></div></div>
-    <div class="community-grid">
-      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord"><div class="comm-icon"><i class="fab fa-discord"></i></div><div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div></a>
-      <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon"><div class="comm-icon"><i class="fab fa-patreon"></i></div><div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of BeamSkin Studio — every bit helps keep the project going.</div></div></a>
-      <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree"><div class="comm-icon"><i class="fas fa-seedling"></i></div><div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div></a>
-    </div>
+  <div class="mobile-tab-bar">
+    <button class="mobile-tab active" onclick="switchTab('uvexporter','home',this,true)">Home</button>
+    <button class="mobile-tab" onclick="switchTab('uvexporter','features',this,true)">Features</button>
+    <button class="mobile-tab" onclick="switchTab('uvexporter','install',this,true)">Install</button>
+    <button class="mobile-tab" onclick="switchTab('uvexporter','releases',this,true)">Releases</button>
+    <button class="mobile-tab" onclick="switchTab('uvexporter','changelog',this,true)">Changelog</button>
   </div>
 
-  <!-- FEATURES -->
-  <div class="tab-panel" id="panel-features">
-    <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
-    <p class="tab-sub">Everything available in the current release of BeamSkin Studio.</p>
-    <div class="feat-grid">
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup BeamSkin Studio checks GitHub for a newer version and notifies you if one is available.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Mod Support</div></div><div class="feat-desc">Basic mod support is included, allowing custom vehicle skins from supported mods — coverage is still expanding.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-palette"></i></div><div class="feat-title">Colorable Skins</div></div><div class="feat-desc">When enabled, select a base color PNG and a color palette map — BeamSkin Studio takes care of the rest automatically.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-file-pen"></i></div><div class="feat-title">Material File Editing</div></div><div class="feat-desc">Adjust material values such as metallic, clearcoat, and other surface properties through a simple interface.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sliders"></i></div><div class="feat-title">Saved Configurations</div></div><div class="feat-desc">Bundle a saved in-game vehicle configuration into your mod, optionally with a preview image.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-language"></i></div><div class="feat-title">Multiple Languages</div></div><div class="feat-desc">The interface supports multiple languages — switch at any time from the settings panel without restarting.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-floppy-disk"></i></div><div class="feat-title">Save / Load Projects</div></div><div class="feat-desc">Save your current skin setup as a project file and reload it later to pick up exactly where you left off.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-desktop"></i></div><div class="feat-title">PySide6 Interface</div></div><div class="feat-desc">Built on Qt via PySide6, providing a modern, responsive interface with better cross-platform compatibility.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-linux"></i></div><div class="feat-title">Linux Support</div></div><div class="feat-desc">A Linux build is available alongside the Windows version. <span class="tag-wip"><i class="fas fa-flask"></i> Untested</span></div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-sun"></i></div><div class="feat-title">Reflective Map Support</div></div><div class="feat-desc">Add a reflectivity map to your skin, making specific areas reflective — perfect for police car decals, chrome accents, and other shiny surfaces.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-truck-moving"></i></div><div class="feat-title">Body Variant Support</div></div><div class="feat-desc">Create skins for vehicle body variants including bus, cargo, box truck, and ambulance configurations.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-open"></i></div><div class="feat-title">Unpacked Mod Export</div></div><div class="feat-desc">Export your mod as a plain folder instead of a ZIP — useful for testing or editing the mod directly without extracting it first.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-puzzle-piece"></i></div><div class="feat-title">Auto Add Mods</div></div><div class="feat-desc">BeamSkin Studio can automatically add your mods and find the correct files — no more manually hunting through mod folders for the right files.</div></div>
-      <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-folder-tree"></i></div><div class="feat-title">Smart Config Browsing</div></div><div class="feat-desc">When browsing for <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.pc</code> and <code style="font-family:var(--font-mono);font-size:.68rem;background:var(--accent-lo);border:1px solid var(--accent-md);color:var(--accent);padding:1px 5px;border-radius:4px;">.jpg</code> config files, the picker opens directly in that vehicle's config folder if it exists.</div></div>
+  <!-- WIP Banner -->
+  <div class="wip-banner" id="wipBanner-uvexporter">
+    <i class="fas fa-triangle-exclamation wip-icon"></i>
+    <div class="wip-content">
+      <strong>Work in Progress —</strong> UV-Exporter is under active development. Known limitations:
+      <div class="wip-pills">
+        <span class="wip-pill">Part coverage still growing</span>
+        <span class="wip-pill">Some mod vehicles unsupported</span>
+        <span class="wip-pill">Windows only</span>
+      </div>
     </div>
+    <div class="wip-links">
+      <a href="https://github.com/Burzt-YT/UV-Exporter/issues" target="_blank"><i class="fab fa-github"></i> Report an Issue</a>
+    </div>
+    <button class="wip-dismiss" onclick="dismissWip(this)"><i class="fas fa-xmark"></i></button>
   </div>
 
-  <!-- INSTALL -->
-  <div class="tab-panel" id="panel-install">
-    <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
-    <p class="tab-sub">Get BeamSkin Studio running in minutes on Windows or Linux.</p>
-    <div class="sub-tabs">
-      <button class="sub-tab active" onclick="switchSub('inst',this)"><i class="fas fa-download"></i> Installation</button>
-      <button class="sub-tab" onclick="switchSub('manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
-      <button class="sub-tab" onclick="switchSub('trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
-    </div>
-    <div class="sub-panel active" id="sub-inst">
-      <div class="os-toggle">
-        <button class="os-btn win-on" id="instW" onclick="switchInstOS('windows')"><i class="fab fa-windows"></i> Windows</button>
-        <button class="os-btn" id="instL" onclick="switchInstOS('linux')"><i class="fab fa-linux"></i> Linux</button>
+  <div class="page-wrap">
+
+    <!-- HOME -->
+    <div class="tab-panel active" id="panel-home-uvexporter">
+      <div class="hero">
+        <div>
+          <div class="hero-badge"><span class="dot"></span> UV template generator for BeamNG.drive</div>
+          <h1 class="hero-title">TEMPLATES<br><span class="ac">FOR</span><br>EVERY<br><span class="dim">PART</span></h1>
+          <p class="hero-sub">Pick a BeamNG vehicle model, choose the parts you need, and UV-Exporter builds a clean, ready-to-paint UV template for skin making — no digging through mod files or guessing at layouts.</p>
+          <div class="hero-actions single">
+            <button class="dl-btn dl-btn-win" id="winBtn-uvexporter">
+              <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
+              <span id="winVer-uvexporter" class="btn-ver">Checking…</span>
+              <span id="winCount-uvexporter" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+            </button>
+          </div>
+          <div class="stats-row two">
+            <div class="stat-card"><div class="stat-icon"><i class="fas fa-download"></i></div><div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal-uvexporter">—</div></div></div>
+            <div class="stat-card"><div class="stat-icon"><i class="fas fa-tag"></i></div><div><div class="stat-label">Releases</div><div class="stat-value" id="statReleases-uvexporter">—</div></div></div>
+          </div>
+          <a href="https://github.com/Burzt-YT/UV-Exporter" target="_blank" class="gh-link"><i class="fab fa-github"></i> View repository on GitHub</a>
+        </div>
+        <div>
+          <div class="viewer-frame" id="viewerFrame-uvexporter">
+            <div class="viewer-placeholder"><i class="fas fa-draw-polygon"></i><span>Preview coming soon</span></div>
+            <img id="vImg-uvexporter" src="" alt="Screenshot" onclick="openLightbox('uvexporter')">
+            <div class="viewer-zoom-hint" id="zoomHint-uvexporter"><i class="fas fa-magnifying-glass-plus"></i> Click to enlarge</div>
+          </div>
+          <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
+          <div class="g-row g-row-3">
+            <div class="g-card"><span class="g-label" style="position:static;background:none;padding:0;color:var(--text-3);">Coming soon</span></div>
+          </div>
+        </div>
       </div>
-      <div class="os-sect active" id="inst-windows">
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div><div class="sec-div-line"></div></div>
+      <div class="qf-grid">
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-car"></i></div><div><div class="qf-title">Vehicle Model Picker</div><div class="qf-desc">Select a vehicle's model file directly and UV-Exporter reads its parts automatically.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-magnifying-glass"></i></div><div><div class="qf-title">Live Part Search</div><div class="qf-desc">Filter through every part on the vehicle in real time until you find exactly what you need.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-expand"></i></div><div><div class="qf-title">Custom Resolution</div><div class="qf-desc">Set width and height independently to match the texture size you're painting at.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-layer-group"></i></div><div><div class="qf-title">Multi-Part Export</div><div class="qf-desc">Build a template piece by piece until the whole vehicle is covered, then export as one image.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-cube"></i></div><div><div class="qf-title">.cdae Support</div><div class="qf-desc">Reads BeamNG's binary mesh format directly — no manual conversion needed.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-desktop"></i></div><div><div class="qf-title">PySide6 Interface</div><div class="qf-desc">A clean, responsive desktop UI built on Qt.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on startup so you're always current.</div></div></div>
+        <div class="qf-card" style="cursor:pointer;" onclick="switchTab('uvexporter','features')"><div class="qf-icon"><i class="fas fa-arrow-right"></i></div><div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming next.</div></div></div>
+      </div>
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-users"></i> Community</div><div class="sec-div-line"></div></div>
+      <div class="community-grid">
+        <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord"><div class="comm-icon"><i class="fab fa-discord"></i></div><div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, share your skins, and stay up to date on development.</div></div></a>
+        <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon"><div class="comm-icon"><i class="fab fa-patreon"></i></div><div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of UV-Exporter and every other project here.</div></div></a>
+        <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree"><div class="comm-icon"><i class="fas fa-seedling"></i></div><div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div></a>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="tab-panel" id="panel-features-uvexporter">
+      <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
+      <p class="tab-sub">Everything available in the current release of UV-Exporter.</p>
+      <div class="feat-grid">
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-car"></i></div><div class="feat-title">Vehicle Model Selection</div></div><div class="feat-desc">Point UV-Exporter at a vehicle's model file and it loads every part available on that vehicle.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-magnifying-glass"></i></div><div class="feat-title">Live Part Search & Filter</div></div><div class="feat-desc">Type to filter the part list instantly, so you can find and select the right pieces without scrolling through hundreds of names.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-expand"></i></div><div class="feat-title">Separate Width/Height Controls</div></div><div class="feat-desc">Set output resolution width and height independently, so your template matches your target texture size exactly.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-layer-group"></i></div><div class="feat-title">Cumulative Part Selection</div></div><div class="feat-desc">Add parts one at a time until you've built up the full set you want mapped, then export the complete template.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-cube"></i></div><div class="feat-title">Native .cdae Parsing</div></div><div class="feat-desc">A built-in binary parser reads BeamNG's <code>.cdae</code> mesh format directly, so there's no need to convert or export models from another tool first.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div class="feat-title">Clean Template Output</div></div><div class="feat-desc">Exports a ready-to-paint UV layout image you can open straight in your image editor of choice.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup, UV-Exporter checks GitHub for a newer version and notifies you if one is available.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-desktop"></i></div><div class="feat-title">PySide6 Interface</div></div><div class="feat-desc">Built on Qt via PySide6 for a modern, responsive desktop experience.</div></div>
+      </div>
+
+      <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-road"></i> On The Roadmap</div><div class="upc-hdr-line"></div></div>
+      <div class="upc-grid">
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fas fa-puzzle-piece"></i></div><div class="upc-title">Wider Mod Support</div><div class="upc-desc">Expanding coverage to more community-made vehicle mods over time.</div></div>
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fab fa-linux"></i></div><div class="upc-title">Linux Build</div><div class="upc-desc">A Linux release, matching the approach used for BeamSkin Studio.</div></div>
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fas fa-file-export"></i></div><div class="upc-title">Direct BeamSkin Studio Export</div><div class="upc-desc">Send a generated template straight into a BeamSkin Studio project without saving an intermediate file.</div></div>
+      </div>
+    </div>
+
+    <!-- INSTALL -->
+    <div class="tab-panel" id="panel-install-uvexporter">
+      <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
+      <p class="tab-sub">Get UV-Exporter running in minutes.</p>
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchSub('uvexporter','inst',this)"><i class="fas fa-download"></i> Installation</button>
+        <button class="sub-tab" onclick="switchSub('uvexporter','manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
+        <button class="sub-tab" onclick="switchSub('uvexporter','trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
+      </div>
+      <div class="sub-panel active" id="sub-inst-uvexporter">
         <div class="steps-grid sg5">
           <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Windows Download</strong> button on the Home tab to grab the latest release ZIP from GitHub.</div></div>
-          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder.</div><div class="step-tip">💡 Avoid paths with spaces — <code>C:\Tools\BeamSkin</code> works great.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder.</div><div class="step-tip">💡 Avoid paths with spaces — <code>C:\Tools\UV-Exporter</code> works great.</div></div>
           <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Run Install.bat</div><div class="step-desc">Open the extracted folder and double-click <code>Install.bat</code>. It installs all required dependencies automatically.</div><div class="step-tip">⚠️ If SmartScreen appears, click <strong>More info → Run anyway</strong>. False positive — common with Python apps.</div></div>
-          <div class="step-card"><div class="step-num">04</div><div class="step-icon"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">Once installation finishes, BeamSkin Studio launches automatically for the first time.</div></div>
-          <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Use <code>BeamSkin Studio.bat</code> from now on — it skips the installer for a faster startup.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
+          <div class="step-card"><div class="step-num">04</div><div class="step-icon"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">Once installation finishes, UV-Exporter launches automatically for the first time.</div></div>
+          <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Use <code>UV-Exporter.bat</code> from now on — it skips the installer for a faster startup.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
         </div>
       </div>
-      <div class="os-sect" id="inst-linux">
-        <div class="lin-warn"><i class="fab fa-linux" style="color:var(--amber);font-size:.9rem;margin-top:2px;flex-shrink:0;"></i><div><strong>Linux — heads up:</strong> The Linux version is <strong>untested</strong> and may have issues. Report them on the <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank">Linux GitHub Issues</a> page. Supports <strong>Ubuntu/Debian, Fedora/RHEL, Arch/Manjaro, and openSUSE</strong>.</div></div>
-        <div class="steps-grid sg4">
-          <div class="step-card lin"><div class="step-num l">01</div><div class="step-icon l"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Linux Download</strong> button on the Home tab.</div></div>
-          <div class="step-card lin"><div class="step-num l">02</div><div class="step-icon l"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Use your file manager or:<br><br><code class="l">unzip BeamSkin-Studio-Linux-*.zip</code></div></div>
-          <div class="step-card lin"><div class="step-num l">03</div><div class="step-icon l"><i class="fas fa-terminal"></i></div><div class="step-label">Run Installer</div><div class="step-desc">Open a terminal in the extracted folder:<br><br><code class="l">chmod +x install_linux.sh</code><br><code class="l">./install_linux.sh</code><br><br>Installs Python 3, pip, tkinter, and all required packages.</div><div class="step-tip">⚠️ May prompt for your <strong>sudo password</strong> — this is expected.</div></div>
-          <div class="step-card lin"><div class="step-num l">04</div><div class="step-icon l"><i class="fas fa-circle-check"></i></div><div class="step-label">First Launch</div><div class="step-desc">The installer will ask to launch immediately. Type <strong>y</strong> and Enter, or run anytime with:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+      <div class="sub-panel" id="sub-manual-uvexporter">
+        <div class="steps-grid sg3" style="margin-bottom:24px;">
+          <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--proj-accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong>. Navigate to the UV-Exporter folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
+          <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
         </div>
-        <div class="upc-hdr" style="margin-top:24px;"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-desktop"></i> Optional — Desktop Shortcut</div><div class="upc-hdr-line"></div></div>
-        <div class="steps-grid sg3">
-          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-file-code"></i></div><div class="step-label">Edit .desktop File</div><div class="step-desc">Open <code class="l">beamskin-studio.desktop</code> in a text editor. Replace both <code class="l">/path/to/BeamSkin-Studio</code> placeholders with your actual path.</div><div class="step-tip">💡 Run <code style="color:var(--amber);background:var(--amber-lo);border:1px solid var(--amber-md);font-family:var(--font-mono);font-size:.68rem;padding:1px 5px;border-radius:4px;">pwd</code> inside the folder to see it.</div></div>
-          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-copy"></i></div><div class="step-label">Install Shortcut</div><div class="step-desc">Copy it so it appears in your app launcher:<br><br><code class="l">cp beamskin-studio.desktop ~/.local/share/applications/</code></div></div>
-          <div class="step-card lin"><div class="opt-badge"><i class="fas fa-star-half-stroke"></i> Optional</div><div class="step-icon l"><i class="fas fa-rocket"></i></div><div class="step-label">Future Launches</div><div class="step-desc">Search for <strong>BeamSkin Studio</strong> in your launcher, or use:<br><br><code class="l">./beamskin_studio.sh</code></div></div>
+        <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div><div class="upc-hdr-line"></div></div>
+        <div class="pkgs-grid">
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6</div></div></div><div class="feat-desc">Qt-based GUI framework powering the entire interface.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div><div class="feat-title">Pillow</div></div></div><div class="feat-desc">Image processing library used to render the exported UV template.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests</div></div></div><div class="feat-desc">HTTP library for the update checker.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-cube"></i></div><div><div class="feat-title">numpy</div></div></div><div class="feat-desc">Used for the UV coordinate and mesh math when parsing model files.</div></div>
+        </div>
+      </div>
+      <div class="sub-panel" id="sub-trouble-uvexporter">
+        <div class="trouble-list">
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong> and <strong>SmartScreen</strong> may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the UV-Exporter folder as an <strong>exception / exclusion</strong>.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly. Re-run <code>Install.bat</code> and let it finish, then launch via <code>UV-Exporter.bat</code>, not <code>main.py</code> directly.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-car-burst"></i></div>Vehicle parts don't load / list is empty<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Make sure you selected the correct model file for the vehicle, not a texture or config file. If the vehicle is from a mod, part coverage may still be limited — check the <a href="https://github.com/Burzt-YT/UV-Exporter/issues" target="_blank">GitHub Issues</a> page to see if it's a known gap.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/Burzt-YT/UV-Exporter/issues" target="_blank"><i class="fab fa-github"></i> Report an Issue</a></div></div></div>
         </div>
       </div>
     </div>
-    <div class="sub-panel" id="sub-manual">
-      <div class="steps-grid sg3" style="margin-bottom:24px;">
-        <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
-        <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong> (Linux: your terminal). Navigate to the BeamSkin Studio folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
-        <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
-      </div>
-      <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div><div class="upc-hdr-line"></div></div>
-      <div class="pkgs-grid">
-        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 6.5.0</span></div></div></div><div class="feat-desc">Qt-based GUI framework powering the entire interface.</div></div>
-        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-image"></i></div><div><div class="feat-title">Pillow <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 10.0.0</span></div></div></div><div class="feat-desc">Image processing library for skin texture manipulation and colorable skin generation.</div></div>
-        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 2.31.0</span></div></div></div><div class="feat-desc">HTTP library for the update checker and online features.</div></div>
-        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-windows"></i></div><div><div class="feat-title">pywin32 <span style="font-weight:400;color:var(--text-2);font-size:.78rem;">≥ 306</span></div></div></div><div class="feat-desc">Windows-only. Improves taskbar icon grouping and file dialog integration. Skipped on Linux.</div></div>
-      </div>
-      <div class="lin-info"><strong><i class="fab fa-linux"></i> Linux note —</strong> PySide6 bundles its own Qt libraries so no system Qt is needed. You may need <code>libGL</code> for rendering: &nbsp;<code>sudo apt install libgl1</code> (Debian/Ubuntu) &nbsp;·&nbsp; <code>sudo dnf install mesa-libGL</code> (Fedora) &nbsp;·&nbsp; <code>sudo pacman -S mesa</code> (Arch)</div>
+
+    <!-- RELEASES -->
+    <div class="tab-panel" id="panel-releases-uvexporter">
+      <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
+      <p class="tab-sub">Complete release history for UV-Exporter.</p>
+      <div id="rlw-uvexporter"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
     </div>
-    <div class="sub-panel" id="sub-trouble">
-      <div class="trouble-list">
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong>, <strong>Windows SmartScreen</strong>, and third-party antivirus may flag the app — this is a <strong>false positive</strong> common with Python applications.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the BeamSkin Studio folder as an <strong>exception / exclusion</strong>.</div></div></div>
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly.<br><br>• <strong>Windows:</strong> Re-run <code>Install.bat</code> and let it finish. Launch via <code>BeamSkin Studio.bat</code>, not <code>main.py</code>.<br>• <strong>Linux:</strong> Re-run <code>./install_linux.sh</code> and check for errors. Or install manually: <code>pip install --user &lt;package-name&gt;</code>.</div></div></div>
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: tkinter not found / GUI fails to open<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">tkinter must be installed separately on Linux:<br><br>• <strong>Ubuntu/Debian:</strong> <code>sudo apt install python3-tk</code><br>• <strong>Fedora/RHEL:</strong> <code>sudo dnf install python3-tkinter</code><br>• <strong>Arch/Manjaro:</strong> <code>sudo pacman -S tk</code><br>• <strong>openSUSE:</strong> <code>sudo zypper install python3-tk</code></div></div></div>
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fab fa-linux"></i></div>Linux: permission denied when running scripts<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">The shell scripts need execute permission before they can run:<br><br><code>chmod +x install_linux.sh beamskin_studio.sh</code><br><br>Then run them with <code>./install_linux.sh</code> or <code>./beamskin_studio.sh</code>.</div></div></div>
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP and the extracted folder entirely.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div></div>
-        <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues" target="_blank"><i class="fab fa-github"></i> Windows Issues</a> &nbsp;·&nbsp; <a href="https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues" target="_blank" style="color:var(--amber);"><i class="fab fa-github"></i> Linux Issues</a></div></div></div>
+
+    <!-- CHANGELOG -->
+    <div class="tab-panel" id="panel-changelog-uvexporter">
+      <div class="cl-wrap">
+        <div class="cl-top"><h2 class="tab-heading">CHANGE<span>LOG</span></h2><span id="clVer-uvexporter" class="cl-ver">Loading…</span><span id="clDate-uvexporter" class="cl-date-label"></span></div>
+        <div class="cl-body" id="clBody-uvexporter"><div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div></div>
       </div>
     </div>
+
   </div>
 
-  <!-- RELEASES -->
-  <div class="tab-panel" id="panel-releases">
-    <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
-    <p class="tab-sub">Complete release history for Windows and Linux builds.</p>
-    <div class="os-toggle" style="margin-bottom:20px;">
-      <button class="os-btn win-on" id="relW" onclick="switchRelOS('windows')"><i class="fab fa-windows"></i> Windows</button>
-      <button class="os-btn" id="relL" onclick="switchRelOS('linux')"><i class="fab fa-linux"></i> Linux</button>
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-brand"><span class="footer-logo-mark"><i class="fas fa-draw-polygon"></i></span><span class="footer-name">UV-Exporter</span></div>
+    <div class="footer-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+      <a href="https://github.com/Burzt-YT/UV-Exporter" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
     </div>
-    <div class="os-sect active" id="rel-windows"><div id="rlw"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
-    <div class="os-sect" id="rel-linux"><div id="rll"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div></div>
-  </div>
-
-  <!-- CHANGELOG -->
-  <div class="tab-panel" id="panel-changelog">
-    <div class="cl-wrap">
-      <div class="cl-top"><h2 class="tab-heading">CHANGE<span>LOG</span></h2><span id="clVer" class="cl-ver">Loading…</span><span id="clDate" class="cl-date-label"></span></div>
-      <div class="cl-body" id="clBody"><div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div></div>
-    </div>
-  </div>
-
+    <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a> · <a href="#hub">All Projects</a></div>
+  </footer>
 </div>
 
-<!-- FOOTER -->
-<footer class="footer">
-  <div class="footer-brand"><img src="beamSkin_studio_logo.png" alt="" class="footer-logo"><span class="footer-name">BeamSkin Studio</span></div>
-  <div class="footer-socials">
-    <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
-    <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
-    <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
-    <a href="https://github.com/orgs/BeamSkin-Studio/repositories" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
-  </div>
-  <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a></div>
-</footer>
+<div id="page-haulhud" class="spa-page">
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="nav-brand" href="#hub">
+      <span class="nav-logo-mark"><i class="fas fa-code-branch"></i></span>
+      <span class="nav-wordmark">BURZT_<span>YT</span></span>
+    </a>
+    <div class="nav-crumb"><i class="fas fa-chevron-right"></i><span class="crumb-text">HaulHUD</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('haulhud','home',this)">Home</button>
+      <button class="nav-tab" onclick="switchTab('haulhud','features',this)">Features</button>
+      <button class="nav-tab" onclick="switchTab('haulhud','install',this)">Install</button>
+      <button class="nav-tab" onclick="switchTab('haulhud','releases',this)">Releases</button>
+      <button class="nav-tab" onclick="switchTab('haulhud','changelog',this)">Changelog</button>
+    </div>
+    <div class="nav-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="soc-btn discord"><i class="fab fa-discord"></i><span>Discord</span></a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="soc-btn patreon"><i class="fab fa-patreon"></i><span>Patreon</span></a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="soc-btn linktree"><i class="fas fa-seedling"></i><span>Linktree</span></a>
+      <a href="https://github.com/Burzt-YT/HaulHUD" target="_blank" class="soc-btn"><i class="fab fa-github"></i><span>GitHub</span></a>
+    </div>
+  </nav>
 
-<!-- LIGHTBOX -->
+  <div class="mobile-tab-bar">
+    <button class="mobile-tab active" onclick="switchTab('haulhud','home',this,true)">Home</button>
+    <button class="mobile-tab" onclick="switchTab('haulhud','features',this,true)">Features</button>
+    <button class="mobile-tab" onclick="switchTab('haulhud','install',this,true)">Install</button>
+    <button class="mobile-tab" onclick="switchTab('haulhud','releases',this,true)">Releases</button>
+    <button class="mobile-tab" onclick="switchTab('haulhud','changelog',this,true)">Changelog</button>
+  </div>
+
+  <!-- WIP Banner -->
+  <div class="wip-banner" id="wipBanner-haulhud">
+    <i class="fas fa-triangle-exclamation wip-icon"></i>
+    <div class="wip-content">
+      <strong>Work in Progress —</strong> HaulHUD is under active development. Known limitations:
+      <div class="wip-pills">
+        <span class="wip-pill">ATS support in testing</span>
+        <span class="wip-pill">Windows only</span>
+        <span class="wip-pill">Game updates may require a plugin update</span>
+      </div>
+    </div>
+    <div class="wip-links">
+      <a href="https://github.com/Burzt-YT/HaulHUD/issues" target="_blank"><i class="fab fa-github"></i> Report an Issue</a>
+    </div>
+    <button class="wip-dismiss" onclick="dismissWip(this)"><i class="fas fa-xmark"></i></button>
+  </div>
+
+  <div class="page-wrap">
+
+    <!-- HOME -->
+    <div class="tab-panel active" id="panel-home-haulhud">
+      <div class="hero">
+        <div>
+          <div class="hero-badge"><span class="dot"></span> Telemetry overlay for ETS2 &amp; ATS</div>
+          <h1 class="hero-title">YOUR CAB.<br><span class="ac">YOUR</span><br>DATA.<br><span class="dim">ON TOP.</span></h1>
+          <p class="hero-sub">A lightweight always-on-top HUD for Euro Truck Simulator 2 and American Truck Simulator. A C++ plugin reads live truck telemetry into shared memory, and a floating PySide6 overlay displays it — including a real-world fatigue reminder for long hauls.</p>
+          <div class="hero-actions single">
+            <button class="dl-btn dl-btn-win" id="winBtn-haulhud">
+              <span class="btn-label"><i class="fab fa-windows"></i> Windows Download</span>
+              <span id="winVer-haulhud" class="btn-ver">Checking…</span>
+              <span id="winCount-haulhud" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+            </button>
+          </div>
+          <div class="stats-row two">
+            <div class="stat-card"><div class="stat-icon"><i class="fas fa-download"></i></div><div><div class="stat-label">Total Downloads</div><div class="stat-value" id="statTotal-haulhud">—</div></div></div>
+            <div class="stat-card"><div class="stat-icon"><i class="fas fa-tag"></i></div><div><div class="stat-label">Releases</div><div class="stat-value" id="statReleases-haulhud">—</div></div></div>
+          </div>
+          <a href="https://github.com/Burzt-YT/HaulHUD" target="_blank" class="gh-link"><i class="fab fa-github"></i> View repository on GitHub</a>
+        </div>
+        <div>
+          <div class="viewer-frame" id="viewerFrame-haulhud">
+            <div class="viewer-placeholder"><i class="fas fa-truck-fast"></i><span>Preview coming soon</span></div>
+            <img id="vImg-haulhud" src="" alt="Screenshot" onclick="openLightbox('haulhud')">
+            <div class="viewer-zoom-hint" id="zoomHint-haulhud"><i class="fas fa-magnifying-glass-plus"></i> Click to enlarge</div>
+          </div>
+          <div class="gallery-label"><i class="fas fa-images"></i> Screenshots</div>
+          <div class="g-row g-row-3">
+            <div class="g-card"><span class="g-label" style="position:static;background:none;padding:0;color:var(--text-3);">Coming soon</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-star"></i> What's Included</div><div class="sec-div-line"></div></div>
+      <div class="qf-grid">
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-gauge-high"></i></div><div><div class="qf-title">Live Telemetry HUD</div><div class="qf-desc">A floating overlay showing real-time truck data pulled straight from the game.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-plug"></i></div><div><div class="qf-title">Two-Process Design</div><div class="qf-desc">A C++ DLL plugin writes telemetry to shared memory; the overlay reads it independently for a stable, lightweight setup.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-mug-hot"></i></div><div><div class="qf-title">Fatigue Reminder</div><div class="qf-desc">A real-world break reminder for long-haul sessions, so you remember to step away from the wheel.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-floppy-disk"></i></div><div><div class="qf-title">Persisted Settings</div><div class="qf-desc">HUD position and preferences are remembered between sessions.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-truck"></i></div><div><div class="qf-title">ETS2 &amp; ATS Support</div><div class="qf-desc">Works across both Euro Truck Simulator 2 and American Truck Simulator.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-desktop"></i></div><div><div class="qf-title">Always-On-Top Overlay</div><div class="qf-desc">Stays visible over the game window without stealing focus.</div></div></div>
+        <div class="qf-card"><div class="qf-icon"><i class="fas fa-rotate"></i></div><div><div class="qf-title">Auto Update Checker</div><div class="qf-desc">Checks GitHub for newer versions on startup so you're always current.</div></div></div>
+        <div class="qf-card" style="cursor:pointer;" onclick="switchTab('haulhud','features')"><div class="qf-icon"><i class="fas fa-arrow-right"></i></div><div><div class="qf-title">See All Features</div><div class="qf-desc">View the full list and what's coming next.</div></div></div>
+      </div>
+      <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-title"><i class="fas fa-users"></i> Community</div><div class="sec-div-line"></div></div>
+      <div class="community-grid">
+        <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="comm-card comm-discord"><div class="comm-icon"><i class="fab fa-discord"></i></div><div><div class="comm-title">Discord Server</div><div class="comm-desc">Join the community, get support, and stay up to date on development.</div></div></a>
+        <a href="https://patreon.com/BURZT_YT" target="_blank" class="comm-card comm-patreon"><div class="comm-icon"><i class="fab fa-patreon"></i></div><div><div class="comm-title">Support on Patreon</div><div class="comm-desc">Help support the development of HaulHUD and every other project here.</div></div></a>
+        <a href="https://linktr.ee/burzt_yt" target="_blank" class="comm-card comm-linktree"><div class="comm-icon"><i class="fas fa-seedling"></i></div><div><div class="comm-title">Linktree</div><div class="comm-desc">All links in one place — YouTube, socials, and everything from @Burzt_YT.</div></div></a>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="tab-panel" id="panel-features-haulhud">
+      <h2 class="tab-heading">CURRENT <span>FEATURES</span></h2>
+      <p class="tab-sub">Everything available in the current release of HaulHUD.</p>
+      <div class="feat-grid">
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-gauge-high"></i></div><div class="feat-title">Live Truck Telemetry</div></div><div class="feat-desc">Displays real-time data from the game — speed, RPM, and other core truck stats — in a floating overlay.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-plug"></i></div><div class="feat-title">C++ Plugin + Shared Memory</div></div><div class="feat-desc">A native DLL plugin hooks into the game's telemetry SDK and writes to shared memory, keeping overhead minimal.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-restore"></i></div><div class="feat-title">PySide6 Overlay</div></div><div class="feat-desc">The HUD itself is a separate lightweight process that reads from shared memory and renders on top of the game window.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-mug-hot"></i></div><div class="feat-title">Real-World Fatigue Reminder</div></div><div class="feat-desc">Tracks real playtime and gently reminds you to take a break during long-haul sessions.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-floppy-disk"></i></div><div class="feat-title">Persisted Settings</div></div><div class="feat-desc">HUD position, size, and preferences are saved automatically and restored on next launch.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-truck"></i></div><div class="feat-title">ETS2 &amp; ATS Support</div></div><div class="feat-desc">Works with both Euro Truck Simulator 2 and American Truck Simulator through the same telemetry SDK.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-rotate"></i></div><div class="feat-title">Automatic Update Checking</div></div><div class="feat-desc">On every startup, HaulHUD checks GitHub for a newer version and notifies you if one is available.</div></div>
+        <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-eye-slash"></i></div><div class="feat-title">Non-Intrusive Overlay</div></div><div class="feat-desc">Stays on top of the game window without capturing keyboard or mouse focus.</div></div>
+      </div>
+
+      <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-road"></i> On The Roadmap</div><div class="upc-hdr-line"></div></div>
+      <div class="upc-grid">
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fas fa-palette"></i></div><div class="upc-title">Custom HUD Themes</div><div class="upc-desc">Choose colors and layout presets to match your setup.</div></div>
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fas fa-gauge"></i></div><div class="upc-title">More Telemetry Fields</div><div class="upc-desc">Additional stats like fuel range, damage, and cruise control status.</div></div>
+        <div class="upc-card"><span class="upc-badge"><i class="fas fa-flask"></i> Planned</span><div class="upc-icon"><i class="fab fa-linux"></i></div><div class="upc-title">Linux Support</div><div class="upc-desc">Investigating a Proton-compatible build for Linux users.</div></div>
+      </div>
+    </div>
+
+    <!-- INSTALL -->
+    <div class="tab-panel" id="panel-install-haulhud">
+      <h2 class="tab-heading">INSTALLATION <span>GUIDE</span></h2>
+      <p class="tab-sub">Get HaulHUD running in minutes.</p>
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchSub('haulhud','inst',this)"><i class="fas fa-download"></i> Installation</button>
+        <button class="sub-tab" onclick="switchSub('haulhud','manual',this)"><i class="fas fa-terminal"></i> Manual Install</button>
+        <button class="sub-tab" onclick="switchSub('haulhud','trouble',this)"><i class="fas fa-wrench"></i> Troubleshooting</button>
+      </div>
+      <div class="sub-panel active" id="sub-inst-haulhud">
+        <div class="steps-grid sg5">
+          <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fas fa-download"></i></div><div class="step-label">Download</div><div class="step-desc">Click the <strong>Windows Download</strong> button on the Home tab to grab the latest release ZIP from GitHub.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-file-zipper"></i></div><div class="step-label">Extract ZIP</div><div class="step-desc">Right-click the downloaded ZIP and choose <strong>Extract All</strong>. Pick any folder.</div><div class="step-tip">💡 Avoid paths with spaces — <code>C:\Tools\HaulHUD</code> works great.</div></div>
+          <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-plug"></i></div><div class="step-label">Install the Plugin</div><div class="step-desc">Run <code>Install.bat</code> — it copies the telemetry DLL into your game's <code>plugins</code> folder and installs the overlay's dependencies.</div><div class="step-tip">⚠️ If SmartScreen appears, click <strong>More info → Run anyway</strong>. False positive — common with Python apps.</div></div>
+          <div class="step-card"><div class="step-num">04</div><div class="step-icon"><i class="fas fa-truck"></i></div><div class="step-label">Launch the Game</div><div class="step-desc">Start ETS2 or ATS as normal. The telemetry plugin loads automatically once installed.</div></div>
+          <div class="step-card"><div class="step-num">05</div><div class="step-icon"><i class="fas fa-rocket"></i></div><div class="step-label">Launch HaulHUD</div><div class="step-desc">Run <code>HaulHUD.bat</code> before or after loading into a save — the overlay will connect once the game is running.</div><div class="step-tip">💡 Create a desktop shortcut to this .bat file for quick access.</div></div>
+        </div>
+      </div>
+      <div class="sub-panel" id="sub-manual-haulhud">
+        <div class="steps-grid sg3" style="margin-bottom:24px;">
+          <div class="step-card"><div class="step-num">01</div><div class="step-icon"><i class="fab fa-python"></i></div><div class="step-label">Install Python</div><div class="step-desc">Download <strong>Python 3.9+</strong> (3.12 recommended) from <a href="https://www.python.org/downloads/" target="_blank" style="color:var(--proj-accent);font-weight:700;">python.org</a>.</div><div class="step-tip">⚠️ Check <strong>"Add Python to PATH"</strong> before clicking Install Now.</div></div>
+          <div class="step-card"><div class="step-num">02</div><div class="step-icon"><i class="fas fa-terminal"></i></div><div class="step-label">Open a Terminal</div><div class="step-desc">Open <strong>Command Prompt</strong> or <strong>PowerShell</strong>. Navigate to the HaulHUD folder with <code>cd</code>.</div><div class="step-tip">💡 In Windows Explorer, type <code>cmd</code> in the address bar inside the folder.</div></div>
+          <div class="step-card"><div class="step-num">03</div><div class="step-icon"><i class="fas fa-box"></i></div><div class="step-label">Install Dependencies</div><div class="step-desc">Run to install all required packages:<br><br><code>pip install -r requirements.txt</code></div><div class="step-tip">💡 If <code>pip</code> isn't found, try <code>python -m pip install -r requirements.txt</code>.</div></div>
+        </div>
+        <div class="upc-hdr"><div class="upc-hdr-line"></div><div class="upc-hdr-title"><i class="fas fa-cube"></i> What Gets Installed</div><div class="upc-hdr-line"></div></div>
+        <div class="pkgs-grid">
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-window-maximize"></i></div><div><div class="feat-title">PySide6</div></div></div><div class="feat-desc">Qt-based GUI framework powering the overlay window.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-memory"></i></div><div><div class="feat-title">Shared Memory Reader</div></div></div><div class="feat-desc">Reads live telemetry written by the C++ plugin via Windows shared memory.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fas fa-globe"></i></div><div><div class="feat-title">requests</div></div></div><div class="feat-desc">HTTP library for the update checker.</div></div>
+          <div class="feat-card"><div class="feat-head"><div class="feat-icon"><i class="fab fa-windows"></i></div><div><div class="feat-title">pywin32</div></div></div><div class="feat-desc">Windows API access for the always-on-top overlay behavior.</div></div>
+        </div>
+        <div class="lin-info"><strong><i class="fas fa-plug"></i> Plugin note —</strong> The telemetry plugin is a compiled DLL, not a Python package — it's copied into <code>bin/win_x64/plugins</code> by the installer and does not need to be built manually.</div>
+      </div>
+      <div class="sub-panel" id="sub-trouble-haulhud">
+        <div class="trouble-list">
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-warn"><i class="fas fa-shield-halved"></i></div>Antivirus / Windows Defender warnings<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Virus scanners including <strong>Windows Defender</strong> and <strong>SmartScreen</strong> may flag the app or plugin DLL — this is a <strong>false positive</strong> common with Python applications and unsigned plugins.<br><br>• On SmartScreen: click <strong>More info → Run anyway</strong>.<br>• In your antivirus: add the HaulHUD folder and your game's <code>plugins</code> folder as an <strong>exception / exclusion</strong>.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-plug-circle-xmark"></i></div>HUD shows no data / stuck on "Waiting for game"<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">This usually means the telemetry plugin isn't loaded.<br><br>• Confirm the DLL is in your game's <code>bin/win_x64/plugins</code> folder.<br>• Make sure the game is fully loaded into a save, not just on the main menu.<br>• Re-run <code>Install.bat</code> if the plugin folder looks empty.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-circle-xmark"></i></div>ModuleNotFoundError on launch<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">A missing module means the installation didn't complete correctly. Re-run <code>Install.bat</code> and let it finish, then launch via <code>HaulHUD.bat</code>, not <code>main.py</code> directly.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-err"><i class="fas fa-rotate-left"></i></div>Everything keeps failing — fresh start<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">If repeated fixes don't help, do a clean reinstall:<br><br>1. <strong>Delete</strong> the downloaded ZIP, the extracted folder, and the plugin DLL from your game's plugins folder.<br>2. Re-download a fresh copy from the Home tab.<br>3. Extract to a new location and run the installer again.</div></div></div>
+          <div class="trouble-item" onclick="toggleT(this)"><div class="trouble-q"><div class="tq-icon tq-info"><i class="fab fa-github"></i></div>Other errors or bugs<i class="fas fa-chevron-down tq-chev"></i></div><div class="trouble-ans"><div class="ta-inner">Please submit a report on GitHub — include any error messages or console output:<br><br><a href="https://github.com/Burzt-YT/HaulHUD/issues" target="_blank"><i class="fab fa-github"></i> Report an Issue</a></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELEASES -->
+    <div class="tab-panel" id="panel-releases-haulhud">
+      <h2 class="tab-heading">ALL <span>RELEASES</span></h2>
+      <p class="tab-sub">Complete release history for HaulHUD.</p>
+      <div id="rlw-haulhud"><div class="rel-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading releases…</div></div>
+    </div>
+
+    <!-- CHANGELOG -->
+    <div class="tab-panel" id="panel-changelog-haulhud">
+      <div class="cl-wrap">
+        <div class="cl-top"><h2 class="tab-heading">CHANGE<span>LOG</span></h2><span id="clVer-haulhud" class="cl-ver">Loading…</span><span id="clDate-haulhud" class="cl-date-label"></span></div>
+        <div class="cl-body" id="clBody-haulhud"><div class="cl-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading changelog…</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-brand"><span class="footer-logo-mark"><i class="fas fa-truck-fast"></i></span><span class="footer-name">HaulHUD</span></div>
+    <div class="footer-socials">
+      <a href="https://discord.com/invite/mbr3YxZzrr" target="_blank" class="footer-soc discord"><i class="fab fa-discord"></i> Discord</a>
+      <a href="https://patreon.com/BURZT_YT" target="_blank" class="footer-soc patreon"><i class="fab fa-patreon"></i> Patreon</a>
+      <a href="https://linktr.ee/burzt_yt" target="_blank" class="footer-soc linktree"><i class="fas fa-seedling"></i> Linktree</a>
+      <a href="https://github.com/Burzt-YT/HaulHUD" target="_blank" class="footer-soc"><i class="fab fa-github"></i> GitHub</a>
+    </div>
+    <div class="footer-credit">Made by <a href="https://linktr.ee/burzt_yt" target="_blank">@Burzt_YT</a> · <a href="#hub">All Projects</a></div>
+  </footer>
+</div>
+
+<!-- LIGHTBOX (single shared instance for all pages) -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close fullscreen"><i class="fas fa-xmark"></i></button>
   <div class="lightbox-inner" onclick="event.stopPropagation()"><img id="lightboxImg" src="" alt="Screenshot fullscreen"></div>
 </div>
 
 <script>
-const WIN_REPO='BeamSkin-Studio/BeamSkin-Studio-Beta';
-const LINUX_REPO='BeamSkin-Studio/BeamSkin-Studio-Linux-Beta';
-let winUrl=`https://github.com/${WIN_REPO}/releases/latest`;
-let linuxUrl=`https://github.com/${LINUX_REPO}/releases/latest`;
+/* ============================================
+   BURZT_YT — Single-Page App Logic
+   (merged from shared.js and the per-page scripts)
+   ============================================ */
 
-async function initData(){
-  try{
-    const [wR,lR]=await Promise.all([
-      fetch(`https://api.github.com/repos/${WIN_REPO}/releases`).then(r=>r.json()),
-      fetch(`https://api.github.com/repos/${LINUX_REPO}/releases`).then(r=>r.json())
-    ]);
-    let wT=0,lT=0,wL=0,lL=0;
-    wR.forEach((r,i)=>r.assets.forEach(a=>{wT+=a.download_count;if(i===0)wL+=a.download_count;}));
-    lR.forEach((r,i)=>r.assets.forEach(a=>{lT+=a.download_count;if(i===0)lL+=a.download_count;}));
-    if(wR.length){document.getElementById('winVer').textContent=wR[0].tag_name;if(wR[0].assets.length)winUrl=wR[0].assets[0].browser_download_url;}
-    if(lR.length){document.getElementById('linVer').textContent=lR[0].tag_name;if(lR[0].assets.length)linuxUrl=lR[0].assets[0].browser_download_url;}
-    document.getElementById('winCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${wL.toLocaleString()} (latest)`;
-    document.getElementById('linCount').innerHTML=`<i class="fas fa-download" style="font-size:.6rem;"></i> ${lL.toLocaleString()} (latest)`;
-    document.getElementById('statTotal').textContent=(wT+lT).toLocaleString();
-    document.getElementById('statWin').textContent=wT.toLocaleString();
-    document.getElementById('statLin').textContent=lT.toLocaleString();
-    buildRelList(wR,'rlw',false);
-    buildRelList(lR,'rll',true);
-  }catch(e){console.error(e);['winVer','linVer'].forEach(id=>document.getElementById(id).textContent='Unavailable');}
+/* ---------- Page Router ---------- */
+const PAGES = ['hub','beamskin','uvexporter','haulhud'];
+
+function showPage(name){
+  if (!PAGES.includes(name)) name = 'hub';
+  document.body.setAttribute('data-page', name);
+  PAGES.forEach(p=>{
+    const el = document.getElementById('page-'+p);
+    if (el) el.classList.toggle('active', p === name);
+  });
+  window.scrollTo({top:0, behavior:'instant'});
+}
+function routeFromHash(){
+  showPage((location.hash || '#hub').slice(1));
+}
+window.addEventListener('hashchange', routeFromHash);
+
+/* ---------- Lightbox (single global instance, shared by all pages) ---------- */
+function openLightbox(scope){
+  const img = document.getElementById('vImg-'+scope);
+  if (!img || !img.src || img.style.display === 'none') return;
+  document.getElementById('lightboxImg').src = img.src;
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(){
+  const lb = document.getElementById('lightbox');
+  if (lb) lb.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLightbox(); });
+
+/* ---------- Gallery (scoped per project page) ---------- */
+function clearG(scope){
+  document.querySelectorAll('#page-'+scope+' .g-card').forEach(c=>c.classList.remove('active'));
+}
+function showVideo(scope, id, card){
+  const v = document.getElementById('vVideo-'+scope), i = document.getElementById('vImg-'+scope), h = document.getElementById('zoomHint-'+scope);
+  if (v) v.src = `https://www.youtube.com/embed/${id}`;
+  if (v) v.style.display = 'block';
+  if (i) i.style.display = 'none';
+  if (h) h.style.display = 'none';
+  clearG(scope);
+  if (card) card.classList.add('active');
+}
+function showImage(scope, src, card){
+  const v = document.getElementById('vVideo-'+scope), i = document.getElementById('vImg-'+scope);
+  if (i) i.src = src;
+  if (v) v.style.display = 'none';
+  if (i) i.style.display = 'block';
+  clearG(scope);
+  if (card) card.classList.add('active');
 }
 
-function fmtDate(iso){return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
+/* ---------- Tabs (scoped per project page) ---------- */
+const TABS = ['home','features','install','releases','changelog'];
+function switchTab(scope, name, btn, isMobile){
+  const root = document.getElementById('page-'+scope);
+  if (!root) return;
+  root.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  const panel = document.getElementById('panel-'+name+'-'+scope);
+  if (panel) panel.classList.add('active');
+  const idx = TABS.indexOf(name);
+  if (!isMobile){
+    root.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
+    root.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
+  } else {
+    root.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    root.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active', i===idx));
+  }
+  window.scrollTo({top:0, behavior:'instant'});
+}
+function switchSub(scope, name, btn){
+  const root = document.getElementById('page-'+scope);
+  if (!root) return;
+  root.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  root.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  const panel = document.getElementById('sub-'+name+'-'+scope);
+  if (panel) panel.classList.add('active');
+}
+function switchInstOS(scope, os){
+  const root = document.getElementById('page-'+scope);
+  if (!root) return;
+  const instPanel = document.getElementById('sub-inst-'+scope);
+  if (instPanel) instPanel.querySelectorAll('.os-sect').forEach(s=>s.classList.remove('active'));
+  const sect = document.getElementById('inst-'+os+'-'+scope);
+  if (sect) sect.classList.add('active');
+  const w = document.getElementById('instW-'+scope), l = document.getElementById('instL-'+scope);
+  if (w) w.className = 'os-btn' + (os==='windows' ? ' win-on' : '');
+  if (l) l.className = 'os-btn' + (os==='linux' ? ' lin-on' : '');
+}
+function switchRelOS(scope, os){
+  const panel = document.getElementById('panel-releases-'+scope);
+  if (panel) panel.querySelectorAll('.os-sect').forEach(s=>s.classList.remove('active'));
+  const sect = document.getElementById('rel-'+os+'-'+scope);
+  if (sect) sect.classList.add('active');
+  const w = document.getElementById('relW-'+scope), l = document.getElementById('relL-'+scope);
+  if (w) w.className = 'os-btn' + (os==='windows' ? ' win-on' : '');
+  if (l) l.className = 'os-btn' + (os==='linux' ? ' lin-on' : '');
+}
+function toggleT(item){ item.classList.toggle('open'); }
 
-function buildRelList(rels,id,lin){
-  const c=document.getElementById(id);
-  if(!rels.length){c.innerHTML='<div class="rel-loading">No releases found.</div>';return;}
-  c.innerHTML='';
+/* ---------- GitHub Releases / Stats ---------- */
+function fmtDate(iso){
+  return new Date(iso).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+}
+
+function buildRelList(rels, id, lin){
+  const c = document.getElementById(id);
+  if (!c) return;
+  if (!rels || !rels.length){ c.innerHTML = '<div class="rel-loading">No releases found.</div>'; return; }
+  c.innerHTML = '';
   rels.forEach((r,i)=>{
-    const isL=i===0;
-    const dlC=r.assets.reduce((s,a)=>s+a.download_count,0);
-    const url=r.assets.length?r.assets[0].browser_download_url:null;
-    const row=document.createElement('div');
-    row.className='release-row'+(lin?' lin-row':'')+(isL?' is-latest':'');
-    const badge=isL?`<span class="rel-latest-badge ${lin?'lin':''}"><i class="fas fa-circle-check"></i> LATEST</span>`:'';
-    const btn=url?`<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>`:`<span class="rel-no-asset">No asset</span>`;
-    row.innerHTML=`<div class="rel-tag">${r.tag_name}${badge}</div><div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div><div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>${btn}`;
+    const isL = i === 0;
+    const dlC = r.assets.reduce((s,a)=>s+a.download_count, 0);
+    const url = r.assets.length ? r.assets[0].browser_download_url : null;
+    const row = document.createElement('div');
+    row.className = 'release-row' + (lin ? ' lin-row' : '') + (isL ? ' is-latest' : '');
+    const badge = isL ? `<span class="rel-latest-badge ${lin?'lin':''}"><i class="fas fa-circle-check"></i> LATEST</span>` : '';
+    const btn = url ? `<a href="${url}" class="rel-dl-btn ${lin?'lin':''}"><i class="fas fa-download"></i> Download</a>` : `<span class="rel-no-asset">No asset</span>`;
+    row.innerHTML = `<div class="rel-tag">${r.tag_name}${badge}</div><div class="rel-date"><i class="fas fa-calendar-alt" style="margin-right:5px;opacity:.3;"></i>${fmtDate(r.published_at)}</div><div class="rel-dl ${lin?'lin':''}"><i class="fas fa-download"></i><span class="dl-n">${dlC.toLocaleString()}</span> downloads</div>${btn}`;
     c.appendChild(row);
   });
 }
 
-async function fetchChangelog(){
+/**
+ * Fetches release + download stats for a single-OS or dual-OS (win/linux) project.
+ * config: { winRepo, linuxRepo (optional), scope }
+ */
+async function initReleaseData(config){
+  const scope = config.scope;
+  const hasLinux = !!config.linuxRepo;
   try{
-    const res=await fetch('https://raw.githubusercontent.com/BeamSkin-Studio/BeamSkin-Studio-Beta/main/core/changelog.py');
-    if(!res.ok)throw new Error('fetch');
-    const text=await res.text();
-    const ls=text.indexOf('CHANGELOGS = [');
-    if(ls===-1)throw new Error('no list');
-    const cont=text.slice(ls);
-    let d=0,s=-1,e=-1;
-    for(let i=0;i<cont.length;i++){if(cont[i]==='{'){if(d===0)s=i;d++;}else if(cont[i]==='}'){d--;if(d===0){e=i;break;}}}
-    if(s===-1||e===-1)throw new Error('parse');
-    const blk=cont.slice(s,e+1);
-    const ver=(blk.match(/"version":\s*"([^"]+)"/))||[];
-    const dat=(blk.match(/"date":\s*"([^"]+)"/))||[];
-    document.getElementById('clVer').textContent=`v${ver[1]||'?'}`;
-    document.getElementById('clDate').textContent=dat[1]||'';
-    const entries=[];
-    const re=/(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
+    const fetchOne = (repo) => fetch(`https://api.github.com/repos/${repo}/releases`).then(async r=>{
+      const data = await r.json();
+      if (!r.ok || !Array.isArray(data)){
+        const rateLimited = r.status===403 || r.status===429 || (data && data.message && /rate limit/i.test(data.message));
+        return { error: true, rateLimited, data: [] };
+      }
+      return { error: false, data };
+    });
+
+    const fetches = [fetchOne(config.winRepo)];
+    if (hasLinux) fetches.push(fetchOne(config.linuxRepo));
+    const results = await Promise.all(fetches);
+
+    const winRes = results[0];
+    const linRes = hasLinux ? results[1] : null;
+    const wR = winRes.data;
+    const lR = hasLinux ? linRes.data : [];
+
+    let wT=0, lT=0, wL=0, lL=0;
+    wR.forEach((r,i)=>r.assets.forEach(a=>{ wT+=a.download_count; if(i===0) wL+=a.download_count; }));
+    if (hasLinux) lR.forEach((r,i)=>r.assets.forEach(a=>{ lT+=a.download_count; if(i===0) lL+=a.download_count; }));
+
+    window.dlUrls = window.dlUrls || {};
+    window.dlUrls[scope] = window.dlUrls[scope] || {};
+
+    if (winRes.error){
+      const verEl = document.getElementById('winVer-'+scope); if (verEl) verEl.textContent = winRes.rateLimited ? 'Rate limited' : 'Unavailable';
+      const cEl = document.getElementById('winCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-triangle-exclamation" style="font-size:.6rem;"></i> ${winRes.rateLimited ? 'Try again shortly' : 'N/A'}`;
+    } else if (wR.length){
+      const verEl = document.getElementById('winVer-'+scope); if (verEl) verEl.textContent = wR[0].tag_name;
+      if (wR[0].assets.length) window.dlUrls[scope].win = wR[0].assets[0].browser_download_url;
+      const cEl = document.getElementById('winCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-download" style="font-size:.6rem;"></i> ${wL.toLocaleString()} (latest)`;
+    } else {
+      const verEl = document.getElementById('winVer-'+scope); if (verEl) verEl.textContent = 'No release yet';
+      const cEl = document.getElementById('winCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-download" style="font-size:.6rem;"></i> 0`;
+    }
+
+    if (hasLinux){
+      if (linRes.error){
+        const verEl = document.getElementById('linVer-'+scope); if (verEl) verEl.textContent = linRes.rateLimited ? 'Rate limited' : 'Unavailable';
+        const cEl = document.getElementById('linCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-triangle-exclamation" style="font-size:.6rem;"></i> ${linRes.rateLimited ? 'Try again shortly' : 'N/A'}`;
+      } else if (lR.length){
+        const verEl = document.getElementById('linVer-'+scope); if (verEl) verEl.textContent = lR[0].tag_name;
+        if (lR[0].assets.length) window.dlUrls[scope].lin = lR[0].assets[0].browser_download_url;
+        const cEl = document.getElementById('linCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-download" style="font-size:.6rem;"></i> ${lL.toLocaleString()} (latest)`;
+      } else {
+        const verEl = document.getElementById('linVer-'+scope); if (verEl) verEl.textContent = 'No release yet';
+        const cEl = document.getElementById('linCount-'+scope); if (cEl) cEl.innerHTML = `<i class="fas fa-download" style="font-size:.6rem;"></i> 0`;
+      }
+    }
+
+    const anyError = winRes.error || (hasLinux && linRes.error);
+    const totalEl = document.getElementById('statTotal-'+scope); if (totalEl) totalEl.textContent = anyError ? '—' : (wT+lT).toLocaleString();
+    const statWinEl = document.getElementById('statWin-'+scope); if (statWinEl) statWinEl.textContent = winRes.error ? '—' : wT.toLocaleString();
+    const statLinEl = document.getElementById('statLin-'+scope); if (statLinEl) statLinEl.textContent = (hasLinux && linRes.error) ? '—' : lT.toLocaleString();
+    const statReleasesEl = document.getElementById('statReleases-'+scope); if (statReleasesEl) statReleasesEl.textContent = winRes.error ? '—' : wR.length.toLocaleString();
+
+    if (winRes.error){
+      const rlwEl = document.getElementById('rlw-'+scope);
+      if (rlwEl) rlwEl.innerHTML = `<div class="rel-loading">${winRes.rateLimited ? "GitHub's public API rate limit was hit. Try again in a few minutes, or view the" : 'Could not load releases. View the'} <a href="https://github.com/${config.winRepo}/releases" target="_blank" style="color:var(--accent);font-weight:700;">releases page</a> directly.</div>`;
+    } else {
+      buildRelList(wR, 'rlw-'+scope, false);
+    }
+    if (hasLinux){
+      if (linRes.error){
+        const rllEl = document.getElementById('rll-'+scope);
+        if (rllEl) rllEl.innerHTML = `<div class="rel-loading">${linRes.rateLimited ? "GitHub's public API rate limit was hit. Try again in a few minutes, or view the" : 'Could not load releases. View the'} <a href="https://github.com/${config.linuxRepo}/releases" target="_blank" style="color:var(--amber);font-weight:700;">releases page</a> directly.</div>`;
+      } else {
+        buildRelList(lR, 'rll-'+scope, true);
+      }
+    }
+
+    return {wR, lR};
+  } catch(e){
+    console.error(e);
+    ['winVer-'+scope, 'linVer-'+scope].forEach(id=>{ const el=document.getElementById(id); if (el) el.textContent = 'Unavailable'; });
+    return {wR:[], lR:[]};
+  }
+}
+
+/* ---------- Changelog (from core/changelog.py convention) ---------- */
+async function fetchChangelog(repo, branch, scope){
+  branch = branch || 'main';
+  try{
+    const res = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/core/changelog.py`);
+    if (!res.ok) throw new Error('fetch');
+    const text = await res.text();
+    const ls = text.indexOf('CHANGELOGS = [');
+    if (ls === -1) throw new Error('no list');
+    const cont = text.slice(ls);
+    let d=0, s=-1, e=-1;
+    for (let i=0; i<cont.length; i++){
+      if (cont[i] === '{'){ if (d===0) s=i; d++; }
+      else if (cont[i] === '}'){ d--; if (d===0){ e=i; break; } }
+    }
+    if (s===-1 || e===-1) throw new Error('parse');
+    const blk = cont.slice(s, e+1);
+    const ver = (blk.match(/"version":\s*"([^"]+)"/)) || [];
+    const dat = (blk.match(/"date":\s*"([^"]+)"/)) || [];
+    const clVer = document.getElementById('clVer-'+scope); if (clVer) clVer.textContent = `v${ver[1]||'?'}`;
+    const clDate = document.getElementById('clDate-'+scope); if (clDate) clDate.textContent = dat[1]||'';
+    const entries = [];
+    const re = /(title|subtitle|item|note|separator)\((?:"((?:[^"\\]|\\.)*)")?\)/g;
     let m;
-    while((m=re.exec(blk))!==null)entries.push({type:m[1],text:m[2]||''});
-    const body=document.getElementById('clBody');
-    body.innerHTML='';
-    const safe=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
-    for(const en of entries){
-      if(en.type==='separator'){const hr=document.createElement('hr');hr.className='cl-sep';body.appendChild(hr);continue;}
-      const div=document.createElement('div');
-      if(en.type==='title'){div.className='cl-title-el';div.innerHTML=safe(en.text);}
-      else if(en.type==='subtitle'){div.className='cl-sub';div.innerHTML=safe(en.text);}
-      else if(en.type==='item'){div.className='cl-item-el';div.innerHTML=safe(en.text);}
-      else if(en.type==='note'){div.className='cl-note-el';div.innerHTML='💡 '+safe(en.text);}
+    while ((m = re.exec(blk)) !== null) entries.push({type:m[1], text:m[2]||''});
+    const body = document.getElementById('clBody-'+scope);
+    if (!body) return;
+    body.innerHTML = '';
+    const safe = t => t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');
+    for (const en of entries){
+      if (en.type === 'separator'){ const hr = document.createElement('hr'); hr.className='cl-sep'; body.appendChild(hr); continue; }
+      const div = document.createElement('div');
+      if (en.type === 'title'){ div.className='cl-title-el'; div.innerHTML=safe(en.text); }
+      else if (en.type === 'subtitle'){ div.className='cl-sub'; div.innerHTML=safe(en.text); }
+      else if (en.type === 'item'){ div.className='cl-item-el'; div.innerHTML=safe(en.text); }
+      else if (en.type === 'note'){ div.className='cl-note-el'; div.innerHTML='💡 '+safe(en.text); }
       body.appendChild(div);
     }
-  }catch(e){console.error(e);document.getElementById('clBody').innerHTML='<div class="cl-loading">Could not load changelog.</div>';document.getElementById('clVer').textContent='';}
+  } catch(e){
+    console.error(e);
+    const clBody = document.getElementById('clBody-'+scope); if (clBody) clBody.innerHTML = '<div class="cl-loading">Could not load changelog. Check back after the next release.</div>';
+    const clVer = document.getElementById('clVer-'+scope); if (clVer) clVer.textContent = '';
+  }
 }
 
-function openLightbox(){const img=document.getElementById('vImg');if(!img.src||img.style.display==='none')return;document.getElementById('lightboxImg').src=img.src;document.getElementById('lightbox').classList.add('open');document.body.style.overflow='hidden';}
-function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.body.style.overflow='';}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightbox();});
-
-function clearG(){document.querySelectorAll('.g-card').forEach(c=>c.classList.remove('active'));}
-function showVideo(id,card){document.getElementById('vVideo').src=`https://www.youtube.com/embed/${id}`;document.getElementById('vVideo').style.display='block';document.getElementById('vImg').style.display='none';document.getElementById('zoomHint').style.display='none';clearG();if(card)card.classList.add('active');}
-function showImage(src,card){document.getElementById('vImg').src=src;document.getElementById('vVideo').style.display='none';document.getElementById('vImg').style.display='block';clearG();if(card)card.classList.add('active');}
-
-const TABS=['home','features','install','releases','changelog'];
-function switchTab(name,btn,isMobile){
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('panel-'+name).classList.add('active');
-  const idx=TABS.indexOf(name);
-  if(!isMobile){document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));document.querySelectorAll('.mobile-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));}
-  else{document.querySelectorAll('.mobile-tab').forEach(t=>t.classList.remove('active'));if(btn)btn.classList.add('active');document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));}
+/* ---------- Download button wiring ---------- */
+function wireDownloadButtons(scope){
+  const winBtn = document.getElementById('winBtn-'+scope);
+  const linBtn = document.getElementById('linBtn-'+scope);
+  if (winBtn) winBtn.onclick = () => { const u = window.dlUrls && window.dlUrls[scope] && window.dlUrls[scope].win; if (u) window.location.href = u; };
+  if (linBtn) linBtn.onclick = () => { const u = window.dlUrls && window.dlUrls[scope] && window.dlUrls[scope].lin; if (u) window.location.href = u; };
 }
-function switchSub(name,btn){document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById('sub-'+name).classList.add('active');}
-function switchInstOS(os){document.querySelectorAll('#sub-inst .os-sect').forEach(s=>s.classList.remove('active'));document.getElementById('inst-'+os).classList.add('active');document.getElementById('instW').className='os-btn'+(os==='windows'?' win-on':'');document.getElementById('instL').className='os-btn'+(os==='linux'?' lin-on':'');}
-function switchRelOS(os){document.querySelectorAll('#panel-releases .os-sect').forEach(s=>s.classList.remove('active'));document.getElementById('rel-'+os).classList.add('active');document.getElementById('relW').className='os-btn'+(os==='windows'?' win-on':'');document.getElementById('relL').className='os-btn'+(os==='linux'?' lin-on':'');}
-function toggleT(item){item.classList.toggle('open');}
 
-document.getElementById('winBtn').onclick=()=>window.location.href=winUrl;
-document.getElementById('linBtn').onclick=()=>window.location.href=linuxUrl;
+/* ---------- WIP banner dismiss ---------- */
+function dismissWip(btn){
+  const b = btn.closest('.wip-banner');
+  if (b) b.style.display = 'none';
+}
 
-initData();
-fetchChangelog();
+/* ---------- Hub download totals ---------- */
+async function loadHubStats(){
+  const repos = {
+    'hub-bs-downloads': ['BeamSkin-Studio/BeamSkin-Studio-Beta','BeamSkin-Studio/BeamSkin-Studio-Linux-Beta'],
+    'hub-uv-downloads': ['Burzt-YT/UV-Exporter'],
+    'hub-hh-downloads': ['Burzt-YT/HaulHUD']
+  };
+  for (const [elId, repoList] of Object.entries(repos)){
+    let total = 0;
+    let hadError = false;
+    let rateLimited = false;
+    for (const repo of repoList){
+      try{
+        const res = await fetch(`https://api.github.com/repos/${repo}/releases`);
+        const rels = await res.json();
+        if (!res.ok || !Array.isArray(rels)){
+          hadError = true;
+          if (res.status===403 || res.status===429 || (rels && rels.message && /rate limit/i.test(rels.message))) rateLimited = true;
+          continue;
+        }
+        rels.forEach(r=>r.assets.forEach(a=>total+=a.download_count));
+      } catch(e){
+        hadError = true;
+      }
+    }
+    const el = document.getElementById(elId);
+    if (el){
+      if (hadError && total === 0){
+        el.innerHTML = `<i class="fas fa-triangle-exclamation"></i> ${rateLimited ? 'Rate limited' : 'Unavailable'}`;
+      } else {
+        el.innerHTML = `<i class="fas fa-download"></i> ${total.toLocaleString()} downloads`;
+      }
+    }
+  }
+}
+
+/* ---------- Boot ---------- */
+function initAllProjects(){
+  wireDownloadButtons('beamskin');
+  initReleaseData({ winRepo:'BeamSkin-Studio/BeamSkin-Studio-Beta', linuxRepo:'BeamSkin-Studio/BeamSkin-Studio-Linux-Beta', scope:'beamskin' });
+  fetchChangelog('BeamSkin-Studio/BeamSkin-Studio-Beta', 'main', 'beamskin');
+
+  wireDownloadButtons('uvexporter');
+  initReleaseData({ winRepo:'Burzt-YT/UV-Exporter', scope:'uvexporter' });
+  fetchChangelog('Burzt-YT/UV-Exporter', 'main', 'uvexporter');
+
+  wireDownloadButtons('haulhud');
+  initReleaseData({ winRepo:'Burzt-YT/HaulHUD', scope:'haulhud' });
+  fetchChangelog('Burzt-YT/HaulHUD', 'main', 'haulhud');
+
+  loadHubStats();
+}
+
+routeFromHash();
+initAllProjects();
+
 </script>
 
 </body>
