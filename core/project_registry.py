@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 
 print("[DEBUG] project_registry: module loading")
 
-### registry file paths resolved relative to this file
+
 _HERE     = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.join(os.path.dirname(_HERE), "data")
 _REGISTRY = os.path.join(_DATA_DIR, "project_registry.json")
@@ -15,8 +15,6 @@ _REGISTRY = os.path.join(_DATA_DIR, "project_registry.json")
 print(f"[DEBUG] project_registry: _DATA_DIR={_DATA_DIR}")
 print(f"[DEBUG] project_registry: _REGISTRY={_REGISTRY}")
 
-
-### internal helpers
 
 def _now_iso() -> str:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -83,8 +81,6 @@ def _normalise_path(path: str) -> str:
     result = os.path.normcase(os.path.abspath(path))
     return result
 
-
-### public API
 
 def load_registry() -> List[Dict]:
     print(f"[DEBUG] load_registry: called")
@@ -167,7 +163,7 @@ def register_existing(path: str) -> Optional[Dict]:
         _write(entries)
         return existing
 
-    ### new entry — read the project file for metadata
+
     print(f"[DEBUG] register_existing: new entry — reading project file for metadata")
     try:
         with open(abs_path, "r", encoding="utf-8") as fh:

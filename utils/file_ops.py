@@ -1,5 +1,4 @@
-# utils/file_ops.py
-# edits the attached files in Add vehicles tab
+
 
 import os
 import shutil
@@ -11,6 +10,23 @@ import json
 
 VEHICLE_FOLDER = "vehicles"
 ADDED_VEHICLES_JSON = os.path.join("vehicles", "added_vehicles.json")
+
+try:
+    from core.config import VEHICLE_IDS, is_rebadge_suffix
+except ImportError:
+    VEHICLE_IDS = {}
+    def is_rebadge_suffix(_c, _s): return False
+
+
+def _is_builtin_carid(carid: str) -> bool:
+    return carid.strip().lower() in {k.lower() for k in VEHICLE_IDS}
+
+
+def _variant_folder_protected(carid: str, suffix_upper: str) -> bool:
+    if is_rebadge_suffix(carid, suffix_upper.lower()):
+        return True
+    existing = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
+    return os.path.isdir(existing)
 
 def sanitize_skin_id(name):
     print(f"[DEBUG] sanitize_skin_id called")
@@ -45,16 +61,19 @@ def zip_folder(source_dir, zip_path):
 
 def create_vehicle_folders(carid):
     print(f"[DEBUG] create_vehicle_folders called for: {carid}")
+    if _is_builtin_carid(carid):
+        print(f"[ERROR] '{carid}' is a built-in vehicle — refusing to create/overwrite its folder")
+        raise ValueError(f"'{carid}' is a built-in vehicle and cannot be overwritten")
     vehicle_path = os.path.join(VEHICLE_FOLDER, carid, "SKINNAME")
     os.makedirs(vehicle_path, exist_ok=True)
     print(f"[DEBUG] Created vehicle folders: {vehicle_path}")
     return True
 
 def create_variant_folders(carid, suffix_upper):
-    """Create vehicles/{carid}/SKINNAME{suffix_upper}/.
-    The parent {carid} dir is created if needed, so variants can be added
-    to built-in vehicles that have no custom folder yet."""
     print(f"[DEBUG] create_variant_folders called for: {carid} / SKINNAME{suffix_upper}")
+    if _variant_folder_protected(carid, suffix_upper):
+        print(f"[ERROR] '{carid}/SKINNAME{suffix_upper}' already exists — refusing to overwrite it")
+        raise ValueError(f"'{carid}+{suffix_upper}' already exists and cannot be overwritten")
     variant_path = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
     os.makedirs(variant_path, exist_ok=True)
     print(f"[DEBUG] Created variant folder: {variant_path}")
@@ -62,6 +81,9 @@ def create_variant_folders(carid, suffix_upper):
 
 def delete_vehicle_folders(carid):
     print(f"[DEBUG] delete_vehicle_folders called for: {carid}")
+    if _is_builtin_carid(carid):
+        print(f"[ERROR] '{carid}' is a built-in vehicle — refusing to delete its folder")
+        raise ValueError(f"'{carid}' is a built-in vehicle and cannot be deleted")
     try:
         vehicle_path = os.path.join(VEHICLE_FOLDER, carid)
         if os.path.exists(vehicle_path):
@@ -79,9 +101,10 @@ def delete_vehicle_folders(carid):
         raise
 
 def delete_variant_folders(carid, suffix_upper):
-    """Remove vehicles/{carid}/SKINNAME{suffix_upper}/ only.
-    Does NOT remove the parent {carid} folder."""
     print(f"[DEBUG] delete_variant_folders called for: {carid} / SKINNAME{suffix_upper}")
+    if is_rebadge_suffix(carid, suffix_upper.lower()):
+        print(f"[ERROR] '{carid}/SKINNAME{suffix_upper}' is a built-in rebadge — refusing to delete it")
+        raise ValueError(f"'{carid}+{suffix_upper}' is a built-in vehicle and cannot be deleted")
     try:
         variant_path = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
         if os.path.exists(variant_path):
@@ -94,21 +117,8 @@ def delete_variant_folders(carid, suffix_upper):
         print(f"[ERROR] Failed to delete variant folders: {e}")
         raise
 
-# ── JSON helpers ───────────────────────────────────────────────────────────────
-#
-# added_vehicles.json structure:
-#   {
-#     "pickup": "Gavril Pickup",          ← custom vehicle entries  (carid: name)
-#     "__variants__": {                   ← custom variant entries  (never shown as vehicles)
-#       "pickup__box": {"carid": "pickup", "suffix": "box"}
-#     }
-#   }
-#
-# load_added_vehicles_json() strips __ keys so callers only see vehicles.
-# Internal write helpers use _load_raw_json() so __variants__ is never lost.
 
 def _load_raw_json() -> dict:
-    """Load added_vehicles.json exactly as stored (including __variants__)."""
     if not os.path.exists(ADDED_VEHICLES_JSON):
         return {}
     try:
@@ -119,7 +129,6 @@ def _load_raw_json() -> dict:
         return {}
 
 def load_added_vehicles_json():
-    """Return only vehicle entries — strips __variants__ and any other __ key."""
     print(f"[DEBUG] load_added_vehicles_json called")
     if not os.path.exists(ADDED_VEHICLES_JSON):
         print(f"[DEBUG] {ADDED_VEHICLES_JSON} not found, returning empty dict")
@@ -134,8 +143,6 @@ def load_added_vehicles_json():
         return {}
 
 def load_added_variants_json() -> dict:
-    """Return the __variants__ dict:
-    { "pickup__box": {"carid": "pickup", "suffix": "box"}, ... }"""
     print(f"[DEBUG] load_added_variants_json called")
     raw = _load_raw_json()
     variants = raw.get("__variants__", {})
@@ -143,11 +150,10 @@ def load_added_variants_json() -> dict:
     return variants
 
 def save_added_vehicles_json(vehicles_dict):
-    """Save vehicle entries while preserving __variants__ already on disk."""
     print(f"[DEBUG] save_added_vehicles_json called with {len(vehicles_dict)} vehicles")
     try:
         os.makedirs(VEHICLE_FOLDER, exist_ok=True)
-        # Preserve all __ keys (e.g. __variants__) from the existing file
+
         raw = _load_raw_json()
         reserved = {k: v for k, v in raw.items() if k.startswith("__")}
         merged = {**vehicles_dict, **reserved}
@@ -161,6 +167,9 @@ def save_added_vehicles_json(vehicles_dict):
 
 def add_vehicle_to_json(carid, carname):
     print(f"[DEBUG] add_vehicle_to_json called: {carid} = {carname}")
+    if _is_builtin_carid(carid):
+        print(f"[ERROR] '{carid}' is a built-in vehicle — refusing to register it as custom")
+        raise ValueError(f"'{carid}' is a built-in vehicle and cannot be re-registered")
     raw = _load_raw_json()
     raw[carid] = carname
     os.makedirs(VEHICLE_FOLDER, exist_ok=True)
@@ -183,8 +192,10 @@ def remove_vehicle_from_json(carid):
         return False
 
 def add_variant_to_json(carid: str, suffix_lower: str) -> bool:
-    """Record a custom variant under __variants__ in added_vehicles.json."""
     print(f"[DEBUG] add_variant_to_json called: {carid}__{suffix_lower}")
+    if is_rebadge_suffix(carid, suffix_lower):
+        print(f"[ERROR] '{carid}+{suffix_lower}' is a built-in rebadge — refusing to register it as custom")
+        raise ValueError(f"'{carid}+{suffix_lower}' is a built-in vehicle and cannot be re-registered")
     key = f"{carid}__{suffix_lower}"
     raw = _load_raw_json()
     raw.setdefault("__variants__", {})[key] = {"carid": carid, "suffix": suffix_lower}
@@ -195,8 +206,10 @@ def add_variant_to_json(carid: str, suffix_lower: str) -> bool:
     return True
 
 def remove_variant_from_json(carid: str, suffix_lower: str) -> bool:
-    """Remove a custom variant from __variants__ in added_vehicles.json."""
     print(f"[DEBUG] remove_variant_from_json called: {carid}__{suffix_lower}")
+    if is_rebadge_suffix(carid, suffix_lower):
+        print(f"[ERROR] '{carid}+{suffix_lower}' is a built-in rebadge — refusing to remove it")
+        raise ValueError(f"'{carid}+{suffix_lower}' is a built-in vehicle and cannot be removed")
     key = f"{carid}__{suffix_lower}"
     raw = _load_raw_json()
     variants = raw.get("__variants__", {})
@@ -217,9 +230,7 @@ def remove_variant_from_json(carid: str, suffix_lower: str) -> bool:
 def fix_stage_two_material_properties(stage2, carid, prefix):
     print(f"[DEBUG] Fixing Stage 2 material properties for prefix: {prefix}...")
 
-    # Remove every field that must NOT appear in a skin Stage[1].
-    # diffuseMapUseUV, roughnessFactor, and metallicFactor were previously
-    # injected here by mistake — they cause the skin to break in-game.
+
     properties_to_remove = [
         "instanceDiffuse",
         "baseColorFactor",
@@ -227,9 +238,9 @@ def fix_stage_two_material_properties(stage2, carid, prefix):
         "colorPaletteMapUseUV",
         "metallicMap",
         "metallicMapUseUV",
-        "diffuseMapUseUV",   # must NOT be in a skin Stage[1]
-        "roughnessFactor",   # must NOT be in a skin Stage[1]
-        "metallicFactor",    # must NOT be in a skin Stage[1]
+        "diffuseMapUseUV",
+        "roughnessFactor",
+        "metallicFactor",
     ]
 
     removed_count = 0
@@ -239,8 +250,7 @@ def fix_stage_two_material_properties(stage2, carid, prefix):
             removed_count += 1
             print(f"[DEBUG]   ✓ Removed incorrect property: {prop}")
 
-    # Always (re)set baseColorMap to the placeholder path — it will be
-    # substituted with the real DDS path later by process_json_files.
+
     old_bcm = stage2.get("baseColorMap", "<not set>")
     stage2["baseColorMap"] = "vehicles/carid/skinname/carid_skin_skinname.dds"
     print(f"[DEBUG]   ✓ Replaced baseColorMap: {old_bcm} → vehicles/carid/skinname/carid_skin_skinname.dds")
@@ -294,16 +304,7 @@ def edit_material_json(source_json_path, target_folder, carid):
                 print(f"[DEBUG] Copied file directly (BeamNG will parse it)")
                 return True
 
-        # Match any key of the form:  {prefix}.skin.{skinname}
-        # or the lbe variant:         {prefix}.skin_lbe.{skinname}
-        #
-        # The prefix is intentionally unrestricted — NOT anchored to carid — because
-        # BeamNG mods use material-layer names as prefixes rather than the vehicle
-        # folder name.  For example a vehicle with carid "sprinfox20_fox" uses keys
-        # like "sprinfox20_paint.skin.60054", "sprinfox20_paint_ext.skin.60054",
-        # "sprinfox20_color.skin.60054" — none of which starts with "sprinfox20_fox".
-        # Anchoring to carid caused skin_groups to always be empty for these mods,
-        # leaving the output file completely unedited.
+
         general_skin_pattern = r"^(.+?)\.skin(?:_lbe)?\.(.+)$"
 
         skin_groups = {}
@@ -385,8 +386,7 @@ def edit_material_json(source_json_path, target_folder, carid):
                                 del stage[field]
                                 print(f"[DEBUG] Removed {field} from {normalized_key} Stage {stage_idx}")
 
-                # Stages[2+] must be empty objects — null-filled stages break
-                # BeamNG skin loading. The working template uses {} for these.
+
                 for i in range(2, len(new_value["Stages"])):
                     new_value["Stages"][i] = {}
                     print(f"[DEBUG] Cleared Stage {i} to empty object in {normalized_key}")

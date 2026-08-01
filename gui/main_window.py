@@ -24,8 +24,6 @@ except ImportError:
     def get_localization(): return None
 
 
-# OFFLINE PLACEHOLDER
-
 class OnlineUnavailableTab(QWidget):
     def __init__(self, parent=None, **_):
         print(f"[DEBUG] __init__() called")
@@ -59,8 +57,6 @@ class OnlineUnavailableTab(QWidget):
         print(f"[DEBUG] refresh_ui() called")
         pass
 
-
-# MAIN  WINDOW
 
 class BeamSkinStudioApp(QMainWindow):
 
@@ -101,7 +97,7 @@ class BeamSkinStudioApp(QMainWindow):
         content_row.setSpacing(0)
 
         self.sidebar = Sidebar(self)
-        # Sidebar now emits (carid, display_name, variant_suffix).
+
         self.sidebar.add_vehicle_requested.connect(
             self._add_vehicle_from_sidebar
         )
@@ -207,23 +203,12 @@ class BeamSkinStudioApp(QMainWindow):
 
 
     def _add_vehicle_from_sidebar(self, carid: str, display_name: str, variant: str = ""):
-        """
-        Callback wired to sidebar.add_vehicle_requested.
-
-        Parameters
-        ----------
-        carid        : Vehicle ID (e.g. "pickup")
-        display_name : Human-readable name including variant if applicable
-                       (e.g. "Pickup (Ambulance)").  This is already formatted
-                       by VehicleVariantExpander before the signal is emitted.
-        variant      : Body-variant suffix, e.g. "" (normal), "ambulance", "box".
-        """
         print(f"[DEBUG] _add_vehicle_from_sidebar() called")
         gen = self.tabs.get("generator")
         if gen and hasattr(gen, "add_car_to_project"):
             gen.add_car_to_project(carid, display_name, variant)
-            # The sidebar widget is removed on add, so Qt never fires leaveEvent
-            # on it — force-hide the preview here so it doesn't get stuck.
+
+
             if hasattr(self, "preview_manager"):
                 self.preview_manager.hide_hover_preview(force=True)
             self.show_notification(
@@ -232,13 +217,6 @@ class BeamSkinStudioApp(QMainWindow):
 
 
     def _refresh_vehicle_list(self):
-        """
-        Called by AddVehiclesTab after a vehicle/variant is added or deleted.
-
-        Mirrors generator._build_car_id_list(): uses load_added_vehicles_json()
-        (the same source of truth used at startup) to sync state.added_vehicles,
-        then repopulates the sidebar, the generator's car list, and the CarListTab.
-        """
         try:
             from utils.file_ops import load_added_vehicles_json
             vehicles = load_added_vehicles_json()
@@ -257,8 +235,7 @@ class BeamSkinStudioApp(QMainWindow):
             except Exception as e:
                 print(f"[WARNING] _refresh_vehicle_list: gen.refresh_vehicle_list failed: {e}")
 
-        # Keep CarListTab in sync — without this, added/deleted vehicles only
-        # appear there after a full app restart.
+
         carlist = self.tabs.get("carlist")
         if carlist and hasattr(carlist, "refresh_vehicle_list"):
             try:
@@ -390,8 +367,6 @@ class BeamSkinStudioApp(QMainWindow):
         print("[DEBUG] Shutting down BeamSkin Studio...")
         event.accept()
 
-
-# ENTRY POINT
 
 def main():
     import sys

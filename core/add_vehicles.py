@@ -1,6 +1,3 @@
-"""
-Core Developer Module - Vehicle File Processing
-"""
 import os
 import shutil
 from typing import Optional
@@ -10,10 +7,28 @@ from utils.file_ops import (
     delete_vehicle_folders,
     edit_material_json,
     edit_jbeam_material,
+    edit_info_json,
     add_vehicle_to_json,
     remove_vehicle_from_json,
-    VEHICLE_FOLDER
 )
+from core.settings import get_vehicles_dir, get_vehicle_previews_dir
+
+try:
+    from core.config import VEHICLE_IDS, is_rebadge_suffix
+except ImportError:
+    VEHICLE_IDS = {}
+    def is_rebadge_suffix(_c, _s): return False
+
+
+def _is_builtin_carid(carid: str) -> bool:
+    return carid.strip().lower() in {k.lower() for k in VEHICLE_IDS}
+
+
+def _variant_already_exists(carid: str, variant_suffix: str) -> bool:
+    if is_rebadge_suffix(carid, variant_suffix):
+        return True
+    existing = os.path.join(get_vehicles_dir(), carid, f"SKINNAME{variant_suffix.upper()}")
+    return os.path.isdir(existing)
 
 
 def process_custom_vehicle(
@@ -21,12 +36,19 @@ def process_custom_vehicle(
     carname: str,
     json_path: str,
     jbeam_path: str,
-    image_path: Optional[str] = None
+    image_path: Optional[str] = None,
+    info_json_path: Optional[str] = None
 ) -> bool:
 
     print(f"[DEBUG] \n{'='*60}")
     print(f"[DEBUG] PROCESSING VEHICLE: {carname} ({carid})")
     print(f"[DEBUG] {'='*60}")
+
+    if _is_builtin_carid(carid):
+        print(f"[ERROR] '{carid}' is a built-in vehicle that ships with the "
+              f"program — refusing to overwrite it. Import as a variant "
+              f"instead if you meant to add a body variant.")
+        return False
 
     try:
         if not os.path.exists(json_path):
@@ -52,7 +74,7 @@ def process_custom_vehicle(
             print(f"[ERROR] Failed to create vehicle folders: {e}")
             return False
 
-        car_folder = os.path.join(VEHICLE_FOLDER, carid)
+        car_folder = os.path.join(get_vehicles_dir(), carid)
         skinname_folder = os.path.join(car_folder, "SKINNAME")
 
         if not os.path.exists(skinname_folder):
@@ -77,9 +99,14 @@ def process_custom_vehicle(
             delete_vehicle_folders(carid)
             return False
 
+        try:
+            edit_info_json(info_json_path, car_folder)
+        except Exception as e:
+            print(f"[WARNING] Failed to create info_skinname.json: {e}")
+
         if image_path:
             try:
-                preview_folder = os.path.join("gui", "images", "vehicles", carid)
+                preview_folder = os.path.join(get_vehicle_previews_dir(), carid)
                 os.makedirs(preview_folder, exist_ok=True)
                 shutil.copy2(image_path, os.path.join(preview_folder, "default.jpg"))
             except Exception as e:
@@ -100,12 +127,15 @@ def process_custom_vehicle(
         traceback.print_exc()
         try:
             delete_vehicle_folders(carid)
-        except:
+        except Exception:
             pass
         return False
 
 
 def delete_custom_vehicle(carid: str) -> bool:
+    if _is_builtin_carid(carid):
+        print(f"[ERROR] '{carid}' is a built-in vehicle — refusing to delete its folder.")
+        return False
     try:
         print(f"[DEBUG] Deleting custom vehicle: {carid}")
         delete_vehicle_folders(carid)
@@ -123,14 +153,15 @@ def process_custom_variant(
     json_path: str,
     jbeam_path: str,
     image_path: Optional[str] = None,
+    info_json_path: Optional[str] = None,
 ) -> bool:
     from utils.file_ops import (
         create_variant_folders,
         delete_variant_folders,
         edit_material_json,
         edit_jbeam_material,
+        edit_info_json,
         add_variant_to_json,
-        VEHICLE_FOLDER,
     )
 
     suffix_upper = variant_suffix.upper()
@@ -139,6 +170,12 @@ def process_custom_variant(
     print(f"[DEBUG] {'='*60}")
     print(f"[DEBUG] PROCESSING VARIANT: {carid} + {suffix_upper}")
     print(f"[DEBUG] {'='*60}")
+
+    if _variant_already_exists(carid, suffix_lower):
+        print(f"[ERROR] '{carid}+{suffix_upper}' already exists (either a "
+              f"built-in vehicle variant or a previously added one) — "
+              f"refusing to overwrite it.")
+        return False
 
     try:
         if not os.path.exists(json_path):
@@ -157,7 +194,7 @@ def process_custom_variant(
             print(f"[ERROR] Failed to create variant folders: {e}")
             return False
 
-        variant_folder = os.path.join(VEHICLE_FOLDER, carid, f"SKINNAME{suffix_upper}")
+        variant_folder = os.path.join(get_vehicles_dir(), carid, f"SKINNAME{suffix_upper}")
         if not os.path.exists(variant_folder):
             print(f"[ERROR] Variant folder was not created: {variant_folder}")
             return False
@@ -178,9 +215,15 @@ def process_custom_variant(
             delete_variant_folders(carid, suffix_upper)
             return False
 
+        try:
+            car_folder = os.path.join(get_vehicles_dir(), carid)
+            edit_info_json(info_json_path, car_folder, output_name=f"info_skinname_{suffix_lower}.json")
+        except Exception as e:
+            print(f"[WARNING] Failed to create info_skinname_{suffix_lower}.json: {e}")
+
         if image_path and image_path.lower().endswith(('.jpg', '.jpeg')):
             try:
-                preview_folder = os.path.join("gui", "images", "vehicles", carid)
+                preview_folder = os.path.join(get_vehicle_previews_dir(), carid)
                 os.makedirs(preview_folder, exist_ok=True)
                 shutil.copy2(image_path, os.path.join(preview_folder, f"default_{suffix_lower}.jpg"))
             except Exception as e:
@@ -206,11 +249,15 @@ def process_custom_variant(
 
 
 def delete_custom_variant(carid: str, suffix: str) -> bool:
-    """Does NOT touch the parent vehicle folder."""
     from utils.file_ops import delete_variant_folders, remove_variant_from_json
 
     suffix_upper = suffix.upper()
     suffix_lower = suffix.lower()
+
+    if is_rebadge_suffix(carid, suffix_lower):
+        print(f"[ERROR] '{carid}+{suffix_upper}' is a built-in rebadge vehicle "
+              f"that ships with the program — refusing to delete it.")
+        return False
 
     try:
         delete_variant_folders(carid, suffix_upper)
@@ -226,20 +273,6 @@ def process_multiple_vehicles(
     selections: list,
     known_carids: Optional[set] = None,
 ) -> dict:
-    """
-    Process multiple vehicles/variants from a multi-select import.
-
-    Each selection dict must have:
-        type       : "vehicle" or "variant"
-        carid      : str
-        json_path  : str
-        jbeam_path : str
-        image_path : str | None
-        carname    : str          (vehicle only)
-        suffix     : str          (variant only)
-
-    Returns {"succeeded": [...], "failed": [...], "skipped": [...]}.
-    """
     print(f"[DEBUG] Batch import: {len(selections)} item(s)")
 
     succeeded: list = []
@@ -256,9 +289,10 @@ def process_multiple_vehicles(
             skipped.append(label)
             continue
 
-        json_path  = sel.get("json_path")  or ""
-        jbeam_path = sel.get("jbeam_path") or ""
-        image_path = sel.get("image_path") or None
+        json_path      = sel.get("json_path")  or ""
+        jbeam_path     = sel.get("jbeam_path") or ""
+        image_path     = sel.get("image_path") or None
+        info_json_path = sel.get("info_json_path") or None
 
         if not json_path or not jbeam_path:
             label = carid if item_type == "vehicle" else f"{carid}+{sel.get('suffix', '?')}"
@@ -266,12 +300,26 @@ def process_multiple_vehicles(
             skipped.append(label)
             continue
 
+        if item_type == "vehicle" and _is_builtin_carid(carid):
+            print(f"[WARNING] Skipping {carid}: built-in vehicle, cannot overwrite")
+            skipped.append(carid)
+            continue
+
+        if item_type == "variant":
+            suffix_check = sel.get("suffix", "").strip().lower()
+            if suffix_check and _variant_already_exists(carid, suffix_check):
+                label = f"{carid}+{suffix_check}"
+                print(f"[WARNING] Skipping {label}: variant already exists")
+                skipped.append(label)
+                continue
+
         if item_type == "vehicle":
             carname = sel.get("carname") or carid.replace("_", " ").title()
             print(f"\n[DEBUG] Importing vehicle {idx + 1}/{len(selections)}: {carid}")
             ok = process_custom_vehicle(
                 carid=carid, carname=carname,
                 json_path=json_path, jbeam_path=jbeam_path, image_path=image_path,
+                info_json_path=info_json_path,
             )
             (succeeded if ok else failed).append(carid)
 
@@ -287,6 +335,7 @@ def process_multiple_vehicles(
             ok = process_custom_variant(
                 carid=carid, variant_suffix=suffix,
                 json_path=json_path, jbeam_path=jbeam_path, image_path=image_path,
+                info_json_path=info_json_path,
             )
             (succeeded if ok else failed).append(label)
 
@@ -306,12 +355,6 @@ def build_selections_from_scan(
     selected_carids: Optional[set] = None,
     selected_variant_keys: Optional[set] = None,
 ) -> list:
-    """
-    Convert scan results into a selections list for process_multiple_vehicles().
-
-    Pass selected_carids / selected_variant_keys to filter to only ticked items.
-    Pass None to include all ready items.
-    """
     selections: list = []
 
     for v in vehicles:
@@ -322,6 +365,7 @@ def build_selections_from_scan(
         selections.append({
             "type": "vehicle", "carid": v.carid, "carname": v.display_name,
             "json_path": v.json_path, "jbeam_path": v.jbeam_path, "image_path": v.image_path,
+            "info_json_path": v.info_json_path,
         })
 
     for var in variants:
@@ -333,6 +377,7 @@ def build_selections_from_scan(
         selections.append({
             "type": "variant", "carid": var.carid, "suffix": var.suffix,
             "json_path": var.json_path, "jbeam_path": var.jbeam_path, "image_path": var.image_path,
+            "info_json_path": var.info_json_path,
         })
 
     return selections
@@ -349,7 +394,6 @@ def delete_multiple_vehicles(carids: list) -> dict:
 
 
 def delete_multiple_variants(variant_pairs: list) -> dict:
-    """variant_pairs: list of (carid, suffix) tuples."""
     succeeded: list = []
     failed:    list = []
     for carid, suffix in variant_pairs:
@@ -361,7 +405,7 @@ def delete_multiple_variants(variant_pairs: list) -> dict:
 
 
 def get_vehicle_folder_path(carid: str) -> Optional[str]:
-    vehicle_folder = os.path.join(VEHICLE_FOLDER, carid)
+    vehicle_folder = os.path.join(get_vehicles_dir(), carid)
     if os.path.exists(vehicle_folder):
         return vehicle_folder
     return None
@@ -379,7 +423,7 @@ def validate_vehicle_files(carid: str) -> bool:
         return False
 
     if not os.path.exists(os.path.join(skinname_folder, "skin.materials.json")):
-        print(f"[DEBUG] Missing required file: skin.materials.json")
+        print("[DEBUG] Missing required file: skin.materials.json")
         return False
 
     jbeam_files = [f for f in os.listdir(skinname_folder) if f.endswith('.jbeam')]
@@ -392,12 +436,13 @@ def validate_vehicle_files(carid: str) -> bool:
 
 
 def list_custom_vehicles() -> list:
-    if not os.path.exists(VEHICLE_FOLDER):
+    vehicle_folder = get_vehicles_dir()
+    if not os.path.exists(vehicle_folder):
         return []
 
     vehicles = []
-    for item in os.listdir(VEHICLE_FOLDER):
-        item_path = os.path.join(VEHICLE_FOLDER, item)
+    for item in os.listdir(vehicle_folder):
+        item_path = os.path.join(vehicle_folder, item)
         if os.path.isdir(item_path):
             if os.path.exists(os.path.join(item_path, "SKINNAME")):
                 vehicles.append(item)

@@ -18,17 +18,16 @@ from gui.theme import COLORS, font, drop_shadow, fade_in
 
 
 class ToggleSwitch(QWidget):
-    """Animated pill-style toggle switch, drop-in replacement for QCheckBox."""
 
-    stateChanged = Signal(int)   # emits 2 (checked) or 0 (unchecked), matching QCheckBox
+    stateChanged = Signal(int)
 
-    _W, _H = 44, 24             # overall size
+    _W, _H = 44, 24
 
     def __init__(self, parent=None):
         print(f"[DEBUG] __init__() called")
         super().__init__(parent)
         self._checked = False
-        self._pos     = 0.0     # 0.0 = off, 1.0 = on
+        self._pos     = 0.0
         self.setFixedSize(self._W, self._H)
         self.setCursor(Qt.PointingHandCursor)
         self._anim = QPropertyAnimation(self, b"_switch_pos", self)
@@ -426,10 +425,6 @@ class FadeStack(QStackedWidget):
             fade_in(w, duration=200)
 
 class VehicleCard(QFrame):
-    """
-    Clickable sidebar card for single-body vehicles.
-    A single click immediately emits add_requested — no expand/collapse step.
-    """
 
     add_requested = Signal(str, str)
 
@@ -439,7 +434,7 @@ class VehicleCard(QFrame):
         display_name: str,
         parent: Optional[QWidget] = None,
         is_custom: bool = False,
-        **_kwargs,          # absorb legacy show_add kwarg without error
+        **_kwargs,
     ):
         super().__init__(parent)
         self.carid        = carid

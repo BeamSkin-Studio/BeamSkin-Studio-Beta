@@ -1,6 +1,3 @@
-"""
-core/colorable_ops.py
-"""
 
 import os
 import shutil
@@ -8,32 +5,22 @@ import json
 import re
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SANITISERS
-# ─────────────────────────────────────────────────────────────────────────────
-
 def sanitize_skin_id(name: str) -> str:
     name = name.replace(" ", "")
     return re.sub(r"[^a-zA-Z0-9\-]", "", name)
 
 
-# Characters that are illegal in Windows file/folder names: \ / : * ? " < > |
 _ILLEGAL_WIN_CHARS = re.compile(r'[\\/:*?"<>|]')
 
 def sanitize_folder_name(name: str) -> str:
     name = name.replace(" ", "_")
     name = _ILLEGAL_WIN_CHARS.sub("", name)
-    # Collapse any runs of underscores left behind (e.g. "Police_|_Sedan" → "Police__Sedan" → "Police_Sedan")
+
     name = re.sub(r"_+", "_", name)
     return name.strip("_")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TEXTURE COPYING
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _copy_texture_files(data_map_source, color_map_source, dest_folder, skin_id):
-    """Copy the two PNGs for a normal (single-body) colorable skin."""
     os.makedirs(dest_folder, exist_ok=True)
 
     data_map_fn  = f"{skin_id}_b.color.png"
@@ -57,16 +44,6 @@ def _copy_texture_files_variant(
     data_map_source_2,  color_map_source_2,
     dest_folder, skin_id, variant_suffix,
 ):
-    """
-    Copy all four PNGs for a variant colorable skin into dest_folder.
-
-    Naming convention
-    -----------------
-    Car body    : {skin_id}_b.color.png          / {skin_id}_cp.color.png
-    Variant body: {skin_id}_{suffix}_b.color.png / {skin_id}_{suffix}_cp.color.png
-
-    Returns (car_data_fn, car_palette_fn, var_data_fn, var_palette_fn).
-    """
     os.makedirs(dest_folder, exist_ok=True)
 
     car_data_fn    = f"{skin_id}_b.color.png"
@@ -88,10 +65,6 @@ def _copy_texture_files_variant(
 
     return car_data_fn, car_palette_fn, var_data_fn, var_palette_fn
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# JBEAM PROCESSING
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _process_jbeam_files(folder_path, vehicle_id, skin_id,
                           skin_name=None, author_name=None):
@@ -121,24 +94,20 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
             content = re.sub(r'("globalSkin"\s*:\s*")SKINNAME\w*(")',
                              lambda m: m.group(1) + skin_id + m.group(2),
                              content, flags=re.IGNORECASE)
-            # Bug C fix: skinName values were not replaced in the colorable path.
+
             content = re.sub(r'("skinName"\s*:\s*")SKINNAME\w*(")',
                              lambda m: m.group(1) + skin_id + m.group(2),
                              content, flags=re.IGNORECASE)
 
-            # Bug B fix: replace authors/name regardless of placeholder text.
-            # The old code only matched the literal strings "YOU" / "YOUR SKIN NAME",
-            # missing templates that use "Your Name Here", "Skin Name", etc.
+
             if author_name:
                 content = re.sub(r'("authors"\s*:\s*")[^"]*"',
                                  rf'\g<1>{author_name}"', content)
             else:
                 print(f"[WARNING] author_name not provided — author left unchanged in {file_path}")
             if skin_name:
-                # Negative lookahead (?![^"]*\.skin\.) skips material-reference
-                # name values (e.g. "us_semi.skin.1TESTING") that were already
-                # handled by the regexes at lines 110-118. Without this guard
-                # the blanket replacement would overwrite those correct values.
+
+
                 content = re.sub(
                     r'("name"\s*:\s*")(?![^"]*\.skin\.)[^"]*"',
                     rf'\g<1>{skin_name}"', content,
@@ -152,10 +121,6 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
                 fh.write(content)
             print(f"[DEBUG] Processed jbeam: {file_path}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SHARED REGEX PASS (SKINNAME placeholders → skin_id)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _apply_skin_id_regexes(content: str, skin_id: str,
                              skin_folder_name: str, vehicle_id: str) -> str:
@@ -180,20 +145,10 @@ def _apply_skin_id_regexes(content: str, skin_id: str,
     return content
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# JSON PROCESSING — NORMAL (single-body, 2 PNGs)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _process_json_files(
     folder_path, vehicle_id, skin_folder_name,
     data_map_filename, color_map_filename, skin_id,
 ):
-    """
-    Normal colorable skin: every material entry gets the same PNG pair.
-    Stage 0 → baseColorMap = data map,  colorPaletteMapUseUV = null
-    Stage 1 → baseColorMap = data map,  colorPaletteMap = palette map,
-              colorPaletteMapUseUV = 1
-    """
     data_path    = f"vehicles/{vehicle_id}/{skin_folder_name}/{data_map_filename}"
     palette_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{color_map_filename}"
 
@@ -238,34 +193,18 @@ def _process_json_files(
             print(f"[DEBUG] Processed json (normal): {file_path}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# JSON PROCESSING — VARIANT COLORABLE (4 PNGs, 2 material entries)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _process_json_files_variant(
     folder_path, vehicle_id, skin_folder_name,
-    car_data_filename,   car_palette_filename,   # PNGs 1 & 2  → car body
-    var_data_filename,   var_palette_filename,   # PNGs 3 & 4  → variant body
+    car_data_filename,   car_palette_filename,
+    var_data_filename,   var_palette_filename,
     skin_id, variant_suffix,
 ):
-    """
-    Variant colorable skin: route each material entry to its own PNG pair.
-
-    Routing rule
-    ------------
-    Material key starts with "{vehicle_id}.skin."  → car body   → PNGs 1 & 2
-    Any other material key                          → variant body → PNGs 3 & 4
-
-    This matches the materials.json structure, e.g.:
-      pickup.skin.SKINNAMEAMBULANCE    → car body
-      ambulance.skin.SKINNAMEAMBULANCE → ambulance body
-    """
     car_data_path    = f"vehicles/{vehicle_id}/{skin_folder_name}/{car_data_filename}"
     car_palette_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{car_palette_filename}"
     var_data_path    = f"vehicles/{vehicle_id}/{skin_folder_name}/{var_data_filename}"
     var_palette_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{var_palette_filename}"
 
-    var_prefix = f"{variant_suffix}.skin."  # e.g. "ambulance.skin."
+    var_prefix = f"{variant_suffix}.skin."
 
     for root_dir, _, files in os.walk(folder_path):
         for filename in files:
@@ -290,8 +229,7 @@ def _process_json_files_variant(
                     if not isinstance(stages, list):
                         continue
 
-                    # Variant body = material whose key starts with "<variant_suffix>.skin."
-                    # Car body = everything else (md_series_main.skin.*, pickup.skin.*, etc.)
+
                     is_var   = mat_key.lower().startswith(var_prefix.lower())
                     d_path   = var_data_path    if is_var else car_data_path
                     p_path   = var_palette_path if is_var else car_palette_path
@@ -322,10 +260,6 @@ def _process_json_files_variant(
                 fh.write(content)
             print(f"[DEBUG] Processed json (variant-colorable): {file_path}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MATERIAL PROPERTY OVERRIDES
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _process_material_properties(folder_path, material_props, skin_id):
     if not material_props:
@@ -386,10 +320,6 @@ def _process_material_properties(folder_path, material_props, skin_id):
         return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC API
-# ─────────────────────────────────────────────────────────────────────────────
-
 def generate_colorable_skin(
     template_path,
     dest_skin_folder,
@@ -401,12 +331,6 @@ def generate_colorable_skin(
     author_name=None,
     material_properties=None,
 ):
-    """
-    Normal (single-body) colorable skin — 2 PNGs.
-
-    Used for all vehicles with a plain SKINNAME template folder where
-    every material entry shares the same texture pair.
-    """
     skin_id = sanitize_skin_id(skin_name)
     print(f"[DEBUG] generate_colorable_skin: '{skin_name}' folder='{skin_folder}' id='{skin_id}'")
 
@@ -447,19 +371,6 @@ def generate_colorable_skin_variant(
     author_name=None,
     material_properties=None,
 ):
-    """
-    Variant colorable skin — 4 PNGs, ONE template folder.
-
-    template_path must point to the variant template folder, e.g.:
-      vehicles/pickup/SKINNAMEAMBULANCE
-
-    That folder's materials.json contains TWO entries:
-      pickup.skin.SKINNAMEAMBULANCE    ← car body    ← PNGs 1 & 2
-      ambulance.skin.SKINNAMEAMBULANCE ← variant body ← PNGs 3 & 4
-
-    The car-body entry is identified by its key starting with
-    "<vehicle_id>.skin."; the variant-body entry is everything else.
-    """
     skin_id = sanitize_skin_id(skin_name)
     print(f"[DEBUG] generate_colorable_skin_variant: '{skin_name}' "
           f"({variant_suffix}) → 4 PNGs, single folder")

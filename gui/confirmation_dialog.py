@@ -19,10 +19,7 @@ except ImportError:
     def t(key, **kw): return key
 
 
-# BASE  DIALOG
-
 class _BaseDialog(QDialog):
-    """Common boilerplate: dark background, centred, animated entrance."""
 
     def __init__(self, parent: QWidget, title: str, width: int = 520, height: int = 320):
         print(f"[DEBUG] __init__() called")
@@ -33,7 +30,7 @@ class _BaseDialog(QDialog):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
 
-        # centre relative to parent
+
         if parent:
             pg = parent.frameGeometry()
             self.move(
@@ -47,7 +44,7 @@ class _BaseDialog(QDialog):
                 (screen.height() - height) // 2,
             )
 
-        # outer card
+
         self._card = QFrame(self)
         self._card.setGeometry(0, 0, width, height)
         self._card.setStyleSheet(f"""
@@ -75,19 +72,7 @@ class _BaseDialog(QDialog):
         super().showEvent(event)
 
 
-# DANGER  CONFIRMATION  DIALOG
-# Used for destructive actions like Clear Project.
-
 class DangerConfirmationDialog(QDialog):
-    """
-    Purpose-built dialog for destructive / irreversible actions.
-
-    Visual language:
-      • Red glowing outer border + thin red accent strip at top
-      • Centered icon, title (red), and optional "irreversible" subtitle
-      • Message card with subtle red-tinted border
-      • Ghost cancel on the left, solid red confirm on the right
-    """
 
     def __init__(
         self,
@@ -115,7 +100,7 @@ class DangerConfirmationDialog(QDialog):
         self.setStyleSheet("background: transparent;")
         self.result = False
 
-        # centre on parent
+
         if parent:
             pg = parent.frameGeometry()
             self.move(
@@ -130,7 +115,7 @@ class DangerConfirmationDialog(QDialog):
         err_h   = COLORS["error_hover"]
         err_dim = "#7a1c1c"
 
-        # Outer card
+
         self._card = QFrame(self)
         self._card.setGeometry(0, 0, W, H)
         self._card.setStyleSheet(f"""
@@ -141,7 +126,7 @@ class DangerConfirmationDialog(QDialog):
             }}
         """)
 
-        # Red drop-shadow glow
+
         glow = QGraphicsDropShadowEffect(self._card)
         glow.setBlurRadius(40)
         glow.setOffset(0, 0)
@@ -152,7 +137,7 @@ class DangerConfirmationDialog(QDialog):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Thin red accent strip at top (matches card's border-radius)
+
         accent_strip = QFrame()
         accent_strip.setFixedHeight(4)
         accent_strip.setStyleSheet(f"""
@@ -167,26 +152,26 @@ class DangerConfirmationDialog(QDialog):
         """)
         root.addWidget(accent_strip)
 
-        # Main content — uniform padding, centred layout to match other dialogs
+
         content = QVBoxLayout()
         content.setContentsMargins(28, 18, 28, 24)
         content.setSpacing(10)
 
-        # Icon (centred, same scale as InfoDialog)
+
         icon_lbl = QLabel(icon)
         icon_lbl.setFont(font(38))
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet("background:transparent;border:none;")
         content.addWidget(icon_lbl)
 
-        # Title in danger colour, centred
+
         title_lbl = QLabel(title)
         title_lbl.setFont(font(18, "bold"))
         title_lbl.setAlignment(Qt.AlignCenter)
         title_lbl.setStyleSheet(f"color:{err};background:transparent;border:none;")
         content.addWidget(title_lbl)
 
-        # Optional "cannot be undone" subtitle
+
         if irreversible:
             irrev_lbl = QLabel(t("dialog.irreversible", default="This action cannot be undone"))
             irrev_lbl.setFont(font(11))
@@ -198,7 +183,7 @@ class DangerConfirmationDialog(QDialog):
 
         content.addSpacing(4)
 
-        # Message card — subtle red-tinted border so it still reads as danger
+
         msg_card = QFrame()
         msg_card.setStyleSheet(f"""
             QFrame {{
@@ -222,7 +207,7 @@ class DangerConfirmationDialog(QDialog):
 
         content.addSpacing(2)
 
-        # Button row
+
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
@@ -230,8 +215,7 @@ class DangerConfirmationDialog(QDialog):
         cancel_btn.setMinimumHeight(42)
         cancel_btn.clicked.connect(self._on_cancel)
 
-        # Solid red confirm — explicit stylesheet so :pressed stays dark-red,
-        # not the global accent_dim (orange).
+
         confirm_btn = QPushButton(confirm_text)
         confirm_btn.setFont(font(14, "bold"))
         confirm_btn.setMinimumHeight(42)
@@ -265,7 +249,7 @@ class DangerConfirmationDialog(QDialog):
 
         root.addLayout(content)
 
-        # default focus → cancel (safe default for destructive actions)
+
         cancel_btn.setFocus()
 
 
@@ -287,10 +271,8 @@ class DangerConfirmationDialog(QDialog):
 
     def showEvent(self, event):
         print(f"[DEBUG] showEvent() called")
-        # _card carries a QGraphicsDropShadowEffect for the red glow, so
-        # fade_in() would detect it and return early (no animation).
-        # Animate the window-level opacity instead — this coexists with any
-        # QGraphicsEffect already applied to child widgets.
+
+
         self.setWindowOpacity(0.0)
         anim = QPropertyAnimation(self, b"windowOpacity", self)
         anim.setDuration(220)
@@ -306,8 +288,6 @@ class DangerConfirmationDialog(QDialog):
         return self.result
 
 
-# STANDARD  CONFIRMATION  DIALOG  (non-danger)
-
 class ConfirmationDialog(_BaseDialog):
 
     def __init__(
@@ -321,8 +301,8 @@ class ConfirmationDialog(_BaseDialog):
         icon: str = "❓",
         danger: bool = False,
     ):
-        # Route destructive requests to the purpose-built danger dialog.
-        # We store the result on self so show_and_get() can return it.
+
+
         if confirm_text is None:
             confirm_text = t("dialog.yes", default="Yes")
         if cancel_text is None:
@@ -335,7 +315,7 @@ class ConfirmationDialog(_BaseDialog):
                 cancel_text=cancel_text,
                 icon=icon,
             )
-            # Skip _BaseDialog.__init__ — we never show this shell.
+
             self.result = False
             return
 
@@ -350,14 +330,14 @@ class ConfirmationDialog(_BaseDialog):
 
     def _build_content(self, title: str):
         print(f"[DEBUG] _build_content() called")
-        # icon
+
         icon_lbl = QLabel(self._icon)
         icon_lbl.setFont(font(44))
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet("background:transparent;border:none;")
         self._root.addWidget(icon_lbl)
 
-        # title
+
         title_lbl = QLabel(title)
         title_lbl.setFont(font(20, "bold"))
         title_lbl.setAlignment(Qt.AlignCenter)
@@ -366,7 +346,7 @@ class ConfirmationDialog(_BaseDialog):
         )
         self._root.addWidget(title_lbl)
 
-        # message card
+
         msg_card = QFrame()
         msg_card.setStyleSheet(f"""
             QFrame {{
@@ -385,7 +365,7 @@ class ConfirmationDialog(_BaseDialog):
         msg_inner.addWidget(msg_lbl)
         self._root.addWidget(msg_card)
 
-        # buttons
+
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
 
@@ -425,14 +405,12 @@ class ConfirmationDialog(_BaseDialog):
 
     def show_and_get(self) -> bool:
         print(f"[DEBUG] show_and_get() called")
-        # If we delegated to DangerConfirmationDialog, run that instead.
+
         if self._delegate is not None:
             return self._delegate.show_and_get()
         self.exec()
         return self.result
 
-
-# INFO  DIALOG  (OK only)
 
 class InfoDialog(_BaseDialog):
 
@@ -508,8 +486,6 @@ class InfoDialog(_BaseDialog):
             self.accept()
         super().keyPressEvent(event)
 
-
-# PUBLIC  HELPER  FUNCTIONS  (same signatures as ctk originals)
 
 def askyesno(parent, title: str, message: str, colors: dict,
              icon: str = "❓", danger: bool = False) -> bool:

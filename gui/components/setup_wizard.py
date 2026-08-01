@@ -26,8 +26,6 @@ except ImportError:
 print("[DEBUG] setup_wizard.py loaded (PySide6)")
 
 
-# LANGUAGE ROW
-
 class _LangRow(QFrame):
     selected = Signal(str)
 
@@ -101,8 +99,6 @@ class _LangRow(QFrame):
         self.selected.emit(self.code)
 
 
-# SETUP WIZARD DIALOG
-
 class SetupWizard(QDialog):
 
     def __init__(self, parent: QWidget, colors: dict,
@@ -119,7 +115,7 @@ class SetupWizard(QDialog):
         self.paths       = {"beamng_install": "", "mods_folder": ""}
         self._selected_lang = "en"
 
-        # centre on parent / screen
+
         if parent:
             pg = parent.frameGeometry()
             self.move(pg.x() + (pg.width() - 860) // 2,
@@ -150,7 +146,7 @@ class SetupWizard(QDialog):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # stacked pages
+
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
 
@@ -160,7 +156,6 @@ class SetupWizard(QDialog):
         self._stack.addWidget(self._page_paths)
         self._stack.setCurrentIndex(0)
 
-    # PAGE 1 — LANGUAGE
 
     def _build_language_page(self) -> QWidget:
         print(f"[DEBUG] _build_language_page() called")
@@ -170,7 +165,7 @@ class SetupWizard(QDialog):
         col.setContentsMargins(36, 28, 36, 28)
         col.setSpacing(16)
 
-        # header
+
         hdr = QVBoxLayout()
         hdr.setSpacing(6)
 
@@ -208,7 +203,7 @@ class SetupWizard(QDialog):
         self._welcome_sub = sub
         col.addLayout(hdr)
 
-        # search bar
+
         self._lang_search = QLineEdit()
         self._lang_search.setPlaceholderText(
             "🔍  " + t("language_selection.search")
@@ -229,7 +224,7 @@ class SetupWizard(QDialog):
         self._lang_search.textChanged.connect(self._filter_languages)
         col.addWidget(self._lang_search)
 
-        # language list scroll
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -247,7 +242,7 @@ class SetupWizard(QDialog):
 
         self._populate_languages("")
 
-        # footer button
+
         col.addWidget(HSeparator())
         next_btn = AnimButton(
             t("language_selection.continue"),
@@ -263,7 +258,7 @@ class SetupWizard(QDialog):
 
     def _populate_languages(self, query: str):
         print(f"[DEBUG] _populate_languages() called")
-        # clear
+
         while self._lang_list_layout.count():
             item = self._lang_list_layout.takeAt(0)
             if item.widget():
@@ -296,7 +291,6 @@ class SetupWizard(QDialog):
         self._refresh_texts()
 
     def _refresh_texts(self):
-        """Re-evaluate all t() calls and push updated strings into existing widgets."""
         self._welcome_title.setText(t("setup_wizard.title"))
         self._welcome_sub.setText(t("language_selection.selection"))
         self._lang_search.setPlaceholderText(
@@ -334,7 +328,6 @@ class SetupWizard(QDialog):
         self._stack.setCurrentIndex(1)
         self._refresh_texts()
 
-    # PAGE 2 — PATHS
 
     def _build_paths_page(self) -> QWidget:
         page = QWidget()
@@ -343,7 +336,7 @@ class SetupWizard(QDialog):
         col.setContentsMargins(36, 28, 36, 28)
         col.setSpacing(16)
 
-        # header
+
         hdr_lbl = QLabel(t("setup_wizard.paths_title"))
         hdr_lbl.setFont(font(20, "bold"))
         hdr_lbl.setAlignment(Qt.AlignCenter)
@@ -364,7 +357,7 @@ class SetupWizard(QDialog):
         self._paths_sub_lbl = sub_lbl
         col.addWidget(HSeparator())
 
-        # scroll area for path sections
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -378,7 +371,7 @@ class SetupWizard(QDialog):
         inner_col.setContentsMargins(0, 0, 0, 0)
         inner_col.setSpacing(14)
 
-        # BeamNG install section
+
         inner_col.addWidget(self._path_section(
             number="1",
             title=t("setup_wizard.beamng_install"),
@@ -387,7 +380,7 @@ class SetupWizard(QDialog):
             browse_cb=self._browse_beamng,
         ))
 
-        # Mods folder section
+
         inner_col.addWidget(self._path_section(
             number="2",
             title=t("setup_wizard.mods_folder"),
@@ -400,7 +393,7 @@ class SetupWizard(QDialog):
         scroll.setWidget(inner)
         col.addWidget(scroll, 1)
 
-        # footer buttons
+
         col.addWidget(HSeparator())
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
@@ -586,7 +579,6 @@ class SetupWizard(QDialog):
 
 
     def _check_finish_ready(self):
-        """Enable the Finish button only when both paths have been confirmed valid."""
         ready = bool(self.paths.get("beamng_install")) and bool(self.paths.get("mods_folder"))
         self._finish_btn.setEnabled(ready)
 
@@ -597,7 +589,7 @@ class SetupWizard(QDialog):
 
     def keyPressEvent(self, event):
         print(f"[DEBUG] keyPressEvent() called")
-        # prevent Escape from closing without completing
+
         if event.key() == Qt.Key_Escape:
             return
         super().keyPressEvent(event)
@@ -606,8 +598,6 @@ class SetupWizard(QDialog):
         print(f"[DEBUG] show() called")
         self.exec()
 
-
-# PUBLIC HELPER  (same signature as before)
 
 def show_setup_wizard(
     parent: QWidget,

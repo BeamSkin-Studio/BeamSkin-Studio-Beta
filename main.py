@@ -1,22 +1,17 @@
-"""
-main.py — BeamSkin Studio entry point  (PySide6 edition)
-"""
 
 import os
 import sys
 import threading
 import platform
 
-# ── working directory ─────────────────────────────────────────────────────────
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 print(f"[DEBUG] Working directory: {os.getcwd()}")
 print(f"[DEBUG] Platform: {platform.system()}")
 
 
-# ── error popup helper  (pure PySide6, no Tkinter) ───────────────────────────
 def show_error_and_exit(title: str, message: str, detail: str = None):
-    """Show a themed error dialog then terminate."""
     full_message = message
     if detail:
         full_message += f"\n\nDetails:\n{detail}"
@@ -37,12 +32,11 @@ def show_error_and_exit(title: str, message: str, detail: str = None):
         box.setIcon(QMessageBox.Critical)
         box.exec()
     except Exception:
-        pass  # if Qt itself is broken, the .bat crash log shows the traceback
+        pass
 
     sys.exit(1)
 
 
-# ── dependency check  (PySide6-era packages) ─────────────────────────────────
 REQUIRED_PACKAGES = {
     "PySide6":        "PySide6",
     "PIL":            "Pillow",
@@ -65,7 +59,6 @@ if missing:
     )
 
 
-# ── AppUserModelID  (taskbar icon grouping on Windows) ───────────────────────
 if sys.platform == "win32":
     try:
         import ctypes
@@ -76,10 +69,9 @@ if sys.platform == "win32":
         print(f"[DEBUG] Failed to set AppUserModelID: {e}")
 
 
-# ── main entry point ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
 
-    # Single-instance lock
+
     try:
         from utils.single_instance import check_single_instance, release_global_lock
         import atexit
@@ -98,7 +90,7 @@ if __name__ == "__main__":
         print(f"[WARNING] Could not import single_instance module: {e}")
         print("[WARNING] Multiple instances may run simultaneously")
 
-    # Core module imports
+
     try:
         from core.updater import check_for_updates, CURRENT_VERSION, set_app_instance
         from gui.theme import COLORS as colors
@@ -106,7 +98,7 @@ if __name__ == "__main__":
         show_error_and_exit("Missing Core Files",
                             "A required core module could not be loaded.", str(e))
 
-    # PySide6 application object — must exist before any QWidget
+
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt, QTimer
 
@@ -115,7 +107,7 @@ if __name__ == "__main__":
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
 
-    # GUI import
+
     try:
         from gui.main_window import BeamSkinStudioApp
     except ImportError as e:
@@ -135,7 +127,7 @@ if __name__ == "__main__":
             traceback.format_exc(),
         )
 
-    # Create main window
+
     try:
         window = BeamSkinStudioApp()
     except Exception as e:
@@ -154,9 +146,7 @@ if __name__ == "__main__":
 
     set_app_instance(window, colors)
 
-    # Centre window on primary screen and show it immediately so Qt always
-    # has a visible window — if show_startup_sequence throws, the window
-    # is still on screen rather than leaving the app in an invisible state.
+
     screen = app.primaryScreen().geometry()
     w, h = 1600, 1000
     window.resize(w, h)
@@ -165,7 +155,7 @@ if __name__ == "__main__":
     window.raise_()
     window.activateWindow()
 
-    # Signal the splash screen that the main window is visible and ready
+
     try:
         import tempfile
         _signal_path = os.path.join(tempfile.gettempdir(), "BeamSkinStudio_ready.signal")
@@ -175,7 +165,7 @@ if __name__ == "__main__":
     except Exception as _e:
         print(f"[DEBUG] Could not write ready signal: {_e}")
 
-    # Connection helpers
+
     def _do_connection_check():
         from utils.connection import check_connection
         from gui.components.connection_dialog import show_connection_dialog

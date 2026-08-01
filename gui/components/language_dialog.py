@@ -28,8 +28,6 @@ except ImportError as e:
     def t(key, **kw): return kw.get("default", key)
 
 
-### Platform transparency check
-
 def _platform_supports_transparency() -> bool:
     print(f"[DEBUG] _platform_supports_transparency: platform={_sys.platform}")
     if _sys.platform in ("win32", "darwin"):
@@ -58,8 +56,6 @@ def _platform_supports_transparency() -> bool:
         print(f"[DEBUG] _platform_supports_transparency: probe failed ({e}), returning False")
         return False
 
-
-### Single language row widget
 
 class _LangRow(QFrame):
     selected = Signal(str)
@@ -144,8 +140,6 @@ class _LangRow(QFrame):
         self.selected.emit(self.lang_code)
 
 
-### Language selection dialog
-
 class LanguageSelectionDialog(QDialog):
 
     def __init__(
@@ -185,7 +179,7 @@ class LanguageSelectionDialog(QDialog):
         self.selected_language = loc.current_language if loc else "en"
         print(f"[DEBUG] LanguageSelectionDialog.__init__: initial selected_language={self.selected_language!r}")
 
-        ### Centre on parent
+
         if parent:
             pg = parent.geometry()
             x = pg.x() + (pg.width()  - 680) // 2
@@ -198,7 +192,6 @@ class LanguageSelectionDialog(QDialog):
         self._build()
         print("[DEBUG] LanguageSelectionDialog.__init__: _build() completed")
 
-    ### Build UI
 
     def _build(self):
         print("[DEBUG] LanguageSelectionDialog._build: starting")
@@ -217,7 +210,7 @@ class LanguageSelectionDialog(QDialog):
         root.setContentsMargins(32, 28, 32, 28)
         root.setSpacing(20)
 
-        ### Header
+
         hdr = QVBoxLayout()
         hdr.setSpacing(6)
         globe = QLabel("🌍")
@@ -246,7 +239,7 @@ class LanguageSelectionDialog(QDialog):
         hdr.addWidget(sub)
         root.addLayout(hdr)
 
-        ### Scroll list
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -265,7 +258,7 @@ class LanguageSelectionDialog(QDialog):
         self._populate_list()
         print("[DEBUG] LanguageSelectionDialog._build: language list populated")
 
-        ### Continue button
+
         continue_text = t("language_selection.continue", default="Continue →")
         print(f"[DEBUG] LanguageSelectionDialog._build: continue button label={continue_text!r}")
         self._continue_btn = AnimButton(
@@ -278,7 +271,6 @@ class LanguageSelectionDialog(QDialog):
         root.addWidget(self._continue_btn)
         print("[DEBUG] LanguageSelectionDialog._build: _build() finished")
 
-    ### Fade-in on first show
 
     def showEvent(self, event: QShowEvent) -> None:
         print(f"[DEBUG] LanguageSelectionDialog.showEvent: _fade_done={self._fade_done}")
@@ -311,7 +303,6 @@ class LanguageSelectionDialog(QDialog):
         anim.start(QPropertyAnimation.DeleteWhenStopped)
         print("[DEBUG] LanguageSelectionDialog.showEvent: animation started")
 
-    ### List helpers
 
     def _populate_list(self):
         print("[DEBUG] LanguageSelectionDialog._populate_list: clearing existing rows")
@@ -365,8 +356,6 @@ class LanguageSelectionDialog(QDialog):
         print(f"[DEBUG] LanguageSelectionDialog.open: dialog closed, returning selected_language={self.selected_language!r}")
         return self.selected_language
 
-
-### Public helper
 
 def show_language_selection(
     parent: QWidget,

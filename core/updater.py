@@ -1,7 +1,3 @@
-"""
-updater.py — GitHub update checker with in-app download/extract/restart
-(PySide6 edition)
-"""
 from __future__ import annotations
 
 import os
@@ -45,8 +41,6 @@ except ImportError:
     def fade_in(w, duration=200): pass
 
 
-# ── path helpers ──────────────────────────────────────────────────────────── #
-
 def get_github_repo():
     if sys.platform == "win32":
         return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta"
@@ -56,28 +50,16 @@ def get_releases_api_url():
     repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
     return f"https://api.github.com/repos/BeamSkin-Studio/{repo}/releases/latest"
 
-# Populated by fetch_latest_release(); used by get_zip_url().
+
 _latest_release_zip_url: str = ""
 
 def get_zip_url():
-    """Return the zip download URL from the latest GitHub release.
-
-    Falls back to a sensible URL if fetch_latest_release() has not been
-    called yet (e.g. in headless / fallback flows).
-    """
     if _latest_release_zip_url:
         return _latest_release_zip_url
     repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
     return f"https://github.com/BeamSkin-Studio/{repo}/releases/latest/download/BeamSkin-Studio.zip"
 
 def fetch_latest_release():
-    """Call the GitHub Releases API and return (version_string, zip_url).
-
-    Also caches the zip URL in ``_latest_release_zip_url`` so that
-    ``get_zip_url()`` can return it without making a second API call.
-
-    Raises ``requests.HTTPError`` or ``KeyError`` on failure.
-    """
     global _latest_release_zip_url
     resp = requests.get(
         get_releases_api_url(),
@@ -87,11 +69,10 @@ def fetch_latest_release():
     resp.raise_for_status()
     data = resp.json()
 
-    tag = re.sub(r"^[Vv]\.?", "", data["tag_name"])  # "V.0.7.11.Beta" → "0.7.11.Beta"
+    tag = re.sub(r"^[Vv]\.?", "", data["tag_name"])
     version = _format_version_string(tag)
 
-    # Prefer an explicit .zip release asset; fall back to the auto-generated
-    # zipball (source archive) which GitHub always provides.
+
     zip_url = data.get("zipball_url", "")
     for asset in data.get("assets", []):
         if asset.get("name", "").endswith(".zip"):
@@ -110,7 +91,7 @@ def get_base_path():
 def get_app_dir():
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
-    # updater.py lives in core/ — parent of parent is app root
+
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_downloads_folder():
@@ -127,10 +108,7 @@ def get_downloads_folder():
     return os.path.join(os.path.expanduser("~"), "Downloads")
 
 
-# ── version helpers ───────────────────────────────────────────────────────── #
-
 def _format_version_string(raw: str) -> str:
-    """Parse a raw version.txt string into a canonical 'M.m.p.Status' form."""
     content = raw.strip().replace("Version:", "").strip()
     parts = content.split(".")
     if len(parts) >= 3:
@@ -184,7 +162,7 @@ CURRENT_VERSION = read_version()
 
 _app_instance      = None
 _colors            = None
-_pending_signaller = None   # kept alive until the update check resolves
+_pending_signaller = None
 
 def set_app_instance(app, colors):
     global _app_instance, _colors
@@ -193,10 +171,7 @@ def set_app_instance(app, colors):
     log.debug("set_app_instance called")
 
 
-# ── skip-version helpers ──────────────────────────────────────────────────── #
-
 def get_skipped_version() -> str:
-    """Return the version string the user chose to skip, or '' if none."""
     try:
         import core.settings as _s
         return _s.app_settings.get("skipped_update_version", "")
@@ -205,7 +180,6 @@ def get_skipped_version() -> str:
 
 
 def set_skipped_version(version: str) -> None:
-    """Persist the version the user wants to skip (pass '' to clear)."""
     log.debug("set_skipped_version: %r", version)
     try:
         import core.settings as _s
@@ -215,12 +189,10 @@ def set_skipped_version(version: str) -> None:
         log.warning("set_skipped_version: could not persist: %s", e)
 
 
-# ── background workers ────────────────────────────────────────────────────── #
-
 class _DownloadWorker(QThread):
-    progress = Signal(int, int)   # bytes_done, total_bytes
-    finished = Signal(str)        # filepath on success
-    failed   = Signal(str)        # error message on failure
+    progress = Signal(int, int)
+    finished = Signal(str)
+    failed   = Signal(str)
 
     def __init__(self, url: str, dest: str):
         super().__init__()
@@ -246,36 +218,22 @@ class _DownloadWorker(QThread):
 
 
 class _ExtractWorker(QThread):
-    status   = Signal(str)   # status text
-    finished = Signal(int)   # files_updated count
-    failed   = Signal(str)   # error message
+    status   = Signal(str)
+    finished = Signal(int)
+    failed   = Signal(str)
 
-    # ── Tier 1: individual files whose content is backed up before overwriting
-    #           and restored afterwards (user-edited JSON blobs).
+
     PRESERVE: set = {
         os.path.join("data",     "app_settings.json"),
         os.path.join("vehicles", "added_vehicles.json"),
     }
 
-    # ── Tier 2: directory prefixes that are NEVER overwritten during the copy
-    #           step, regardless of what the zip contains.  The files already
-    #           on disk are left completely intact.
-    #
-    #   • data/ — every file in here is user state; the zip has no business
-    #             touching any of it (app_settings, project_registry,
-    #             seen_changelogs, etc.)
+
     NEVER_OVERWRITE_PREFIXES: frozenset = frozenset({
         "data",
     })
 
-    # ── Tier 3: directory prefixes where existing files are NEVER deleted
-    #           during cleanup, even if the new zip doesn't contain them.
-    #           New files shipped by the update ARE still copied in — only
-    #           deletions are blocked inside these trees.
-    #
-    #   • data/               — all user settings / state (also in Tier 2)
-    #   • vehicles/           — vehicle template trees (may have user-created ones)
-    #   • gui/images/vehicles — bundled vehicle preview images
+
     NEVER_DELETE_PREFIXES: frozenset = frozenset({
         "data",
         "vehicles",
@@ -287,11 +245,9 @@ class _ExtractWorker(QThread):
         self._zip     = zip_path
         self._version = new_version
 
-    # ── helpers ──────────────────────────────────────────────────────────────
 
     @classmethod
     def _is_overwrite_protected(cls, rel_norm: str) -> bool:
-        """Return True if this path must never be overwritten by the zip."""
         parts = rel_norm.split(os.sep)
         for prefix in cls.NEVER_OVERWRITE_PREFIXES:
             prefix_parts = prefix.split(os.sep)
@@ -301,19 +257,17 @@ class _ExtractWorker(QThread):
 
     @classmethod
     def _is_deletion_protected(cls, rel_norm: str) -> bool:
-        """Return True if this on-disk relative path must never be deleted."""
         parts = rel_norm.split(os.sep)
-        # Always keep __pycache__ and compiled bytecode — not shipped in zip.
+
         if "__pycache__" in parts or rel_norm.endswith(".pyc"):
             return True
-        # Keep anything rooted inside a NEVER_DELETE prefix.
+
         for prefix in cls.NEVER_DELETE_PREFIXES:
             prefix_parts = prefix.split(os.sep)
             if parts[: len(prefix_parts)] == prefix_parts:
                 return True
         return False
 
-    # ── main run ─────────────────────────────────────────────────────────────
 
     def run(self):
         try:
@@ -321,7 +275,7 @@ class _ExtractWorker(QThread):
             dl_folder = os.path.dirname(self._zip)
             temp_dir  = os.path.join(dl_folder, f"BeamSkin-Studio-temp-{self._version}")
 
-            # ── 1. Extract zip to a temp location ────────────────────────── #
+
             self.status.emit("Extracting archive\u2026")
             with zipfile.ZipFile(self._zip, "r") as z:
                 z.extractall(temp_dir)
@@ -332,15 +286,14 @@ class _ExtractWorker(QThread):
                            os.path.isdir(os.path.join(temp_dir, contents[0]))
                         else temp_dir)
 
-            # ── 2. Collect every relative path the new version ships ──────── #
-            #       (used in step 5 to detect files that no longer exist)
+
             incoming: set = set()
             for root, _, files in os.walk(source):
                 for fname in files:
                     rel = os.path.relpath(os.path.join(root, fname), source)
                     incoming.add(rel.replace("/", os.sep).replace("\\", os.sep))
 
-            # ── 3. Back up Tier-1 preserved files ────────────────────────── #
+
             backups: dict = {}
             for rel in self.PRESERVE:
                 full = os.path.join(app_dir, rel)
@@ -351,7 +304,7 @@ class _ExtractWorker(QThread):
                     except Exception:
                         pass
 
-            # ── 4. Copy new / changed files into app_dir ─────────────────── #
+
             self.status.emit("Copying files\u2026")
             updated = 0
             preserve_norm = {p.replace("/", os.sep).replace("\\", os.sep)
@@ -366,9 +319,9 @@ class _ExtractWorker(QThread):
                     rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
                     rel_norm = rel_file.replace("/", os.sep).replace("\\", os.sep)
                     if rel_norm in preserve_norm:
-                        continue   # will be restored from backup in step 6
+                        continue
                     if self._is_overwrite_protected(rel_norm):
-                        continue   # entire directory is off-limits for writes
+                        continue
                     try:
                         shutil.copy2(os.path.join(root, fname),
                                      os.path.join(target_dir, fname))
@@ -376,8 +329,7 @@ class _ExtractWorker(QThread):
                     except Exception:
                         pass
 
-            # ── 5. Remove files the new version no longer ships ───────────── #
-            #       Skips anything covered by _is_deletion_protected().
+
             self.status.emit("Removing obsolete files\u2026")
             for root, dirs, files in os.walk(app_dir, topdown=False):
                 if self.isInterruptionRequested():
@@ -386,23 +338,23 @@ class _ExtractWorker(QThread):
                     full     = os.path.join(root, fname)
                     rel_norm = os.path.relpath(full, app_dir)
                     if rel_norm in incoming:
-                        continue   # still present in new version — keep
+                        continue
                     if rel_norm in preserve_norm:
-                        continue   # handled separately
+                        continue
                     if self._is_deletion_protected(rel_norm):
-                        continue   # protected tree — never touch
+                        continue
                     try:
                         os.remove(full)
                         log.debug("Removed obsolete file: %s", rel_norm)
                     except Exception as e:
                         log.warning("Could not remove %s: %s", rel_norm, e)
-                # Remove directories that are now empty, but only if they
-                # are not inside a protected tree.
+
+
                 for dname in dirs:
                     dpath    = os.path.join(root, dname)
                     rel_norm = os.path.relpath(dpath, app_dir)
-                    # Pass a fake child path so the prefix check works for
-                    # the directory itself, not just its contents.
+
+
                     if self._is_deletion_protected(os.path.join(rel_norm, ".keep")):
                         continue
                     try:
@@ -411,7 +363,7 @@ class _ExtractWorker(QThread):
                     except Exception:
                         pass
 
-            # ── 6. Restore Tier-1 preserved files ────────────────────────── #
+
             for rel, content in backups.items():
                 full = os.path.join(app_dir, rel)
                 os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -421,7 +373,7 @@ class _ExtractWorker(QThread):
                 except Exception:
                     pass
 
-            # ── 7. Clean up temp extraction folder and downloaded zip ─────── #
+
             try:   shutil.rmtree(temp_dir)
             except Exception: pass
             try:   os.remove(self._zip)
@@ -435,8 +387,6 @@ class _ExtractWorker(QThread):
             self.failed.emit(str(e))
 
 
-# ── update dialog (all states in one window) ──────────────────────────────── #
-
 _PAGE_MAIN        = 0
 _PAGE_DOWNLOADING = 1
 _PAGE_DOWNLOADED  = 2
@@ -446,7 +396,6 @@ _PAGE_DL_ERROR    = 5
 
 
 class _UpdateDialog(QDialog):
-    """Single dialog that transitions through all update states."""
 
     def __init__(self, parent: QWidget, new_version: str, on_done=None):
         super().__init__(parent)
@@ -466,7 +415,6 @@ class _UpdateDialog(QDialog):
         self._build()
         self.adjustSize()
 
-    # ── on_done wiring — fires exactly once on any close path ─────────────── #
 
     def _fire_done(self):
         if not self._done_fired:
@@ -485,14 +433,13 @@ class _UpdateDialog(QDialog):
         self._fire_done()
         super().reject()
 
-    # ── build ─────────────────────────────────────────────────────────────── #
 
     def _build(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ── header ────────────────────────────────────────────────────────── #
+
         header = QFrame(self)
         header.setFixedHeight(120)
         header.setStyleSheet(f"""
@@ -502,7 +449,7 @@ class _UpdateDialog(QDialog):
             }}
         """)
 
-        # accent top stripe — in a VBoxLayout so it tracks dialog width
+
         header_vlay = QVBoxLayout(header)
         header_vlay.setContentsMargins(0, 0, 0, 0)
         header_vlay.setSpacing(0)
@@ -525,7 +472,7 @@ class _UpdateDialog(QDialog):
         hrow.setSpacing(18)
         header_vlay.addLayout(hrow, 1)
 
-        # icon badge
+
         badge = QFrame()
         badge.setFixedSize(52, 52)
         badge.setStyleSheet(f"""
@@ -546,7 +493,7 @@ class _UpdateDialog(QDialog):
         badge_lay.addWidget(icon_lbl)
         hrow.addWidget(badge)
 
-        # title block
+
         tcol = QVBoxLayout()
         tcol.setSpacing(4)
         t1 = QLabel(t("update.title", default="Update Available"))
@@ -561,20 +508,19 @@ class _UpdateDialog(QDialog):
 
         root.addWidget(header)
 
-        # ── stacked pages ─────────────────────────────────────────────────── #
+
         self._stack = QStackedWidget(self)
         self._stack.setStyleSheet(f"background:{COLORS['card_bg']};")
-        self._stack.addWidget(self._page_main())        # 0
-        self._stack.addWidget(self._page_downloading()) # 1
-        self._stack.addWidget(self._page_downloaded())  # 2
-        self._stack.addWidget(self._page_extracting())  # 3
-        self._stack.addWidget(self._page_complete())    # 4
-        self._stack.addWidget(self._page_dl_error())    # 5
+        self._stack.addWidget(self._page_main())
+        self._stack.addWidget(self._page_downloading())
+        self._stack.addWidget(self._page_downloaded())
+        self._stack.addWidget(self._page_extracting())
+        self._stack.addWidget(self._page_complete())
+        self._stack.addWidget(self._page_dl_error())
         root.addWidget(self._stack)
 
         fade_in(self, duration=200)
 
-    # ── widget helpers ────────────────────────────────────────────────────── #
 
     def _body(self):
         f = QFrame()
@@ -645,7 +591,6 @@ class _UpdateDialog(QDialog):
         return b
 
     def _ver_pill(self, label: str, version: str, accent: bool = False):
-        """Version chip with label above version string."""
         w = QFrame()
         if accent:
             w.setStyleSheet(f"""
@@ -697,7 +642,6 @@ class _UpdateDialog(QDialog):
         return lbl
 
     def _progress_bar(self, indeterminate: bool = False):
-        """Styled progress bar — determinate or indeterminate (busy)."""
         bar = QProgressBar()
         if indeterminate:
             bar.setRange(0, 0)
@@ -722,7 +666,6 @@ class _UpdateDialog(QDialog):
         return bar
 
     def _status_card(self, text: str, color: str = None):
-        """Subtle inset card for file path / status text."""
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
@@ -744,7 +687,6 @@ class _UpdateDialog(QDialog):
         return card, lbl
 
     def _success_badge(self):
-        """Large circular success indicator."""
         badge = QFrame()
         badge.setFixedSize(64, 64)
         badge.setStyleSheet(f"""
@@ -765,12 +707,11 @@ class _UpdateDialog(QDialog):
         lay.addWidget(icon)
         return badge
 
-    # ── pages ─────────────────────────────────────────────────────────────── #
 
     def _page_main(self):
         f, lay = self._body()
 
-        # version comparison row
+
         row = QHBoxLayout()
         row.setSpacing(12)
         current_pill = self._ver_pill(
@@ -797,7 +738,7 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-        # feature highlights
+
         highlights = [
             ("⚡", t("update.feat1", default="Latest features & improvements")),
             ("🛡", t("update.feat2", default="Bug fixes & stability updates")),
@@ -821,7 +762,7 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-        # "What's New" changelog shortcut
+
         changelog_btn = self._btn(
             t("update.view_changelog", default="📋  What's New in this version"),
             primary=False,
@@ -831,7 +772,7 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-        # buttons
+
         brow = QHBoxLayout()
         brow.setSpacing(10)
         later_btn    = self._btn(t("update.maybe_later",     default="Maybe Later"),     primary=False)
@@ -842,7 +783,7 @@ class _UpdateDialog(QDialog):
         brow.addWidget(download_btn, 1)
         lay.addLayout(brow)
 
-        # skip link — unobtrusive, below the main buttons
+
         skip_btn = QPushButton(
             t("update.skip_version", default="Skip this version")
         )
@@ -875,7 +816,7 @@ class _UpdateDialog(QDialog):
         self._dl_file_lbl = self._center_lbl("", 10)
         lay.addWidget(self._dl_file_lbl)
 
-        # progress bar + percentage on same row
+
         prog_row = QHBoxLayout()
         prog_row.setSpacing(10)
         self._dl_bar = self._progress_bar()
@@ -897,7 +838,7 @@ class _UpdateDialog(QDialog):
     def _page_downloaded(self):
         f, lay = self._body()
 
-        # success badge centered
+
         badge_row = QHBoxLayout()
         badge_row.addStretch()
         badge_row.addWidget(self._success_badge())
@@ -968,7 +909,7 @@ class _UpdateDialog(QDialog):
     def _page_complete(self):
         f, lay = self._body()
 
-        # success badge
+
         badge_row = QHBoxLayout()
         badge_row.addStretch()
         badge_row.addWidget(self._success_badge())
@@ -992,10 +933,8 @@ class _UpdateDialog(QDialog):
         lay.addWidget(later_btn)
         return f
 
-    # ── changelog preview ─────────────────────────────────────────────────── #
 
     def _on_view_changelog(self):
-        """Fetch and show the changelog for the new version in a ChangelogDialog."""
         try:
             from gui.components.changelog_dialog import show_update_changelog
             show_update_changelog(self, self._new_version)
@@ -1004,7 +943,6 @@ class _UpdateDialog(QDialog):
             import webbrowser
             webbrowser.open(get_github_repo())
 
-    # ── actions ───────────────────────────────────────────────────────────── #
 
     def _skip_this_version(self):
         log.debug("_skip_this_version: skipping %r", self._new_version)
@@ -1109,8 +1047,6 @@ class _UpdateDialog(QDialog):
         QApplication.instance().quit()
 
 
-# ── public API ────────────────────────────────────────────────────────────── #
-
 class _UpdateSignaller(QObject):
     update_available = Signal(str)
     no_update        = Signal()
@@ -1129,28 +1065,14 @@ def prompt_update(new_version: str, on_done=None):
 
 
 def check_for_updates(on_done=None):
-    """
-    Check GitHub for a newer version on a background thread.
-    Silently skips the prompt if the remote version was previously skipped by
-    the user.  on_done is called on the main thread after the dialog is
-    dismissed, or immediately if no update is available / version is skipped.
-    """
     _check_for_updates_impl(on_done=on_done, ignore_skip=False)
 
 
 def check_for_updates_manual(on_done=None):
-    """
-    Same as check_for_updates() but always shows the dialog even for
-    previously skipped versions.  Use this for the "Check for Updates" button.
-    """
     _check_for_updates_impl(on_done=on_done, ignore_skip=True)
 
 
 def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
-    """
-    Internal implementation shared by check_for_updates() and
-    check_for_updates_manual().
-    """
     global _pending_signaller
     log.debug("check_for_updates called")
     log.debug("========== UPDATE CHECK STARTED ==========")
@@ -1159,7 +1081,7 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
     log.debug("ignore_skip=%s  skipped=%r", ignore_skip, get_skipped_version())
 
     signaller = _UpdateSignaller()
-    _pending_signaller = signaller   # prevent GC until thread resolves
+    _pending_signaller = signaller
 
     def _on_update(latest: str):
         global _pending_signaller
@@ -1178,7 +1100,7 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
         log.debug("_on_no_update — main thread")
         _pending_signaller = None
         if ignore_skip:
-            # Manual check: tell the user they're already up to date.
+
             _show_up_to_date_toast()
         if on_done:
             on_done()
@@ -1207,7 +1129,6 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
 
 
 def _show_up_to_date_toast() -> None:
-    """Show a brief toast when a manual check finds no update."""
     try:
         for top in QApplication.topLevelWidgets():
             if hasattr(top, "show_notification"):

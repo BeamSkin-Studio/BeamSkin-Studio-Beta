@@ -22,21 +22,12 @@ except ImportError:
     def t(key, **kw): return key
 
 
-# VARIANT  DETECTION  HELPER
-
 def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
-    """
-    Scan vehicles/<carid>/ for SKINNAME* subdirectories.
+    try:
+        from core.config import is_rebadge_suffix
+    except ImportError:
+        def is_rebadge_suffix(_c, _s): return False
 
-    Returns a list of (variant_suffix, display_label) tuples.
-      ("",          "Normal")     — the standard body (SKINNAME folder)
-      ("ambulance", "Ambulance")  — SKINNAMEAMBULANCE folder
-      ("box",       "Box")        — SKINNAMEBOX folder
-      …
-
-    Always returns at least [("", "Normal")].
-    The list is sorted: normal first, then alphabetically by label.
-    """
     vehicles_dir = os.path.join("vehicles", carid)
     if not os.path.isdir(vehicles_dir):
         return [("", "Normal")]
@@ -50,7 +41,9 @@ def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
         if dl == "skinname":
             variants.append(("", "Normal"))
         elif dl.startswith("skinname"):
-            suffix = dl[len("skinname"):]          # e.g. "ambulance", "box"
+            suffix = dl[len("skinname"):]
+            if is_rebadge_suffix(carid, suffix):
+                continue
             variants.append((suffix, suffix.capitalize()))
 
     if not variants:
@@ -60,33 +53,15 @@ def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
     return variants
 
 
-# VEHICLE  VARIANT  EXPANDER
-
 class VehicleVariantExpander(QFrame):
-    """
-    Sidebar widget for vehicles with multiple body variants.
 
-    Layout (collapsed):
-      ▶  Pickup                    2 variants
-
-    Layout (expanded):
-      ▼  Pickup                    2 variants
-      ┌────────────────────────┐
-      │  [Normal]  [Ambulance] │
-      └────────────────────────┘
-
-    Each variant pill is clickable until that variant has been added to the
-    project, at which point it grays out.  When all variants are added the
-    whole widget hides itself.
-    """
-
-    variant_add_requested = Signal(str, str, str)   # carid, display_name, variant_suffix
+    variant_add_requested = Signal(str, str, str)
 
     def __init__(
         self,
         carid:        str,
         display_name: str,
-        variants:     List[Tuple[str, str]],   # [(suffix, label), …]
+        variants:     List[Tuple[str, str]],
         parent:       QWidget | None = None,
         is_custom:    bool = False,
     ):
@@ -95,7 +70,7 @@ class VehicleVariantExpander(QFrame):
         self.display_name = display_name
         self.variants     = variants
         self._expanded    = False
-        self._added:      set = set()      # variant suffixes already in project
+        self._added:      set = set()
         self._buttons:    Dict[str, QPushButton] = {}
 
         self.setStyleSheet("background:transparent;border:none;")
@@ -227,32 +202,24 @@ class VehicleVariantExpander(QFrame):
 
     def _on_pill(self, suffix: str, label: str):
         print(f"[DEBUG] _on_pill() called")
-        # No guard here — clicking an already-added variant simply re-selects
-        # it in the generator (which shows its skin form) rather than blocking.
+
+
         vname = (f"{self.display_name} ({label})"
                  if suffix else self.display_name)
         self.variant_add_requested.emit(self.carid, vname, suffix)
 
     def mark_variant_added(self, suffix: str):
-        """
-        Called by the sidebar after a variant has been added to the project.
-        Hides the specific variant pill, matching the behaviour of single-body
-        vehicle cards which are removed from the list on add.
-        """
         print(f"[DEBUG] mark_variant_added() called")
         self._added.add(suffix)
-        # Hide the specific variant pill that was just added
+
         if suffix in self._buttons:
             self._buttons[suffix].setVisible(False)
-        # Hide the whole expander once every variant has been added
+
         if {s for s, _ in self.variants}.issubset(self._added):
             self.setVisible(False)
 
 
-# NAV  PILL  BUTTON  (topbar tab)
-
 class NavPill(QPushButton):
-    """Animated topbar tab button with underline indicator."""
 
     def __init__(
         self,
@@ -309,10 +276,7 @@ class NavPill(QPushButton):
             self._apply(active)
 
 
-# TOPBAR
-
 class Topbar(QFrame):
-    """Top navigation bar."""
 
     view_changed     = Signal(str)
     generate_clicked = Signal()
@@ -343,7 +307,7 @@ class Topbar(QFrame):
         layout.setContentsMargins(20, 0, 20, 0)
         layout.setSpacing(0)
 
-        # logo / brand
+
         logo_px = self.logo_pixmap or self._load_logo_pixmap()
         if logo_px:
             logo = QLabel()
@@ -363,7 +327,7 @@ class Topbar(QFrame):
             layout.addWidget(brand)
             layout.addSpacing(8)
 
-        # menu pills
+
         items = [
             (t("menu.generator"),    "generator"),
             (t("menu.HowToTab"),     "howto"),
@@ -382,7 +346,7 @@ class Topbar(QFrame):
 
         layout.addStretch()
 
-        # generate button
+
         self.generate_button = AnimButton(
             t("project.generate_mod", default="Generate Mod"),
             icon_text="✨",
@@ -399,7 +363,6 @@ class Topbar(QFrame):
         self.set_active("generator")
 
     def _load_logo_pixmap(self) -> Optional[QPixmap]:
-        """Load the theme-appropriate topbar logo (White in dark, Black in light)."""
         icon_dir = os.path.join("gui", "Icons")
         suffix   = "White" if state.theme_mode == "dark" else "Black"
         path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
@@ -414,7 +377,6 @@ class Topbar(QFrame):
         self.generate_button.setVisible(view_name == "generator")
 
     def refresh_ui(self, logo_pixmap: Optional[QPixmap] = None):
-        """Rebuild the topbar in place (called after language/theme change)."""
         print(f"[DEBUG] _load_logo_pixmap() called")
         if logo_pixmap:
             self.logo_pixmap = logo_pixmap
@@ -442,14 +404,9 @@ class Topbar(QFrame):
         self.set_active(saved_view)
 
 
-# SIDEBAR
-
 class Sidebar(QFrame):
-    """Left sidebar — project settings + vehicle picker."""
 
-    # Signal now carries 3 args: carid, display_name, variant_suffix
-    # variant_suffix is "" for normal vehicles and "ambulance" / "box" / etc
-    # for variant bodies on vehicles like Pickup and Van.
+
     add_vehicle_requested = Signal(str, str, str)
 
     def __init__(self, parent: QWidget):
@@ -465,7 +422,7 @@ class Sidebar(QFrame):
 
         self._populate_callback: Optional[Callable] = None
         self._vehicle_cards: List[VehicleCard] = []
-        # Tracks VehicleVariantExpander widgets keyed by carid.
+
         self._variant_expanders: Dict[str, VehicleVariantExpander] = {}
 
         self._mod_name_text = ""
@@ -638,7 +595,7 @@ class Sidebar(QFrame):
         veh_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
         inner_layout.addWidget(veh_lbl)
 
-        # ── Developer testing mode: Add All Vehicles button ────────────── #
+
         self._add_all_btn = QPushButton("⚡  Add All Vehicles & Variants")
         self._add_all_btn.setFont(font(12, "bold"))
         self._add_all_btn.setFixedHeight(36)
@@ -691,10 +648,14 @@ class Sidebar(QFrame):
 
 
     def populate_vehicles(self, add_callback: Callable[[str, str, str], None]):
-        """Called by the main window to populate the sidebar vehicle list."""
         self._populate_callback = add_callback
         state.sidebar_vehicle_buttons.clear()
         self._clear_vehicle_list()
+
+        try:
+            from core.config import get_rebadges_for
+        except ImportError:
+            def get_rebadges_for(_c): return {}
 
         gen = self._get_generator()
         project_keys = set(gen.project_data["cars"].keys()) if gen else set()
@@ -709,8 +670,15 @@ class Sidebar(QFrame):
             else:
                 self._add_vehicle_card(cid, name, add_callback)
 
+
+            for suffix, rebadge_name in get_rebadges_for(cid).items():
+                from gui.tabs.generator import _make_project_key
+                if _make_project_key(cid, suffix) in project_keys:
+                    continue
+                self._add_vehicle_card(cid, rebadge_name, add_callback,
+                                       variant_suffix=suffix)
+
     def _get_generator(self):
-        """Walk up to main window and return the generator tab, or None."""
         print(f"[DEBUG] populate_vehicles: rebuilding sidebar vehicle list")
         mw = self.window()
         if mw and hasattr(mw, "tabs"):
@@ -718,11 +686,6 @@ class Sidebar(QFrame):
         return None
 
     def _is_fully_in_project(self, carid: str, project_keys: set) -> bool:
-        """
-        Return True only when every variant of carid is already in the project.
-        For single-body vehicles that means one key; for multi-variant vehicles
-        the user can still add remaining bodies even if one is present.
-        """
         print(f"[DEBUG] _is_fully_in_project() called")
         variants = _get_vehicle_variants(carid)
         for suffix, _ in variants:
@@ -732,24 +695,41 @@ class Sidebar(QFrame):
         return True
 
     def restore_vehicle(self, carid: str, variant_suffix: str = ""):
-        """
-        Add a vehicle (or a single variant) back to the sidebar after it has
-        been removed from the project.  Called by the generator tab.
-        """
         print(f"[DEBUG] restore_vehicle() called")
         if self._populate_callback is None:
+            return
+
+        try:
+            from core.config import is_rebadge_suffix
+        except ImportError:
+            def is_rebadge_suffix(_c, _s): return False
+
+
+        if variant_suffix and is_rebadge_suffix(carid, variant_suffix):
+            try:
+                from core.config import get_rebadges_for
+                rebadge_name = get_rebadges_for(carid).get(variant_suffix, carid)
+            except ImportError:
+                rebadge_name = carid
+            already_present = any(
+                cid == carid and vs == variant_suffix
+                for _card, cid, _name, vs in state.sidebar_vehicle_buttons
+            )
+            if not already_present:
+                self._add_vehicle_card(carid, rebadge_name, self._populate_callback,
+                                       variant_suffix=variant_suffix)
             return
 
         name = state.vehicle_ids.get(carid) or state.added_vehicles.get(carid, carid)
         variants = _get_vehicle_variants(carid)
 
         if len(variants) > 1:
-            # Multi-variant: if an expander already exists for this carid,
-            # just un-gray the pill.  Otherwise rebuild the whole expander.
+
+
             if carid in self._variant_expanders:
                 exp = self._variant_expanders[carid]
                 exp.setVisible(True)
-                # Re-enable the specific pill that was removed
+
                 if variant_suffix in exp._buttons:
                     btn = exp._buttons[variant_suffix]
                     btn.setEnabled(True)
@@ -759,15 +739,14 @@ class Sidebar(QFrame):
             else:
                 self._add_variant_expander(carid, name, variants, self._populate_callback)
         else:
-            # Single-body: only add the card back if it isn't already there
+
             if not any(c.carid == carid for c in self._vehicle_cards):
                 self._add_vehicle_card(carid, name, self._populate_callback)
 
     def _insert_sorted(self, widget: QWidget, display_name: str):
-        """Insert widget into _vehicle_list at the correct alphabetical position."""
         target = display_name.lower()
         count  = self._vehicle_list.count()
-        insert_at = count  # default: append
+        insert_at = count
         for i in range(count):
             item = self._vehicle_list.itemAt(i)
             if item is None:
@@ -775,7 +754,7 @@ class Sidebar(QFrame):
             w = item.widget()
             if w is None:
                 continue
-            # Get the display name from whatever widget type is at this slot
+
             if hasattr(w, "display_name"):
                 existing = w.display_name.lower()
             elif isinstance(w, VehicleVariantExpander):
@@ -794,7 +773,6 @@ class Sidebar(QFrame):
         variants: List[Tuple[str, str]],
         callback: Callable,
     ):
-        """Add a VehicleVariantExpander for multi-body vehicles."""
         print(f"[DEBUG] _insert_sorted() called")
         is_custom = carid in state.added_vehicles
         expander = VehicleVariantExpander(carid, name, variants, parent=self,
@@ -805,61 +783,66 @@ class Sidebar(QFrame):
         self._variant_expanders[carid] = expander
         self._insert_sorted(expander, name)
         fade_in(expander, 180)
-        # Header hover → default image
-        self._attach_hover_preview(expander._header, carid, "")
-        # Each pill hover → variant-specific image
-        for suffix, _label in variants:
-            if suffix in expander._buttons:
-                self._attach_hover_preview(expander._buttons[suffix], carid, suffix)
 
-    def _add_vehicle_card(self, carid: str, name: str, callback: Callable):
-        """Add a plain VehicleCard for single-body vehicles."""
+        self._attach_hover_preview(expander._header, carid, "")
+
+        for suffix, label in variants:
+            if suffix in expander._buttons:
+                self._attach_hover_preview(
+                    expander._buttons[suffix], carid, suffix,
+                    display_name=f"{name} {label}" if suffix else name,
+                )
+
+    def _add_vehicle_card(self, carid: str, name: str, callback: Callable,
+                          variant_suffix: str = ""):
         is_custom = carid in state.added_vehicles
         card = VehicleCard(carid, name, parent=self, is_custom=is_custom)
         card.add_requested.connect(
-            lambda c, d: self._on_add_vehicle(c, d, "", callback)
+            lambda c, d: self._on_add_vehicle(c, d, variant_suffix, callback)
         )
         self._vehicle_cards.append(card)
-        state.sidebar_vehicle_buttons.append((card, carid, name, ""))
+        state.sidebar_vehicle_buttons.append((card, carid, name, variant_suffix))
         self._insert_sorted(card, name)
         fade_in(card, 180)
-        self._attach_hover_preview(card, carid, "")
+        self._attach_hover_preview(card, carid, variant_suffix, display_name=name)
 
     def _attach_hover_preview(
-        self, widget: QWidget, carid: str, variant_suffix: str = ""
+        self, widget: QWidget, carid: str, variant_suffix: str = "",
+        display_name: Optional[str] = None,
     ) -> None:
         mw = self.window()
         if mw is None or not hasattr(mw, "preview_manager"):
             return
         img_name = f"{variant_suffix}.jpg" if variant_suffix else "default.jpg"
         img_path = os.path.join("gui", "images", "vehicles", carid, img_name)
-        # Fall back to default.jpg if the variant image doesn't exist
+
         if not os.path.exists(img_path):
             img_path = os.path.join("gui", "images", "vehicles", carid, "default.jpg")
         mw.preview_manager.setup_robust_hover(
-            widget, carid, get_image_path=lambda p=img_path: p
+            widget, carid,
+            get_image_path=lambda p=img_path: p,
+            get_display_name=(lambda n=display_name: n) if display_name else None,
         )
 
     def _on_add_vehicle(self, carid: str, name: str, variant: str, callback: Callable):
-        """
-        print(f"[DEBUG] _add_vehicle_card() called")
-        Invoked when any vehicle (plain card or variant pill) is added.
-        Forwards to the main-window callback, then updates the sidebar state.
-        """
         callback(carid, name, variant)
 
         if carid in self._variant_expanders:
-            # Multi-variant expander: mark the specific variant as added.
-            # The expander hides itself when all variants are done.
+
+
             self._variant_expanders[carid].mark_variant_added(variant)
         else:
-            # Plain single-variant card: remove it entirely.
-            for card in list(self._vehicle_cards):
-                if card.carid == carid:
+
+
+            target_cards = [
+                card for card, cid, _name, vs in state.sidebar_vehicle_buttons
+                if cid == carid and vs == variant
+            ]
+            for card in target_cards:
+                if card in self._vehicle_cards:
                     self._vehicle_list.removeWidget(card)
                     card.deleteLater()
                     self._vehicle_cards.remove(card)
-                    break
 
         state.sidebar_vehicle_buttons = [
             item for item in state.sidebar_vehicle_buttons
@@ -893,10 +876,6 @@ class Sidebar(QFrame):
 
 
     def _add_all_vehicles(self):
-        """
-        Developer testing mode: add every known vehicle and every variant to
-        the project in one shot.  Silently skips vehicles already in the project.
-        """
         print(f"[DEBUG] _add_all_vehicles: testing mode bulk-add triggered")
         if self._populate_callback is None:
             return
@@ -986,8 +965,6 @@ class Sidebar(QFrame):
         if self._populate_callback:
             self.populate_vehicles(self._populate_callback)
 
-
-# HELPERS
 
 def _radio_qss() -> str:
     return f"""

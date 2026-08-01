@@ -20,7 +20,6 @@ except ImportError:
 
 
 class HowToTab(QWidget):
-    """Documentation tab with chapter nav, search, and animated transitions."""
 
     def __init__(self, parent: QWidget):
         print(f"[DEBUG] __init__() called")
@@ -31,9 +30,8 @@ class HowToTab(QWidget):
         self._content:         Optional[QTextEdit]           = None
         self._search:          Optional[QLineEdit]           = None
         self._setup_ui()
-        # 50 ms gives Qt time to finish laying out the widget before we set
-        # the scroll position — 0 ms fires before the first paint and the
-        # viewport reset gets ignored.
+
+
         QTimer.singleShot(50, self.load_all_chapters)
 
 
@@ -115,7 +113,7 @@ class HowToTab(QWidget):
         text_col.addWidget(self._page_sub_lbl)
         hdr_row.addLayout(text_col, 1)
 
-        # search
+
         search_row = QHBoxLayout()
         search_row.setSpacing(8)
         si = QLabel("🔍")
@@ -242,17 +240,6 @@ class HowToTab(QWidget):
 
 
     def _set_text_scroll_top(self, text: str):
-        """
-        Set content and guarantee the viewport starts at the top.
-
-        processEvents() flushes Qt's pending layout pass synchronously so our
-        setValue(0) is always the last thing to touch the scrollbar.
-
-        fade_in() is intentionally NOT called on self._content or its direct
-        parent — applying QGraphicsOpacityEffect to either causes Qt to
-        re-render the QTextEdit through an offscreen pixmap, resetting the
-        viewport scroll after we set it to 0.
-        """
         self._content.setPlainText(text)
         QApplication.processEvents()
         self._content.moveCursor(QTextCursor.Start)
@@ -281,16 +268,16 @@ class HowToTab(QWidget):
         print(f"[DEBUG] load_all_chapters: rendering full doc view")
         chapters = self._get_chapters()
 
-        # Build the same intro block as the original ctk version
+
         intro = (
             t("howto.welcome_title")         + "\n\n"
             + t("howto.welcome_intro")       + "\n\n"
         )
-        # Optional quick-nav lines (graceful fallback if keys don't exist)
+
         for key in ("howto.quick_nav_title", "howto.quick_nav_chapters",
                     "howto.quick_nav_search", "howto.quick_nav_walkthrough"):
             line = t(key)
-            if line != key:          # key was actually translated
+            if line != key:
                 intro += line + "\n"
         lets = t("howto.lets_start")
         if lets != "howto.lets_start":
@@ -336,26 +323,22 @@ class HowToTab(QWidget):
 
 
     def refresh_ui(self):
-        """
-        Refresh translations without rebuilding the widget tree.
-        Only the text content is reloaded, preserving the layout.
-        """
         print(f"[DEBUG] refresh_ui() called")
         self._page_title_lbl.setText(t("howto.page_title"))
         self._page_sub_lbl.setText(t("howto.page_subtitle"))
         if self._search:
             self._search.setPlaceholderText(t("howto.search_placeholder"))
         chapters = self._get_chapters()
-        # Re-label the view-all button
+
         if self._view_all_btn:
             self._view_all_btn.setText(f"📖  {t('howto.view_all')}")
-        # Re-label each chapter button
+
         for btn, key in self._chapter_buttons:
             if key in chapters:
                 data = chapters[key]
                 btn.setText(f"{data['icon']} {data['title']}")
 
-        # Reload content with new locale strings (guard against not-yet-shown)
+
         if self._content is not None:
             self.load_all_chapters()
 

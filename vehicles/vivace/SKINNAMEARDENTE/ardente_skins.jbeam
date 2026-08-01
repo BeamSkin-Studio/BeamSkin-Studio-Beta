@@ -1,0 +1,12 @@
+ {
+  "ardente_skin_SKINNAME": {
+    "information":{
+        "authors":"BeamNG",
+        "name":"SKINNAME",
+        "value":200
+    },
+    "slotType" : "skin_ardente",
+    "skinType" : "paint_design",
+    "globalSkin" : "SKINNAME"
+   },
+   }

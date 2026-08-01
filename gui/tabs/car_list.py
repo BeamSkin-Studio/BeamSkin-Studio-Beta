@@ -28,8 +28,6 @@ except ImportError:
         return {}
 
 
-# PATHS
-
 _APP_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _IMAGES_DIR = os.path.join(_APP_DIR, "gui", "images", "vehicles")
 _SETTINGS   = os.path.join(_APP_DIR, "data", "app_settings.json")
@@ -37,27 +35,24 @@ _SETTINGS   = os.path.join(_APP_DIR, "data", "app_settings.json")
 CARD_IMG_H  = 160
 CARD_W      = 280
 CARD_SPACING = 12
-GLOW_PAD    = 7       # transparent outer ring — glow and grow effect live here        
+GLOW_PAD    = 7
 
-
-# VARIANT IMAGE HELPER
 
 _UV_KEYWORDS = ("uv", "uvmap", "uv_map", "uv_layout", "uv1_layout")
 _UV_EXTS     = (".dds", ".png", ".jpg", ".jpeg", ".pdn")
-# Same qualifier list as mod_scanner — catches double-extension typed textures
-# like name.color.dds / name.data.dds that happen to contain "uv" in the stem.
+
+
 _UV_TYPE_QUALIFIERS = (
     ".color", ".colour", ".data", ".normal", ".nrm",
     ".metallic", ".roughness", ".alpha", ".ao",
 )
 _UV_MAX_UNDERSCORES = 3
 
-# vehicles/ folder root — mirrors VEHICLE_FOLDER in utils/file_ops.py
+
 _VEHICLES_DIR = os.path.join(_APP_DIR, "vehicles")
 
 
 def _is_uv_map_file(fn: str) -> bool:
-    """Return True when *fn* looks like a UV layout template, not a livery texture."""
     lower = fn.lower()
     if not any(lower.endswith(ext) for ext in _UV_EXTS):
         return False
@@ -72,15 +67,6 @@ def _is_uv_map_file(fn: str) -> bool:
 
 
 def _get_local_uv_map_paths(carid: str) -> List[str]:
-    """Return UV-layout image paths for a developer-added vehicle.
-
-    Searches two locations so that UV maps are found regardless of whether
-    they were pre-copied to the images cache:
-
-    1. ``gui/images/vehicles/{carid}/``  -- the images cache folder.
-    2. ``vehicles/{carid}/``             -- the actual mod folder tree
-       (walked recursively, same rules as mod_scanner._find_uv_maps).
-    """
     seen: set = set()
     results: List[str] = []
 
@@ -105,11 +91,12 @@ def _get_local_uv_map_paths(carid: str) -> List[str]:
 
 
 def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
-    """Return [(label, abs_path), …] for every image in a vehicle's folder.
+    try:
+        from core.config import get_rebadges_for
+        rebadge_suffixes = set(get_rebadges_for(carid).keys())
+    except ImportError:
+        rebadge_suffixes = set()
 
-    Files are sorted so that ``default.*`` always comes first, then
-    alphabetically.  Only .jpg / .jpeg / .png files are returned.
-    """
     vehicle_dir = os.path.join(_IMAGES_DIR, carid)
     if not os.path.isdir(vehicle_dir):
         return []
@@ -120,14 +107,32 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
         if _is_uv_map_file(fn):
             continue
         stem = os.path.splitext(fn)[0]
-        label = "Default" if stem.lower() == "default" else stem.replace("_", " ").title()
+        stem_l = stem.lower()
+
+
+        if any(stem_l == suf or stem_l.endswith(f"_{suf}") for suf in rebadge_suffixes):
+            continue
+        label = "Default" if stem_l == "default" else stem.replace("_", " ").title()
         entries.append((label, os.path.join(vehicle_dir, fn)))
-    # Ensure 'Default' is first
+
     entries.sort(key=lambda x: (x[0] != "Default", x[0].lower()))
     return entries
 
 
-# BUILT-IN VEHICLE LIST
+def _get_rebadge_images(carid: str, suffix: str) -> List[Tuple[str, str]]:
+    vehicle_dir = os.path.join(_IMAGES_DIR, carid)
+    if not os.path.isdir(vehicle_dir):
+        return []
+    suf_l = suffix.lower()
+    candidates = [f"{suf_l}", f"default_{suf_l}"]
+    for fn in sorted(os.listdir(vehicle_dir)):
+        if not fn.lower().endswith((".jpg", ".jpeg", ".png")):
+            continue
+        stem_l = os.path.splitext(fn)[0].lower()
+        if stem_l in candidates:
+            return [("Default", os.path.join(vehicle_dir, fn))]
+    return []
+
 
 _BUILTIN_VEHICLES: List[Tuple[str, str]] = [
     ("autobello", "Autobello Piccolina"), ("atv", "FPU Wydra"),
@@ -153,8 +158,6 @@ _BUILTIN_VEHICLES: List[Tuple[str, str]] = [
     ("wl40", "Hirochi WL-40"),
 ]
 
-
-# UV-MAP SELECTION DIALOG
 
 class _UVSelectDialog(QDialog):
     def __init__(
@@ -269,8 +272,6 @@ class _UVSelectDialog(QDialog):
             self.accept()
 
 
-# ANIMATED MODERN CARD
-
 def _hex_to_rgb(h: str):
     h = h.lstrip("#")
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -286,18 +287,11 @@ def _lerp_color(c1: str, c2: str, t: float) -> QColor:
 
 
 class AnimatedCard(QFrame):
-    """
-    Modern vehicle card with hover animation drawn entirely in paintEvent.
-    No QGraphicsEffect — avoids QPainter reentrancy crashes inside QScrollArea.
-
-    At rest  : card background + 1px border at full GLOW_PAD inset
-    On hover : card expands into the GLOW_PAD ring (grow) + layered glow rings
-    """
 
     def __init__(self, parent: QWidget | None = None):
         print(f"[DEBUG] __init__() called")
         super().__init__(parent)
-        # Let our paintEvent own the background entirely
+
         self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self.setStyleSheet("AnimatedCard { background: transparent; border: none; }")
         self._t = 0.0
@@ -335,8 +329,8 @@ class AnimatedCard(QFrame):
         t  = self._t
         w, h = self.width(), self.height()
 
-        # Card rect shrinks into GLOW_PAD at rest; grows outward as t→1
-        grow  = int(t * 3)                    # expand up to 3px into the ring
+
+        grow  = int(t * 3)
         inset = max(0, GLOW_PAD - grow)
         radius = 12
 
@@ -346,7 +340,7 @@ class AnimatedCard(QFrame):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
 
-        # ── glow layers (drawn outward → inward so inner overwrites outer) ──
+
         if t > 0.01:
             num_layers = 7
             for i in range(num_layers, 0, -1):
@@ -359,7 +353,7 @@ class AnimatedCard(QFrame):
                                   w - 2 * layer_inset, h - 2 * layer_inset,
                                   r, r)
 
-        # ── card background ──
+
         bg     = _lerp_color(COLORS["card_bg"], COLORS.get("card_hover", COLORS["card_bg"]), t)
         border = _lerp_color(COLORS["border"],  COLORS["accent"], t)
         bw = 1.0 + t * 0.6
@@ -371,8 +365,6 @@ class AnimatedCard(QFrame):
         p.end()
 
 
-# CAR LIST TAB
-
 class CarListTab(QWidget):
     def __init__(self, parent: QWidget, **_):
         print(f"[DEBUG] __init__() called")
@@ -382,7 +374,7 @@ class CarListTab(QWidget):
         self._items: List[Tuple[QWidget, str, str]] = []
         self._modern_row = 0
         self._modern_col = 0
-        self._modern_cols_current = 0   
+        self._modern_cols_current = 0
         self._view_mode: str = self._load_view_mode()
 
         self._setup_ui()
@@ -528,20 +520,34 @@ class CarListTab(QWidget):
         state.added_vehicles.clear()
         state.added_vehicles.update(added)
 
-        all_vehicles: List[Tuple[str, str, bool]] = []
+        try:
+            from core.config import get_rebadges_for
+        except ImportError:
+            def get_rebadges_for(_c): return {}
+
+        base_vehicles: List[Tuple[str, str, bool]] = []
         for carid, name in _BUILTIN_VEHICLES:
-            all_vehicles.append((carid, name, False))
+            base_vehicles.append((carid, name, False))
         for carid, name in state.added_vehicles.items():
-            all_vehicles.append((carid, name, True))
+            base_vehicles.append((carid, name, True))
+
+
+        all_vehicles: List[Tuple[str, str, bool, str]] = [
+            (carid, name, dev_added, "") for carid, name, dev_added in base_vehicles
+        ]
+        for carid, _name, dev_added in base_vehicles:
+            for suffix, rebadge_name in get_rebadges_for(carid).items():
+                all_vehicles.append((carid, rebadge_name, dev_added, suffix))
+
         all_vehicles.sort(key=lambda x: x[1].lower())
 
-        for carid, name, dev_added in all_vehicles:
-            self._add_card(carid, name, developer_added=dev_added)
+        for carid, name, dev_added, suffix in all_vehicles:
+            self._add_card(carid, name, developer_added=dev_added, variant_suffix=suffix)
 
-    def _add_card(self, carid: str, name: str, developer_added: bool):
+    def _add_card(self, carid: str, name: str, developer_added: bool, variant_suffix: str = ""):
         print(f"[DEBUG] _add_card() called")
         if self._view_mode == "modern":
-            card = self._build_modern_card(carid, name, developer_added)
+            card = self._build_modern_card(carid, name, developer_added, variant_suffix)
             self._items.append((card, carid, name))
             self._list_layout.addWidget(card)
         else:
@@ -551,7 +557,7 @@ class CarListTab(QWidget):
                     insert_pos = i
                     break
 
-            card = self._build_card(carid, name, developer_added)
+            card = self._build_card(carid, name, developer_added, variant_suffix)
             self._items.insert(insert_pos, (card, carid, name))
 
             while self._list_layout.count() > 1:
@@ -559,16 +565,25 @@ class CarListTab(QWidget):
             for i, (w, _, _) in enumerate(self._items):
                 self._list_layout.insertWidget(i, w)
 
-            # Classic mode: attach the floating hover-preview popup
-            self._attach_hover_preview(card, carid)
+
+            img_path = None
+            if variant_suffix:
+                imgs = _get_rebadge_images(carid, variant_suffix)
+                img_path = imgs[0][1] if imgs else None
+            self._attach_hover_preview(
+                card, carid,
+                get_image_path=(lambda p=img_path: p) if img_path else None,
+                display_name=name if variant_suffix else None,
+            )
 
     def _attach_hover_preview(self, widget: QWidget, carid: str,
-                              get_image_path=None) -> None:
-        """Wire enter/leave preview hooks for both Classic and Modern modes."""
+                              get_image_path=None, display_name=None) -> None:
         mw = self.window()
         if mw is not None and hasattr(mw, "preview_manager"):
             mw.preview_manager.setup_robust_hover(
-                widget, carid, get_image_path=get_image_path
+                widget, carid,
+                get_image_path=get_image_path,
+                get_display_name=(lambda n=display_name: n) if display_name else None,
             )
 
     @staticmethod
@@ -586,11 +601,11 @@ class CarListTab(QWidget):
         path = QPainterPath()
         path.moveTo(radius, 0)
         path.lineTo(w - radius, 0)
-        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)   
+        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)
         path.lineTo(w, h)
         path.lineTo(0, h)
         path.lineTo(0, radius)
-        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)                
+        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)
         path.closeSubpath()
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, cropped)
@@ -599,12 +614,12 @@ class CarListTab(QWidget):
 
     def _cols_for_width(self, viewport_width: int) -> int:
         print(f"[DEBUG] _cols_for_width() called")
-        available = max(viewport_width - 8, CARD_W)   
+        available = max(viewport_width - 8, CARD_W)
         return max(1, available // (CARD_W + CARD_SPACING))
 
     def _card_width_for(self, viewport_width: int, cols: int) -> int:
         print(f"[DEBUG] _card_width_for() called")
-        margins = 8   
+        margins = 8
         spacing = CARD_SPACING * (cols - 1)
         return max(CARD_W, (viewport_width - margins - spacing) // cols) - 2
 
@@ -651,7 +666,8 @@ class CarListTab(QWidget):
         super().resizeEvent(event)
         self._reflow_modern_grid()
 
-    def _build_card(self, carid: str, name: str, developer_added: bool) -> QFrame:
+    def _build_card(self, carid: str, name: str, developer_added: bool,
+                    variant_suffix: str = "") -> QFrame:
         print(f"[DEBUG] _build_card() called")
         card = QFrame()
         card.setObjectName("vehicle_card")
@@ -688,7 +704,9 @@ class CarListTab(QWidget):
         )
         text_col.addWidget(name_lbl)
 
-        id_lbl = QLabel(carid)
+
+        id_text = f"{carid} ({variant_suffix})" if variant_suffix else carid
+        id_lbl = QLabel(id_text)
         id_lbl.setFont(font(12))
         id_lbl.setStyleSheet(
             f"color:{COLORS['text_secondary']};background:transparent;border:none;"
@@ -708,8 +726,8 @@ class CarListTab(QWidget):
             )
             btn_row.addWidget(uv_btn)
         else:
-            # For custom-added vehicles show UV button only when a local UV
-            # map was copied in during import.
+
+
             local_uvs = _get_local_uv_map_paths(carid)
             if local_uvs:
                 uv_btn = self._mk_btn(
@@ -729,17 +747,23 @@ class CarListTab(QWidget):
         row.addLayout(btn_row)
         return card
 
-    def _build_modern_card(self, carid: str, name: str, developer_added: bool) -> AnimatedCard:
+    def _build_modern_card(self, carid: str, name: str, developer_added: bool,
+                           variant_suffix: str = "") -> AnimatedCard:
         print(f"[DEBUG] _build_modern_card() called")
         card = AnimatedCard()
         card.setObjectName("vehicle_card")
         card.setFixedWidth(CARD_W)
 
-        variants = _get_variant_images(carid)
+        if variant_suffix:
+
+
+            variants = _get_rebadge_images(carid, variant_suffix)
+        else:
+            variants = _get_variant_images(carid)
         card._variants    = variants
         card._variant_idx = 0
 
-        # GLOW_PAD on all sides — glow + grow effect lives in this outer ring
+
         inner_w = CARD_W - 2 * GLOW_PAD
         col = QVBoxLayout(card)
         col.setContentsMargins(GLOW_PAD, GLOW_PAD, GLOW_PAD, GLOW_PAD + 5)
@@ -786,21 +810,21 @@ class CarListTab(QWidget):
                 QPushButton:hover {{ background: rgba(0,0,0,210); }}
             """
 
-            # Left arrow
+
             prev_btn = QPushButton("‹", img_container)
             prev_btn.setFixedSize(26, 38)
             prev_btn.setStyleSheet(_NAV_BTN.format(r=6))
             prev_btn.setCursor(Qt.PointingHandCursor)
             prev_btn.raise_()
 
-            # Right arrow
+
             next_btn = QPushButton("›", img_container)
             next_btn.setFixedSize(26, 38)
             next_btn.setStyleSheet(_NAV_BTN.format(r=6))
             next_btn.setCursor(Qt.PointingHandCursor)
             next_btn.raise_()
 
-            # Variant label badge — bottom-left of image
+
             var_lbl = QLabel(variants[0][0], img_container)
             var_lbl.setObjectName("variant_label")
             var_lbl.setFont(font(9, "bold"))
@@ -816,7 +840,7 @@ class CarListTab(QWidget):
             var_lbl.adjustSize()
             var_lbl.raise_()
 
-            # Dot indicators
+
             dot_size   = 6
             dot_gap    = 4
             dot_widgets: List[QLabel] = []
@@ -835,7 +859,6 @@ class CarListTab(QWidget):
                             pb=prev_btn, nb=next_btn,
                             vl=var_lbl, dws=dot_widgets,
                             il=img_lbl, ds=dot_size, dg=dot_gap):
-                """Reposition all overlay widgets to match the container size."""
                 il.setGeometry(0, 0, w, h)
                 pb.move(4, (h - pb.height()) // 2)
                 nb.move(w - nb.width() - 4, (h - nb.height()) // 2)
@@ -846,10 +869,10 @@ class CarListTab(QWidget):
                 for di, dw in enumerate(dws):
                     dw.move(dx + di * (ds + dg), dy)
 
-            # Initial placement
+
             _reposition(img_container.width() or inner_w, CARD_IMG_H)
 
-            # Keep positions correct whenever the container is resized
+
             img_container.resizeEvent = lambda ev, rp=_reposition: rp(
                 ev.size().width(), ev.size().height()
             )
@@ -1049,7 +1072,6 @@ class CarListTab(QWidget):
         print(f"[DEBUG] Car ID '{carid}' copied to clipboard")
 
     def _get_local_uv_map(self, carid: str):
-        """Serve a UV map that was copied locally during auto-import."""
         uv_paths = _get_local_uv_map_paths(carid)
         if not uv_paths:
             self._notify(
@@ -1060,7 +1082,7 @@ class CarListTab(QWidget):
         if len(uv_paths) == 1:
             selected = [(uv_paths[0], "")]
         else:
-            # Reuse the existing multi-file selection dialog.
+
             found_files = [(p, p) for p in uv_paths]
             dlg = _UVSelectDialog(self, carid, found_files)
             if dlg.exec() != QDialog.Accepted or not dlg.selected_files:
@@ -1070,7 +1092,6 @@ class CarListTab(QWidget):
         self._save_uv_files_local(selected)
 
     def _save_uv_files_local(self, selected: List[Tuple[str, str]]):
-        """Save locally-stored UV maps to a user-chosen location."""
         if len(selected) == 1:
             src_path, _ = selected[0]
             ext  = os.path.splitext(src_path)[1]

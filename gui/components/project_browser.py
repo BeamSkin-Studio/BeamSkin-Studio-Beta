@@ -37,8 +37,6 @@ except ImportError:
     def t(key, **kw): return kw.get("default", key)
 
 
-### formatting helpers
-
 def _fmt_date(iso: str) -> str:
     print(f"[DEBUG] _fmt_date: formatting {iso!r}")
     try:
@@ -66,8 +64,6 @@ def _trunc(text: str, maxlen: int = 52) -> str:
     return result
 
 
-### _ProjectRow — single card in the project list
-
 class _ProjectRow(QFrame):
 
     open_requested   = Signal(str)
@@ -89,11 +85,11 @@ class _ProjectRow(QFrame):
         outer.setContentsMargins(14, 10, 14, 10)
         outer.setSpacing(12)
 
-        ### left info column
+
         info_col = QVBoxLayout()
         info_col.setSpacing(3)
 
-        ### row 1: mod name + optional missing badge
+
         name_row = QHBoxLayout()
         name_row.setSpacing(8)
 
@@ -124,7 +120,7 @@ class _ProjectRow(QFrame):
         name_row.addStretch()
         info_col.addLayout(name_row)
 
-        ### row 2: author | cars | skins
+
         author = entry.get("author",     "")
         cars   = entry.get("car_count",  0)
         skins  = entry.get("skin_count", 0)
@@ -143,7 +139,7 @@ class _ProjectRow(QFrame):
         )
         info_col.addWidget(meta_lbl)
 
-        ### row 3: last saved | size | path
+
         last_saved = _fmt_date(entry.get("last_saved", ""))
         size_str   = _fmt_size(entry.get("file_size_kb", 0))
         path_short = _trunc(self._path)
@@ -161,7 +157,7 @@ class _ProjectRow(QFrame):
 
         outer.addLayout(info_col, 1)
 
-        ### right button column
+
         btn_col = QVBoxLayout()
         btn_col.setSpacing(6)
         btn_col.setAlignment(Qt.AlignVCenter)
@@ -250,8 +246,6 @@ class _ProjectRow(QFrame):
         super().mouseDoubleClickEvent(event)
 
 
-### ProjectBrowserDialog — main load dialog
-
 class ProjectBrowserDialog(QDialog):
 
     def __init__(self, parent: QWidget = None):
@@ -279,7 +273,6 @@ class ProjectBrowserDialog(QDialog):
         self._load_and_populate()
         print(f"[DEBUG] ProjectBrowserDialog.__init__: init complete")
 
-    ### build UI (called once)
 
     def _setup_ui(self):
         print(f"[DEBUG] ProjectBrowserDialog._setup_ui: building UI")
@@ -287,7 +280,7 @@ class ProjectBrowserDialog(QDialog):
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(14)
 
-        ### title + project count
+
         title_row = QHBoxLayout()
         title_lbl = QLabel(t("project_browser.title"))
         title_lbl.setFont(font(20, "bold"))
@@ -305,7 +298,7 @@ class ProjectBrowserDialog(QDialog):
         title_row.addWidget(self._count_lbl)
         root.addLayout(title_row)
 
-        ### search bar
+
         self._search = QLineEdit()
         self._search.setPlaceholderText(t("project_browser.search_placeholder"))
         self._search.setClearButtonEnabled(True)
@@ -324,7 +317,7 @@ class ProjectBrowserDialog(QDialog):
         self._search.textChanged.connect(self._on_search)
         root.addWidget(self._search)
 
-        ### missing-files banner (hidden until needed)
+
         self._missing_banner = QLabel("")
         self._missing_banner.setFont(font(12))
         self._missing_banner.setWordWrap(True)
@@ -340,7 +333,7 @@ class ProjectBrowserDialog(QDialog):
         self._missing_banner.setVisible(False)
         root.addWidget(self._missing_banner)
 
-        ### scrollable project list
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -359,7 +352,7 @@ class ProjectBrowserDialog(QDialog):
         scroll.setWidget(self._list_widget)
         root.addWidget(scroll, 1)
 
-        ### empty-state label shown when no entries match
+
         self._empty_lbl = QLabel(t("project_browser.empty_state"))
         self._empty_lbl.setFont(font(14))
         self._empty_lbl.setAlignment(Qt.AlignCenter)
@@ -369,7 +362,7 @@ class ProjectBrowserDialog(QDialog):
         self._empty_lbl.setVisible(False)
         root.addWidget(self._empty_lbl)
 
-        ### bottom action buttons
+
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
@@ -418,7 +411,6 @@ class ProjectBrowserDialog(QDialog):
             }}
         """
 
-    ### data loading
 
     def _load_and_populate(self):
         print(f"[DEBUG] ProjectBrowserDialog._load_and_populate: validating registry")
@@ -445,7 +437,7 @@ class ProjectBrowserDialog(QDialog):
     def _rebuild_list(self):
         print(f"[DEBUG] ProjectBrowserDialog._rebuild_list: rebuilding with filter={self._filter_text!r}")
 
-        ### clear existing rows (keep the trailing stretch at index -1)
+
         while self._list_layout.count() > 1:
             item = self._list_layout.takeAt(0)
             if item.widget():
@@ -486,7 +478,6 @@ class ProjectBrowserDialog(QDialog):
         self._empty_lbl.setVisible(count == 0)
         print(f"[DEBUG] ProjectBrowserDialog._rebuild_list: empty_lbl visible={count == 0}")
 
-    ### user interactions
 
     def _on_search(self, text: str):
         print(f"[DEBUG] ProjectBrowserDialog._on_search: text={text!r}")
@@ -545,7 +536,7 @@ class ProjectBrowserDialog(QDialog):
                 failed.append(os.path.basename(path))
                 continue
 
-            ### insert at top if not already in the in-memory list
+
             norm    = os.path.normcase(os.path.abspath(path))
             already = any(
                 os.path.normcase(os.path.abspath(e.get("path", ""))) == norm

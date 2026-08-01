@@ -19,8 +19,6 @@ except ImportError as e:
     def t(key, **kw): return kw.get('default', key)
 
 
-### Startup sequence
-
 def run_startup_sequence(
     parent: QWidget,
     show_offline_dialog_fn: Optional[Callable] = None,
@@ -34,16 +32,6 @@ def run_startup_sequence(
             print("[DEBUG] run_startup_sequence: _step0_wip completed")
         except Exception as e:
             print(f"[ERROR] show_wip_warning raised: {e}")
-        print("[DEBUG] run_startup_sequence: scheduling _step0b_discord in 100ms")
-        QTimer.singleShot(100, _step0b_discord)
-
-    def _step0b_discord():
-        print("[DEBUG] run_startup_sequence: _step0b_discord starting")
-        try:
-            show_discord_notice(parent)
-            print("[DEBUG] run_startup_sequence: _step0b_discord completed")
-        except Exception as e:
-            print(f"[ERROR] show_discord_notice raised: {e}")
         print("[DEBUG] run_startup_sequence: scheduling _step1_update_check in 100ms")
         QTimer.singleShot(100, _step1_update_check)
 
@@ -93,8 +81,6 @@ def run_startup_sequence(
     QTimer.singleShot(200, _step0_wip)
 
 
-### Toast notification shim
-
 def show_notification(
     parent: QWidget,
     message: str,
@@ -120,8 +106,6 @@ def show_notification(
     print("[DEBUG] show_notification: toast shown and raised")
 
 
-### WIP warning dialog
-
 def show_wip_warning(parent: QWidget) -> None:
     print("\n[DEBUG] ========== WIP WARNING CHECK ==========")
 
@@ -140,7 +124,7 @@ def show_wip_warning(parent: QWidget) -> None:
 
     print("[DEBUG] show_wip_warning: first launch confirmed — building dialog")
 
-    ### Dialog shell
+
     dlg = QDialog(parent)
     dlg.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
     dlg.setModal(True)
@@ -158,7 +142,7 @@ def show_wip_warning(parent: QWidget) -> None:
     root.setContentsMargins(24, 24, 24, 24)
     root.setSpacing(16)
 
-    ### Icon + title
+
     icon_lbl = QLabel("⚠️")
     icon_lbl.setFont(font(42))
     icon_lbl.setAlignment(Qt.AlignCenter)
@@ -173,7 +157,7 @@ def show_wip_warning(parent: QWidget) -> None:
     title_lbl.setStyleSheet(f"color: {COLORS['text']}; background: transparent; border: none;")
     root.addWidget(title_lbl)
 
-    ### Scrollable message card
+
     card = QFrame()
     card.setStyleSheet(f"""
         QFrame {{
@@ -226,7 +210,7 @@ def show_wip_warning(parent: QWidget) -> None:
     card_lay.addWidget(msg_lbl)
     root.addWidget(scroll)
 
-    ### Don't show again checkbox
+
     chk_text = t("wip.wip_dont_show", default="Don't show this message again")
     print(f"[DEBUG] show_wip_warning: checkbox label={chk_text!r}")
     chk = QCheckBox(chk_text)
@@ -250,7 +234,7 @@ def show_wip_warning(parent: QWidget) -> None:
     """)
     root.addWidget(chk, alignment=Qt.AlignCenter)
 
-    ### I Understand button
+
     ok_btn = QPushButton(t("wip.wip_understand", default="I Understand"))
     ok_btn.setFont(font(13, "bold"))
     ok_btn.setFixedHeight(44)
@@ -294,14 +278,14 @@ def show_wip_warning(parent: QWidget) -> None:
     ok_btn.clicked.connect(_on_ok)
     root.addWidget(ok_btn, alignment=Qt.AlignCenter)
 
-    # Block Escape — the button is the only way to dismiss this dialog.
+
     dlg.keyPressEvent = lambda e: None
 
     dlg.adjustSize()
     set_window_icon(dlg)
     print(f"[DEBUG] show_wip_warning: dialog adjusted size={dlg.width()}x{dlg.height()}")
 
-    ### Centre on parent
+
     if parent and parent.isVisible():
         pg = parent.geometry()
         x = pg.x() + (pg.width()  - dlg.width())  // 2
@@ -315,244 +299,3 @@ def show_wip_warning(parent: QWidget) -> None:
     result = dlg.exec()
     print(f"[DEBUG] show_wip_warning: dialog closed, result={result}")
     print("[DEBUG] ========== WIP WARNING COMPLETE ==========\n")
-
-
-### Discord notice dialog
-
-DISCORD_URL = "https://discord.gg/mbr3YxZzrr"
-_OK_DELAY_MS = 20_000   # 20 seconds before OK becomes clickable
-
-
-def show_discord_notice(parent: QWidget) -> None:
-
-    import webbrowser
-
-    print("\n[DEBUG] ========== DISCORD NOTICE CHECK ==========")
-
-    try:
-        from gui.state import state
-        already_shown = state.app_settings.get("discord_notice_shown", False)
-        print(f"[DEBUG] show_discord_notice: discord_notice_shown={already_shown}")
-    except Exception as e:
-        already_shown = False
-        print(f"[DEBUG] show_discord_notice: could not load state ({e}), defaulting to show")
-
-    if already_shown:
-        print("[DEBUG] show_discord_notice: already shown — skipping")
-        print("[DEBUG] ========== DISCORD NOTICE SKIPPED ==========\n")
-        return
-
-    print("[DEBUG] show_discord_notice: first time — building dialog")
-
-    # ── Dialog shell ──────────────────────────────────────────────────────────
-    dlg = QDialog(parent)
-    dlg.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-    dlg.setModal(True)
-    dlg.setFixedWidth(580)
-    dlg.setStyleSheet(f"""
-        QDialog {{
-            background: {COLORS['frame_bg']};
-            border: 1px solid {COLORS['border']};
-            border-radius: 14px;
-        }}
-    """)
-
-    root = QVBoxLayout(dlg)
-    root.setContentsMargins(28, 28, 28, 28)
-    root.setSpacing(18)
-
-    # ── Icon + title row ──────────────────────────────────────────────────────
-    icon_lbl = QLabel("📢")
-    icon_lbl.setFont(font(84))
-    icon_lbl.setAlignment(Qt.AlignCenter)
-    icon_lbl.setStyleSheet("background: transparent; border: none;")
-    root.addWidget(icon_lbl)
-
-    title_lbl = QLabel("Important Notice from the Developer")
-    title_lbl.setFont(font(24, "bold"))
-    title_lbl.setAlignment(Qt.AlignCenter)
-    title_lbl.setWordWrap(True)
-    title_lbl.setStyleSheet(
-        f"color: {COLORS['text']}; background: transparent; border: none;"
-    )
-    root.addWidget(title_lbl)
-
-    # ── Message card ──────────────────────────────────────────────────────────
-    card = QFrame()
-    card.setStyleSheet(f"""
-        QFrame {{
-            background: {COLORS['card_bg']};
-            border-radius: 12px;
-            border: 1px solid {COLORS['border']};
-        }}
-    """)
-    card_lay = QVBoxLayout(card)
-    card_lay.setContentsMargins(20, 18, 20, 18)
-    card_lay.setSpacing(10)
-
-    msg_text = (
-        "I have been wrongfully banned and removed from the official "
-        "BeamNG.Drive Discord server.\n\n"
-        "Because of this, I am no longer able to provide support, share "
-        "development updates, or stay in contact with the community through "
-        "that server.\n\n"
-        "If you want to:\n"
-        "  •  Stay up to date with BeamSkin Studio development\n"
-        "  •  Get help with issues or questions\n"
-        "  •  Give feedback or report bugs\n"
-        "  •  Connect directly with me\n\n"
-        "Please join the official BeamSkin Studio Discord server using the "
-        "button below. It is the only place where I can guarantee support "
-        "and direct communication going forward.\n\n"
-        "Thank you for your understanding and continued support! ❤️\n"
-        "— Burzt"
-    )
-
-    msg_lbl = QLabel(msg_text)
-    msg_lbl.setFont(font(13))
-    msg_lbl.setWordWrap(True)
-    msg_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-    msg_lbl.setStyleSheet(
-        f"color: {COLORS['text']}; background: transparent; border: none;"
-    )
-    card_lay.addWidget(msg_lbl)
-
-    scroll = QScrollArea()
-    scroll.setWidget(card)
-    scroll.setWidgetResizable(True)
-    scroll.setFixedHeight(280)
-    scroll.setStyleSheet("""
-        QScrollArea { border: none; background: transparent; }
-        QScrollBar:vertical {
-            background: transparent; width: 6px; margin: 0;
-        }
-        QScrollBar::handle:vertical {
-            background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 20px;
-        }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-    """)
-    root.addWidget(scroll)
-
-    # ── Button row ────────────────────────────────────────────────────────────
-    btn_row = QHBoxLayout()
-    btn_row.setSpacing(12)
-
-    # "Join Discord" — always clickable
-    join_btn = QPushButton("Join the BeamSkin Studio Discord Server")
-    join_btn.setFont(font(13, "bold"))
-    join_btn.setFixedHeight(44)
-    join_btn.setCursor(Qt.PointingHandCursor)
-    join_btn.setStyleSheet(f"""
-        QPushButton {{
-            background: #5865F2;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 0 18px;
-        }}
-        QPushButton:hover  {{ background: #4752C4; }}
-        QPushButton:pressed {{ background: #3C45A5; }}
-    """)
-    join_btn.clicked.connect(lambda: webbrowser.open(DISCORD_URL))
-    btn_row.addWidget(join_btn)
-
-    # "OK" — locked for _OK_DELAY_MS milliseconds
-    ok_btn = QPushButton("OK  (15)")
-    ok_btn.setFont(font(13, "bold"))
-    ok_btn.setFixedHeight(44)
-    ok_btn.setFixedWidth(110)
-    ok_btn.setEnabled(False)
-    ok_btn.setCursor(Qt.ForbiddenCursor)
-
-    _locked_style = f"""
-        QPushButton {{
-            background: {COLORS.get('card_bg', '#2a2a2a')};
-            color: {COLORS.get('text_secondary', '#888888')};
-            border: 1px solid {COLORS['border']};
-            border-radius: 10px;
-        }}
-    """
-    _unlocked_style = f"""
-        QPushButton {{
-            background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 {COLORS['accent']},
-                stop:1 {COLORS.get('accent_hover', COLORS['accent'])});
-            color: white;
-            border: none;
-            border-radius: 10px;
-        }}
-        QPushButton:hover  {{ background: {COLORS.get('accent_hover', COLORS['accent'])}; }}
-        QPushButton:pressed {{ background: {COLORS.get('accent_dim',   COLORS['accent'])}; }}
-    """
-    ok_btn.setStyleSheet(_locked_style)
-    btn_row.addWidget(ok_btn)
-
-    root.addLayout(btn_row)
-
-    # ── Countdown timer ───────────────────────────────────────────────────────
-    _remaining = [_OK_DELAY_MS // 1000]   # mutable cell for the closure
-
-    def _tick():
-        _remaining[0] -= 1
-        if _remaining[0] > 0:
-            ok_btn.setText(f"OK  ({_remaining[0]})")
-        else:
-            ok_btn.setText("OK")
-            ok_btn.setEnabled(True)
-            ok_btn.setCursor(Qt.PointingHandCursor)
-            ok_btn.setStyleSheet(_unlocked_style)
-            _countdown.stop()
-
-    _countdown = QTimer(dlg)
-    _countdown.setInterval(1000)
-    _countdown.timeout.connect(_tick)
-    _countdown.start()
-
-    # ── OK handler ────────────────────────────────────────────────────────────
-    def _on_ok():
-        print("[DEBUG] show_discord_notice: user clicked OK")
-        _countdown.stop()
-        try:
-            from gui.state import state
-            from core.settings import save_settings
-            state.app_settings["discord_notice_shown"] = True
-            save_settings()
-            print("[DEBUG] show_discord_notice: discord_notice_shown=True saved")
-        except Exception as e:
-            print(f"[DEBUG] show_discord_notice: could not save setting: {e}")
-        dlg.accept()
-
-    ok_btn.clicked.connect(_on_ok)
-
-    # If the user closes via the X button, still mark as shown so we don't
-    # spam them on every launch.
-    def _on_rejected():
-        print("[DEBUG] show_discord_notice: dialog closed via X")
-        _countdown.stop()
-        try:
-            from gui.state import state
-            from core.settings import save_settings
-            state.app_settings["discord_notice_shown"] = True
-            save_settings()
-        except Exception:
-            pass
-
-    # Escape key fires the rejected signal — _on_rejected handles it.
-    dlg.rejected.connect(_on_rejected)
-
-    # ── Layout & positioning ──────────────────────────────────────────────────
-    dlg.adjustSize()
-    set_window_icon(dlg)
-    print(f"[DEBUG] show_discord_notice: dialog size={dlg.width()}x{dlg.height()}")
-
-    if parent and parent.isVisible():
-        pg = parent.geometry()
-        dlg.move(
-            pg.x() + (pg.width()  - dlg.width())  // 2,
-            pg.y() + (pg.height() - dlg.height()) // 2,
-        )
-
-    print("[DEBUG] show_discord_notice: executing dialog")
-    result = dlg.exec()
-    print(f"[DEBUG] show_discord_notice: dialog closed, result={result}")
-    print("[DEBUG] ========== DISCORD NOTICE COMPLETE ==========\n")

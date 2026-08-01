@@ -1,46 +1,46 @@
-"""
-BeamSkin Studio - Changelog
-============================
-"""
 
 from typing import TypedDict, Literal
 
-
-# ── Entry type definitions ─────────────────────────────────────────────────── #
 
 EntryType = Literal["title", "subtitle", "item", "note", "separator"]
 
 class Entry(TypedDict):
     type:  EntryType
-    text:  str          # empty string for separators
+    text:  str
 
-
-# ── Entry helper functions ─────────────────────────────────────────────────── #
 
 def title(text: str) -> Entry:
-    """Large bold section heading (e.g. '🚀 New Features')"""
     return {"type": "title", "text": text}
 
 def subtitle(text: str) -> Entry:
-    """Medium bold subheading"""
     return {"type": "subtitle", "text": text}
 
 def item(text: str) -> Entry:
-    """Standard bullet-point entry"""
     return {"type": "item", "text": text}
 
 def note(text: str) -> Entry:
-    """Small italic footnote / tip"""
     return {"type": "note", "text": text}
 
 def separator() -> Entry:
-    """Horizontal divider line — no text needed"""
     return {"type": "separator", "text": ""}
 
 
-# ── CHANGELOG DATA ─────────────────────────────────────────────────────────── #
-
 CHANGELOGS = [
+
+    {
+        "version": "0.8.3.Beta",
+        "date": "01-08-2026",
+        "entries": [
+            title("🏎️ New Vehicles"),
+            subtitle("Cherrier Ardente"),
+            item("Added Cherrier Ardente."),
+            separator(),
+            title("Removed Stuff:"),
+            subtitle("Discord"),
+            item("Removed the Discord Ban popup"),
+        ]
+    },
+
 
     {
         "version": "0.8.2.Beta",
@@ -115,32 +115,9 @@ CHANGELOGS = [
         ]
     },
 
-    # ════════════════════════════════════════════════════════════════════════ #
-    #  TEMPLATE
-    # ════════════════════════════════════════════════════════════════════════ #
-    # {
-    #     "version": "X.Y.Z",
-    #     "date": "DD-MM-YYYY",
-    #     "entries": [
-    #         title("🚀 New Features"),
-    #         item("..."),
-    #         item("..."),
-    #         separator(),
-    #         title("⚙️ Improvements"),
-    #         subtitle("Optional sub-section label"),
-    #         item("..."),
-    #         separator(),
-    #         title("🐛 Bug Fixes"),
-    #         item("..."),
-    #         separator(),
-    #         note("Optional footnote or thank-you message"),
-    #     ]
-    # },
 
 ]
 
-
-# ── Public API ─────────────────────────────────────────────────────────────── #
 
 def get_changelog_for_version(version: str) -> dict | None:
     version = version.strip()

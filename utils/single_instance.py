@@ -1,8 +1,3 @@
-"""
-Single Instance Lock – Prevents multiple instances of BeamSkin Studio from running.
-Cross-platform implementation for Windows, Linux, and macOS.
-Uses PySide6 QMessageBox instead of tkinter (Qt Quick migration).
-"""
 import os
 import sys
 import tempfile
@@ -12,7 +7,6 @@ print(f"[DEBUG] Loading class: SingleInstanceLock")
 
 
 class SingleInstanceLock:
-    """Ensures only one instance of the application can run at a time."""
 
     def __init__(self, app_name: str = "BeamSkinStudio"):
         print(f"[DEBUG] SingleInstanceLock.__init__ called")
@@ -29,7 +23,7 @@ class SingleInstanceLock:
         self.lock_file_path = os.path.join(lock_dir, f"{app_name}.lock")
         print(f"[DEBUG] Lock file path: {self.lock_file_path}")
 
-    # ------------------------------------------------------------------ #
+
     def acquire(self) -> bool:
         print(f"[DEBUG] acquire called")
         try:
@@ -74,9 +68,9 @@ class SingleInstanceLock:
 
         except Exception as e:
             print(f"[ERROR] Failed to acquire lock: {e}")
-            return True  # fail-open so the app can still start
+            return True
 
-    # ------------------------------------------------------------------ #
+
     def release(self):
         print(f"[DEBUG] release called")
         if self.file_handle:
@@ -95,7 +89,7 @@ class SingleInstanceLock:
             except Exception as e:
                 print(f"[ERROR] Failed to release lock: {e}")
 
-    # ------------------------------------------------------------------ #
+
     def _is_process_running(self, pid: int) -> bool:
         try:
             if sys.platform == "win32":
@@ -112,7 +106,7 @@ class SingleInstanceLock:
         except (OSError, Exception):
             return False
 
-    # ------------------------------------------------------------------ #
+
     def __enter__(self):
         return self.acquire()
 
@@ -120,15 +114,7 @@ class SingleInstanceLock:
         self.release()
 
 
-# ---------------------------------------------------------------------------
-# High-level helper used by main.py
-# ---------------------------------------------------------------------------
 def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
-    """
-    Check if another instance is running.
-    Shows a QMessageBox if so, and tries to bring the existing window forward.
-    Returns True if this is the only instance, False otherwise.
-    """
     global _global_lock
     print(f"[DEBUG] check_single_instance called")
 
@@ -137,7 +123,7 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
     if not _global_lock.acquire():
         print(f"[DEBUG] Another instance detected, attempting to bring it to front...")
 
-        # ── Try to focus the existing window ─────────────────────────── #
+
         try:
             if sys.platform == "win32":
                 try:
@@ -182,11 +168,11 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
         except Exception as e:
             print(f"[DEBUG] Could not bring existing window to front: {e}")
 
-        # ── Show QMessageBox error dialog ─────────────────────────────── #
+
         try:
             from PySide6.QtWidgets import QApplication, QMessageBox
 
-            # Reuse an existing QApplication if one is already running
+
             q_app = QApplication.instance() or QApplication(sys.argv)
 
             msg = QMessageBox()
@@ -196,11 +182,11 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
                 f"{app_name} is already running!\n\n"
                 "Please close the existing instance before starting a new one."
             )
-            msg.setWindowFlags(msg.windowFlags() | 0x00040000)  # WindowStaysOnTopHint
+            msg.setWindowFlags(msg.windowFlags() | 0x00040000)
             msg.exec()
 
         except Exception as e:
-            # Last resort: plain console output
+
             print(f"[ERROR] Failed to show dialog: {e}")
             print(f"[ERROR] {app_name} is already running!")
 
@@ -209,9 +195,6 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
     return True
 
 
-# ---------------------------------------------------------------------------
-# Global lock management
-# ---------------------------------------------------------------------------
 _global_lock: SingleInstanceLock | None = None
 
 

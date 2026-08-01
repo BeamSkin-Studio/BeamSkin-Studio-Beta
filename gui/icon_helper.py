@@ -19,7 +19,6 @@ _ICO_PATH: str = _resolve_icon_path()
 
 
 def set_window_icon(window: QWidget) -> None:
-    """Apply the application icon to any top-level window."""
     print(f"[DEBUG] set_window_icon: applying icon to {type(window).__name__}")
     if os.path.exists(_ICO_PATH):
         window.setWindowIcon(QIcon(_ICO_PATH))

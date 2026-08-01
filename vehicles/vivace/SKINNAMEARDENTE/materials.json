@@ -1,0 +1,59 @@
+{
+  "ardente_main.skin.SKINNAME": {
+    "name": "ardente_main.skin.SKINNAME",
+    "mapTo": "ardente_main.skin.SKINNAME",
+    "class": "Material",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/vehicles/vivace/ardente/ardente_main_ao.data.png",
+        "clearCoatFactor": 1,
+        "clearCoatMap": "/vehicles/vivace/ardente/ardente_main_cc.data.png",
+        "colorPaletteMap": "/vehicles/vivace/ardente/ardente_skin_race_p.color.png",
+        "colorPaletteMapUseUV": 1,
+        "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.100000001,
+        "detailScale": [
+          128,
+          64
+        ],
+        "diffuseMapUseUV": null,
+        "metallicFactor": 1,
+        "normalDetailMapUseUV": 1,
+        "normalMap": "vehicles/vivace/ardente/ardente_main_nm.normal.png",
+        "opacityMapUseUV": null,
+        "roughnessFactor": null
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/vivace/ardente/ardente_main_ao.data.png",
+        "baseColorMap": "vehicles/vivace/SKINNAME/ardente_skin_SKINNAME.dds",
+        "clearCoatFactor": 1,
+        "colorPaletteMapUseUV": 1,
+        "detailNormalMapStrength": null,
+        "detailScale": null,
+        "diffuseMapUseUV": 1,
+        "metallicFactor": 1,
+        "metallicMap": "/vehicles/vivace/ardente/ardente_main_m.data.png",
+        "normalDetailMapUseUV": null,
+        "normalMap": "/vehicles/vivace/ardente/ardente_main_nm.normal.png",
+        "roughnessFactor": null,
+        "roughnessMap": "/vehicles/vivace/ardente/ardente_main_r.data.png"
+      },
+      {
+        "clearCoatFactor": null,
+        "colorPaletteMapUseUV": null,
+        "detailNormalMapStrength": null,
+        "detailScale": null,
+        "diffuseMapUseUV": null,
+        "metallicFactor": null,
+        "normalDetailMapUseUV": null,
+        "opacityMapUseUV": null,
+        "roughnessFactor": null
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  },
+}
