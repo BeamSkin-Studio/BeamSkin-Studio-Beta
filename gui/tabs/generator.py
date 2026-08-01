@@ -64,7 +64,6 @@ except ImportError as _pb_imp_exc:
 print("[DEBUG] Loading class: GeneratorTab")
 
 
-
 def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Optional[QPixmap]:
     from PySide6.QtGui import QImageReader
 
@@ -84,7 +83,7 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
             return None
         try:
             from PySide6.QtGui import QImage
-            _PILImage.MAX_IMAGE_PIXELS = None  # allow large game textures (e.g. 16384×16384 BC7)
+            _PILImage.MAX_IMAGE_PIXELS = None
             img = _PILImage.open(path)
             img.thumbnail((max_w * 2, max_h * 2), _PILImage.Resampling.LANCZOS)
             img = img.convert("RGBA")
@@ -103,10 +102,8 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
         return _pil_load()
 
     elif ext == ".dds":
-        # Many game DDS files use DX10-extended headers with sRGB DXGI formats
-        # (e.g. BC1_UNORM_SRGB = 72). Every library rejects these even though the
-        # block layout is byte-for-byte identical to the linear variant (71).
-        # Patch the 4-byte DXGI format field in-memory before decoding.
+
+
         _SRGB_REMAP = {29: 28, 72: 71, 75: 74, 78: 77, 99: 98}
 
         def _patch_dxgi(data: bytes) -> bytes:
@@ -129,7 +126,7 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
                 import numpy as _np
                 from PIL import Image as _PilImg
                 from PySide6.QtGui import QImage
-                _PilImg.MAX_IMAGE_PIXELS = None  # allow large game textures (e.g. 16384×16384 BC7)
+                _PilImg.MAX_IMAGE_PIXELS = None
                 with open(path, "rb") as _fh:
                     raw = _fh.read()
                 arr = _iio.imread(_io.BytesIO(_patch_dxgi(raw)))
@@ -215,18 +212,11 @@ def _get_entry_text(entry) -> str:
     return entry.text() if hasattr(entry, "text") else ""
 
 
-
 def _make_project_key(carid: str, variant_suffix: str) -> str:
-    """
-    Generate the project dictionary key for a (carid, variant) combination.
-      pickup + ""           → "pickup"
-      pickup + "ambulance"  → "pickup__ambulance"
-    """
     return f"{carid}__{variant_suffix}" if variant_suffix else carid
 
 
 def _split_project_key(key: str):
-    """Return (base_carid, variant_suffix) from a project key."""
     if "__" in key:
         base, suffix = key.split("__", 1)
         return base, suffix
@@ -236,15 +226,8 @@ def _split_project_key(key: str):
 _ILLEGAL_NAME_CHARS = set('\\/:*?"<>|')
 
 def _find_illegal_chars(name: str):
-    """Return a sorted list of illegal filename characters found in *name*."""
     return sorted({c for c in name if c in _ILLEGAL_NAME_CHARS})
 
-
-#  GENERATOR TAB
-
-
-
-#  GENERATOR TAB
 
 class GeneratorTab(QWidget):
 
@@ -273,11 +256,11 @@ class GeneratorTab(QWidget):
 
         self.config_types = _CONFIG_TYPES
 
-        # Normal / single-body paths
+
         self._dds_path       = ""
         self._data_map_path  = ""
         self._color_map_path = ""
-        # Second body (variant) paths – only used when variant_suffix != ""
+
         self._dds_path_2       = ""
         self._data_map_path_2  = ""
         self._color_map_path_2 = ""
@@ -288,7 +271,7 @@ class GeneratorTab(QWidget):
         self._jpg_file_path  = ""
         self._config_name    = ""
         self._data_map_photo_stash: Optional[QPixmap] = None
-        self._current_project_path: Optional[str] = None   # set on load/save; None = unsaved new project
+        self._current_project_path: Optional[str] = None
 
         self.material_properties_entries: Dict[str, Dict[str, QLineEdit]] = {}
         self.car_id_list: List = self._build_car_id_list()
@@ -298,29 +281,36 @@ class GeneratorTab(QWidget):
         self._status_signal.connect(self._export_status.setText)
         self._progress_signal.connect(self._progress_bar.setValue)
         self._done_signal.connect(self._on_generate_done)
-        self._pending_generate_button = None   # set in generate_mod(), cleared in _on_generate_done()
+        self._pending_generate_button = None
 
 
     def _selected_variant_suffix(self) -> str:
-        """Return the variant suffix for the currently selected car, or ''."""
         if not self.selected_car_for_skin:
             return ""
         info = self.project_data["cars"].get(self.selected_car_for_skin, {})
         return info.get("variant_suffix", "")
 
     def _is_variant(self) -> bool:
-        """True when the selected car is a non-normal body variant."""
         print(f"[DEBUG] _selected_variant_suffix() called")
         return self._selected_variant_suffix() != ""
+
+    def _needs_double_layer(self) -> bool:
+        if not self._is_variant():
+            return False
+        base = self.project_data["cars"].get(self.selected_car_for_skin, {})\
+                   .get("base_carid", "")
+        suffix = self._selected_variant_suffix()
+        try:
+            from core.config import is_single_layer_variant
+        except ImportError:
+            def is_single_layer_variant(_c, _s): return False
+        return not is_single_layer_variant(base, suffix)
 
 
     def _on_generate_done(self, success: bool):
         print(f"[DEBUG] _on_generate_done() called")
 
-        # Re-enable the generate button on the main thread (the only safe place).
-        # Prefer looking up the live topbar button so that a theme/language
-        # refresh (which destroys and recreates topbar widgets) doesn't leave us
-        # holding a stale reference.
+
         enabled = False
         try:
             mw = self.window()
@@ -328,16 +318,16 @@ class GeneratorTab(QWidget):
                 mw.topbar.generate_button.setEnabled(True)
                 enabled = True
         except RuntimeError:
-            pass  # C++ object already deleted — topbar is mid-rebuild
+            pass
 
         if not enabled:
-            # Fallback: re-enable the exact button that was passed to generate_mod()
+
             btn = getattr(self, "_pending_generate_button", None)
             if btn is not None:
                 try:
                     btn.setEnabled(True)
                 except RuntimeError:
-                    pass  # Widget was deleted during a concurrent refresh_ui()
+                    pass
         self._pending_generate_button = None
 
         hide_delay = 2000 if success else 8000
@@ -473,7 +463,7 @@ class GeneratorTab(QWidget):
         self._add_skin_label.setVisible(False)
         self._right_col.addWidget(self._add_skin_label)
 
-        # variant info banner (hidden for normal cars)
+
         self._variant_banner = QLabel("")
         self._variant_banner.setFont(font(12))
         self._variant_banner.setWordWrap(True)
@@ -523,7 +513,7 @@ class GeneratorTab(QWidget):
         self._right_col.addStretch()
         right_scroll.setWidget(right_inner)
 
-        # Wrap scroll + sticky button footer so the button is always visible
+
         right_wrapper = QWidget()
         right_wrapper.setStyleSheet("background:transparent;")
         right_wrap_layout = QVBoxLayout(right_wrapper)
@@ -531,7 +521,7 @@ class GeneratorTab(QWidget):
         right_wrap_layout.setSpacing(0)
         right_wrap_layout.addWidget(right_scroll, 1)
 
-        # Sticky "Add Skin / Update Skin" footer — lives outside the scroll area
+
         self._btn_row_widget = QWidget()
         self._btn_row_widget.setStyleSheet(f"""
             background:{COLORS['app_bg']};
@@ -708,14 +698,14 @@ class GeneratorTab(QWidget):
         clr_row.addStretch()
         col.addLayout(clr_row)
 
-        #  DDS SECTION  (non-colorable)
+
         self._dds_widget = QWidget()
         self._dds_widget.setStyleSheet("background:transparent;")
         dds_col = QVBoxLayout(self._dds_widget)
         dds_col.setContentsMargins(0, 0, 0, 0)
         dds_col.setSpacing(4)
 
-        # Body 1 – always shown when non-colorable
+
         self._dds_label_1 = self._mk_label(t("project.dds_texture"), bold=True)
         dds_col.addWidget(self._dds_label_1)
         dds_input = QHBoxLayout()
@@ -731,9 +721,7 @@ class GeneratorTab(QWidget):
         dds_input.addWidget(self._dds_browse)
         dds_col.addLayout(dds_input)
 
-        # Body 2 – only shown for variant cars (non-colorable).
-        # Wrapped in a QWidget so the whole block (label + row) can be
-        # shown/hidden with a single setVisible() call.
+
         self._dds_section_2 = QWidget()
         self._dds_section_2.setStyleSheet("background:transparent;")
         self._dds_section_2.setVisible(False)
@@ -758,7 +746,7 @@ class GeneratorTab(QWidget):
 
         col.addWidget(self._dds_widget)
 
-        #  PNG / COLORABLE SECTION
+
         self._colorable_widget = QWidget()
         self._colorable_widget.setStyleSheet("background:transparent;")
         self._colorable_widget.setVisible(False)
@@ -771,7 +759,7 @@ class GeneratorTab(QWidget):
         self._clr_body1_lbl.setStyleSheet(
             f"color:{COLORS['accent']};background:transparent;border:none;"
         )
-        self._clr_body1_lbl.setVisible(False)   # only shown for variants
+        self._clr_body1_lbl.setVisible(False)
         clr_col.addWidget(self._clr_body1_lbl)
 
         self._base_color_map_lbl_1 = self._mk_label(t("project.base_Color_Map"), bold=True)
@@ -851,7 +839,7 @@ class GeneratorTab(QWidget):
         clr_col.addWidget(self._clr_body2_section)
         col.addWidget(self._colorable_widget)
 
-        #  REFLECTIVITY MAP SECTION  (optional, applies to any skin type)
+
         rfl_row = QHBoxLayout()
         self._rfl_lbl = QLabel(t("project.reflectivity_map"))
         self._rfl_lbl.setFont(font(11, "bold"))
@@ -870,7 +858,7 @@ class GeneratorTab(QWidget):
         rfl_col.setContentsMargins(0, 0, 0, 4)
         rfl_col.setSpacing(4)
 
-        # "Normal Body" sublabel — only shown for variant cars
+
         self._rfl_body1_lbl = QLabel(t("project.normal_body"))
         self._rfl_body1_lbl.setFont(font(11, "bold"))
         self._rfl_body1_lbl.setStyleSheet(
@@ -894,7 +882,7 @@ class GeneratorTab(QWidget):
         rfl_input_row.addWidget(self._rfl_browse)
         rfl_col.addLayout(rfl_input_row)
 
-        # Variant body reflectivity map — only shown for variant cars
+
         self._rfl_section_2 = QWidget()
         self._rfl_section_2.setStyleSheet("background:transparent;")
         self._rfl_section_2.setVisible(False)
@@ -957,7 +945,6 @@ class GeneratorTab(QWidget):
         self._color_map_preview_2.setWordWrap(True)
         self._color_map_preview_2.setVisible(False)
         col.addWidget(self._color_map_preview_2)
-
 
 
     def refresh_project_display(self):
@@ -1107,7 +1094,7 @@ class GeneratorTab(QWidget):
         f.setFixedHeight(row_h)
         f.setCursor(Qt.PointingHandCursor)
         f.setStyleSheet(f"QFrame {{ background:{row_bg};border-radius:6px; }}")
-        f.mousePressEvent = lambda e, c=car_id, i=idx: \
+        f.mousePressEvent = lambda e, c=car_id, i=idx:\
             QTimer.singleShot(0, lambda: self.select_skin_for_editing(c, i))
 
         row = QHBoxLayout(f)
@@ -1157,7 +1144,7 @@ class GeneratorTab(QWidget):
         print(f"[DEBUG] _car_display_name() called")
         for cid, cname in self.car_id_list:
             if cid == base_carid:
-                # If this car_id has a variant suffix, append it to name
+
                 _, v = _split_project_key(car_id)
                 if v:
                     return f"{cname} ({v.capitalize()})"
@@ -1170,15 +1157,6 @@ class GeneratorTab(QWidget):
 
 
     def add_car_to_project(self, carid: str, display_name: str, variant_suffix: str = ""):
-        """
-        Add a vehicle (optionally a specific body variant) to the project.
-
-        Parameters
-        ----------
-        carid          : Base vehicle ID (e.g. "pickup")
-        display_name   : Human-readable label shown in UI
-        variant_suffix : Body variant suffix ("" = normal, "ambulance", "box", etc.)
-        """
         print(f"[DEBUG] add_car_to_project: {carid!r} variant={variant_suffix!r}")
         project_key = _make_project_key(carid, variant_suffix)
 
@@ -1208,7 +1186,7 @@ class GeneratorTab(QWidget):
             return
         base    = self.project_data["cars"][car_id].get("base_carid", car_id)
         variant = self.project_data["cars"][car_id].get("variant_suffix", "")
-        dname   = self.project_data["cars"][car_id].get("display_name") \
+        dname   = self.project_data["cars"][car_id].get("display_name")\
                   or self._car_display_name(base, car_id)
         del self.project_data["cars"][car_id]
         if self.selected_car_for_skin == car_id:
@@ -1222,7 +1200,7 @@ class GeneratorTab(QWidget):
         )
         self.refresh_project_display()
 
-        # Add the vehicle back to the sidebar
+
         try:
             mw = self.window()
             if mw and hasattr(mw, "sidebar"):
@@ -1251,12 +1229,17 @@ class GeneratorTab(QWidget):
         self._skin_card.setVisible(True)
         self._btn_row_widget.setVisible(True)
 
-        # Update variant banner
+
         info    = self.project_data["cars"][car_id]
         variant = info.get("variant_suffix", "")
-        dname   = info.get("display_name", self._car_display_name(
-                            info.get("base_carid", car_id), car_id))
-        if variant:
+        base    = info.get("base_carid", car_id)
+        dname   = info.get("display_name", self._car_display_name(base, car_id))
+        try:
+            from core.config import is_single_layer_variant
+        except ImportError:
+            def is_single_layer_variant(_c, _s): return False
+        needs_double = bool(variant) and not is_single_layer_variant(base, variant)
+        if needs_double:
             is_colorable = self._colorable_toggle.isChecked()
             requirements = t("project.variant_4_pngs") if is_colorable else t("project.variant_2_dds")
             self._variant_banner.setText(
@@ -1269,40 +1252,39 @@ class GeneratorTab(QWidget):
         if not self.editing_mode:
             self._reset_skin_form_fields()
 
-        # Update variant-specific UI visibility
+
         self._update_variant_ui()
         self.refresh_project_display()
 
     def _update_variant_ui(self):
-        """Show/hide variant-specific file pickers based on selected car."""
-        is_var  = self._is_variant()
+        is_var  = self._needs_double_layer()
         is_clr  = self._colorable_toggle.isChecked()
 
-        # DDS section
+
         v_suffix = self._selected_variant_suffix()
         self._dds_label_1.setText(
             t("project.dds_texture_normal_body") if is_var else t("project.dds_texture")
         )
-        # Toggle the whole second-body block (label + entry + browse button)
-        # via its container widget — bare QHBoxLayouts can't be hidden.
+
+
         self._dds_section_2.setVisible(is_var and not is_clr)
 
-        # Colorable section
+
         self._clr_body1_lbl.setVisible(is_var and is_clr)
         self._clr_body2_section.setVisible(is_var and is_clr)
 
-        # Update variant suffix label
+
         if is_var:
             self._clr_body2_lbl.setText(t("project.variant_body_named", variant=v_suffix.capitalize()))
 
-        # Show/hide body-2 preview labels
+
         if not is_var:
             self._dds_preview_2.setVisible(False)
             self._dds_preview_2.clear()
             self._color_map_preview_2.setVisible(False)
             self._color_map_preview_2.clear()
 
-        # Update banner text when colorable changes
+
         if is_var and self._variant_banner.isVisible():
             requirements = t("project.variant_4_pngs") if is_clr else t("project.variant_2_dds")
             info  = self.project_data["cars"].get(self.selected_car_for_skin, {})
@@ -1311,7 +1293,7 @@ class GeneratorTab(QWidget):
                 t("project.variant_banner", name=dname, requirements=requirements, variant=v_suffix)
             )
 
-        # Reflectivity map: body-1 sublabel + body-2 section track is_var
+
         self._rfl_body1_lbl.setVisible(is_var)
         self._rfl_section_2.setVisible(is_var)
         if is_var:
@@ -1349,7 +1331,7 @@ class GeneratorTab(QWidget):
             return
 
         is_colorable = self._colorable_toggle.isChecked()
-        is_var       = self._is_variant()
+        is_var       = self._needs_double_layer()
 
         if is_colorable:
             if not self._data_map_path:
@@ -1363,7 +1345,7 @@ class GeneratorTab(QWidget):
                 )
                 return
             if is_var:
-                # 4 PNGs required for variant colorable
+
                 if not self._data_map_path_2:
                     self.show_notification(
                         t("project.notification.please_select_datamap_variant"), "warning"
@@ -1402,7 +1384,7 @@ class GeneratorTab(QWidget):
             if is_var:
                 skin_data["dds_path_2"] = self._dds_path_2
 
-        # Config data
+
         if self._config_toggle.isChecked():
             config_name = self._config_name_entry.text().strip()
             if not config_name:
@@ -1427,13 +1409,13 @@ class GeneratorTab(QWidget):
                 "jpg_file_path": self._jpg_file_path,
             }
 
-        # Material properties
+
         if self._material_toggle.isChecked():
             mat = self._collect_material_properties()
             if mat:
                 skin_data["material_properties"] = mat
 
-        # Reflectivity map
+
         if self._rfl_toggle.isChecked():
             if not self._rough_met_path:
                 self.show_notification(
@@ -1453,7 +1435,7 @@ class GeneratorTab(QWidget):
 
         self.project_data["cars"][self.selected_car_for_skin]["skins"].append(skin_data)
 
-        # ── Testing mode: broadcast skin to every other vehicle in project ─ #
+
         if state.testing_mode and len(self.project_data["cars"]) > 1:
             broadcast_count = 0
             for car_key, car_info in self.project_data["cars"].items():
@@ -1462,9 +1444,8 @@ class GeneratorTab(QWidget):
                 target_is_variant = bool(car_info.get("variant_suffix", ""))
                 broadcast_skin = dict(skin_data)
                 if target_is_variant:
-                    # Variant cars need a second body slot (_2 paths).
-                    # If the skin was authored for a non-variant car those are
-                    # absent — mirror the primary paths so every slot is filled.
+
+
                     if broadcast_skin.get("is_colorable"):
                         if not broadcast_skin.get("data_map_path_2"):
                             broadcast_skin["data_map_path_2"] = broadcast_skin.get("data_map_path", "")
@@ -1476,12 +1457,12 @@ class GeneratorTab(QWidget):
                     if not broadcast_skin.get("rough_met_path_2"):
                         broadcast_skin["rough_met_path_2"] = broadcast_skin.get("rough_met_path", "")
                 else:
-                    # Non-variant cars only have one body — strip variant slots.
+
                     broadcast_skin.pop("dds_path_2",       None)
                     broadcast_skin.pop("data_map_path_2",  None)
                     broadcast_skin.pop("color_map_path_2", None)
                     broadcast_skin.pop("rough_met_path_2", None)
-                # Skip if this car already has a skin with the same name
+
                 existing_names = {s.get("name") for s in car_info["skins"]}
                 if broadcast_skin["name"] not in existing_names:
                     car_info["skins"].append(broadcast_skin)
@@ -1544,7 +1525,7 @@ class GeneratorTab(QWidget):
             self.color_map_entry.setText(os.path.basename(self._color_map_path))
             self._load_preview(self._data_map_path,  self._dds_preview)
             self._load_preview(self._color_map_path, self._color_map_preview)
-            # variant body 2
+
             self._data_map_path_2  = skin.get("data_map_path_2",  "")
             self._color_map_path_2 = skin.get("color_map_path_2", "")
             self.data_map_entry_2.setText(os.path.basename(self._data_map_path_2))
@@ -1557,7 +1538,7 @@ class GeneratorTab(QWidget):
             self._dds_path = skin.get("dds_path", "")
             self.dds_entry.setText(os.path.basename(self._dds_path))
             self._load_preview(self._dds_path, self._dds_preview)
-            # variant body 2
+
             self._dds_path_2 = skin.get("dds_path_2", "")
             self.dds_entry_2.setText(os.path.basename(self._dds_path_2))
             if self._dds_path_2:
@@ -1613,7 +1594,7 @@ class GeneratorTab(QWidget):
 
         skin_name    = self.skin_name_entry.text().strip()
         is_colorable = self._colorable_toggle.isChecked()
-        is_var       = self._is_variant()
+        is_var       = self._needs_double_layer()
 
         if not skin_name:
             self.show_notification(t("project.notification.skin_name_required"), "error")
@@ -1794,7 +1775,6 @@ class GeneratorTab(QWidget):
             self._load_preview(path, self._dds_preview)
 
     def browse_dds_2(self):
-        """Browse for the second (variant body) DDS texture."""
         print(f"[DEBUG] _update_variant_ui() called")
         v_suffix = self._selected_variant_suffix()
         title = t("project.dialog_select_dds_variant", variant=v_suffix.capitalize())
@@ -1807,28 +1787,17 @@ class GeneratorTab(QWidget):
             self._load_preview(path, self._dds_preview_2)
 
     def _get_vehicle_browse_dir(self) -> str:
-        """
-        Return the best initial directory for config-related file dialogs.
-
-        Logic:
-          1. Fetch the saved mods folder (e.g. …/BeamNG.drive/current/mods).
-          2. Derive the sibling ``vehicles`` folder by replacing the last
-             ``mods`` path component with ``vehicles``.
-          3. Append the base car-id of the currently selected vehicle.
-          4. Return that path if it exists on disk, otherwise fall back to
-             the bare ``vehicles`` folder, then the ``mods`` folder, then "".
-        """
         mods_path = _get_mods_folder_path()
         print(f"[DEBUG] _get_vehicle_browse_dir: mods_path={mods_path!r}")
         if not mods_path or not os.path.isdir(mods_path):
             return ""
 
-        # …/current/mods  →  …/current/vehicles
+
         parent       = os.path.dirname(mods_path)
         vehicles_dir = os.path.join(parent, "vehicles")
         print(f"[DEBUG] _get_vehicle_browse_dir: vehicles_dir={vehicles_dir!r}  exists={os.path.isdir(vehicles_dir)}")
 
-        # Resolve the base car-id for the currently selected project key.
+
         base_carid = ""
         if self.selected_car_for_skin:
             car_info   = self.project_data["cars"].get(self.selected_car_for_skin, {})
@@ -1952,7 +1921,7 @@ class GeneratorTab(QWidget):
             label.setAlignment(Qt.AlignCenter)
             label.setVisible(True)
             return
-        # Respect the "Texture Previews" setting from Settings tab
+
         if not getattr(state, 'texture_previews_enabled', True):
             label.setText(f"📄  {os.path.basename(path)}")
             label.setStyleSheet(
@@ -1989,7 +1958,7 @@ class GeneratorTab(QWidget):
     def _toggle_colorable(self):
         print(f"[DEBUG] _toggle_colorable() called")
         on      = self._colorable_toggle.isChecked()
-        is_var  = self._is_variant()
+        is_var  = self._needs_double_layer()
         self._dds_widget.setVisible(not on)
         self._colorable_widget.setVisible(on)
         if not on:
@@ -2164,12 +2133,6 @@ class GeneratorTab(QWidget):
         import re
 
         def _folder_matches_variant(folder_name: str, suffix: str) -> bool:
-            """
-            Template folders are named SKINNAME / skinname (default variant) or
-            SKINNAMEAMBULANCE / skinnameambulance (named variant).
-            Strip 'skinname' (case-insensitive) and compare the remainder to
-            the desired suffix so each variant gets its own material file.
-            """
             name_lower = folder_name.lower()
             if "skinname" not in name_lower:
                 return False
@@ -2251,11 +2214,11 @@ class GeneratorTab(QWidget):
         self.project_data["author"]   = author or "Unknown"
 
         if self._current_project_path:
-            # Project was loaded from (or previously saved to) a file — overwrite it directly.
+
             path = self._current_project_path
             print(f"[DEBUG] save_project: overwriting existing project file at {path!r}")
         else:
-            # New unsaved project — open dialog with mod name pre-filled as filename.
+
             import re
             safe_name = re.sub(r'[\\/*?:"<>|]', "_", mod_name) if mod_name else ""
             default_filename = f"{safe_name}.json" if safe_name else ""
@@ -2276,9 +2239,9 @@ class GeneratorTab(QWidget):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.project_data, f, indent=2)
             print(f"[DEBUG] save_project: write successful")
-            self._current_project_path = path   # future saves overwrite this file directly
+            self._current_project_path = path
 
-            ### register in the project registry
+
             try:
                 print(f"[DEBUG] save_project: calling _reg_add with path={path!r}")
                 _reg_add(path, self.project_data)
@@ -2299,7 +2262,7 @@ class GeneratorTab(QWidget):
         print(f"[DEBUG] load_project: called")
         path: Optional[str] = None
 
-        ### open browser dialog if available, else fall back to raw file dialog
+
         if ProjectBrowserDialog is not None:
             print(f"[DEBUG] load_project: opening ProjectBrowserDialog")
             dlg    = ProjectBrowserDialog(self.window())
@@ -2322,7 +2285,7 @@ class GeneratorTab(QWidget):
             print(f"[DEBUG] load_project: no path selected — returning early")
             return
 
-        self._current_project_path = path   # enables direct overwrite on next save
+        self._current_project_path = path
         print(f"[DEBUG] load_project: reading project file from {path!r}")
         try:
             with open(path, encoding="utf-8") as f:
@@ -2379,7 +2342,7 @@ class GeneratorTab(QWidget):
             except Exception as e:
                 print(f"[DEBUG] load_project: failed to set author sidebar entry: {e}")
 
-            ### register the opened file in the project registry
+
             try:
                 print(f"[DEBUG] load_project: calling _reg_add to register loaded path")
                 _reg_add(path, self.project_data)
@@ -2453,7 +2416,7 @@ class GeneratorTab(QWidget):
         self.selected_car_for_skin = None
         self.editing_mode          = False
         self.selected_skin_index   = None
-        self._current_project_path = None   # cleared project is no longer tied to any file
+        self._current_project_path = None
         self._update_button_ui()
         self._reset_skin_form_fields()
         self._skin_card.setVisible(False)
@@ -2468,7 +2431,7 @@ class GeneratorTab(QWidget):
         self.show_notification(t("project.notification.project_cleared"), "info")
         self.refresh_project_display()
 
-        # Repopulate the sidebar with all vehicles now that the project is empty
+
         try:
             mw = self.window()
             if mw and hasattr(mw, "sidebar") and hasattr(mw, "_add_vehicle_from_sidebar"):
@@ -2550,7 +2513,7 @@ class GeneratorTab(QWidget):
                         f" {mods_folder}", "error", 4000
                     )
                     return
-                # When unpacked, output to the game's built-in unpacked subfolder
+
                 if unpacked:
                     output_path = os.path.join(mods_folder, "unpacked")
                     os.makedirs(output_path, exist_ok=True)
@@ -2564,11 +2527,7 @@ class GeneratorTab(QWidget):
         else:
             output_path = None
 
-        # ── overwrite check ────────────────────────────────────────────────────
-        # Mirrors the path logic in file_ops.generate_multi_skin_mod so we can
-        # detect a collision *on the main thread* and ask the user before the
-        # background worker even starts.  If the user confirms, we remove the
-        # old file/folder here so file_ops won't raise FileExistsError.
+
         try:
             from core.file_ops import (
                 get_beamng_mods_path   as _get_mods_path,
@@ -2611,7 +2570,7 @@ class GeneratorTab(QWidget):
                     ) == QMessageBox.Yes
                 if not _confirmed:
                     return
-                # Delete now so file_ops won't hit FileExistsError mid-thread.
+
                 try:
                     if os.path.isdir(_conflict_path):
                         import shutil as _shutil
@@ -2627,7 +2586,7 @@ class GeneratorTab(QWidget):
                         "error", 5000,
                     )
                     return
-        # ── end overwrite check ────────────────────────────────────────────────
+
 
         self.project_data["mod_name"] = mod_name
         self.project_data["author"]   = author
@@ -2637,7 +2596,7 @@ class GeneratorTab(QWidget):
         self._progress_bar.setValue(0)
         self._progress_bar.setVisible(True)
         generate_button.setEnabled(False)
-        # Store so _on_generate_done (main thread) can re-enable it safely.
+
         self._pending_generate_button = generate_button
 
         def _update_status(msg: str):
@@ -2704,10 +2663,8 @@ class GeneratorTab(QWidget):
                     "error", 7000
                 )
             finally:
-                # Do NOT call QTimer.singleShot from a background thread —
-                # it is not thread-safe and will silently fail to fire.
-                # Button re-enablement is handled in _on_generate_done(),
-                # which runs on the main thread via the queued _done_signal.
+
+
                 self._done_signal.emit(_success)
 
         threading.Thread(target=_thread_fn, daemon=True).start()
@@ -2725,21 +2682,21 @@ class GeneratorTab(QWidget):
             t("project.add_skins_header", default="Add Skins to Selected Car")
         )
 
-        # skin form — skin name label + placeholder
+
         self._skin_name_lbl.setText(t("project.skin_name"))
         self.skin_name_entry.setPlaceholderText(t("project.skin_name_placeholder"))
 
-        # toggle labels
+
         self._cfg_lbl.setText(t("project.add_config_data"))
         self._mat_lbl.setText(t("project.edit_materials"))
         self._clr_lbl.setText(t("project.colorable"))
 
-        # config fields
+
         self._config_name_lbl.setText(t("project.config_name"))
         self._config_name_entry.setPlaceholderText(t("project.config_name_placeholder"))
         self._config_type_lbl.setText(t("project.type"))
 
-        # config file section labels + placeholders
+
         self._pc_file_lbl.setText(t("project.pc_file"))
         self.pc_file_entry.setPlaceholderText(t("common.nofile_selected"))
         self._pc_browse.setText(t("common.browse"))
@@ -2747,7 +2704,7 @@ class GeneratorTab(QWidget):
         self.jpg_file_entry.setPlaceholderText(t("common.nofile_selected"))
         self._jpg_browse.setText(t("common.browse"))
 
-        # DDS section labels + placeholders
+
         self._dds_label_1.setText(t("project.dds_texture"))
         self.dds_entry.setPlaceholderText(t("common.nofile_selected"))
         self._dds_browse.setText(t("common.browse"))
@@ -2755,7 +2712,7 @@ class GeneratorTab(QWidget):
         self.dds_entry_2.setPlaceholderText(t("common.nofile_selected"))
         self._dds_browse_2.setText(t("common.browse"))
 
-        # colorable section labels + placeholders (body 1)
+
         self._clr_body1_lbl.setText(t("project.normal_body"))
         self._base_color_map_lbl_1.setText(t("project.base_Color_Map"))
         self.data_map_entry.setPlaceholderText(t("common.nofile_selected"))
@@ -2764,7 +2721,7 @@ class GeneratorTab(QWidget):
         self.color_map_entry.setPlaceholderText(t("common.nofile_selected"))
         self._cm_browse.setText(t("common.browse"))
 
-        # colorable section labels + placeholders (body 2 / variant)
+
         self._clr_body2_lbl.setText(t("project.variant_body"))
         self._base_color_map_lbl_2.setText(t("project.base_Color_Map"))
         self.data_map_entry_2.setPlaceholderText(t("common.nofile_selected"))
@@ -2773,11 +2730,11 @@ class GeneratorTab(QWidget):
         self.color_map_entry_2.setPlaceholderText(t("common.nofile_selected"))
         self._cm2_browse.setText(t("common.browse"))
 
-        # action buttons
+
         self.add_skin_btn.setText(t("project.add_skin"))
         self.cancel_edit_btn.setText(t("project.cancel_edit"))
 
-        # reflectivity map section
+
         self._rfl_lbl.setText(t("project.reflectivity_map"))
         self.rfl_entry.setPlaceholderText(t("common.nofile_selected"))
         self._rfl_browse.setText(t("common.browse"))
@@ -2786,8 +2743,7 @@ class GeneratorTab(QWidget):
         self.rfl_entry_2.setPlaceholderText(t("common.nofile_selected"))
         self._rfl_browse_2.setText(t("common.browse"))
 
-        # variant banner — always re-render in new language when a car is selected,
-        # regardless of current visibility (banner may be shown later with stale text)
+
         if self.selected_car_for_skin:
             info     = self.project_data["cars"].get(self.selected_car_for_skin, {})
             dname    = info.get("display_name", "")

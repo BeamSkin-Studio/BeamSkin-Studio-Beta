@@ -28,13 +28,7 @@ except ImportError:
     toggle_debug_mode = None
 
 
-
 class _ThemeToggle(QWidget):
-    """
-    A pill-shaped segmented control with two options: 🌙 Dark  /  ☀️ Light.
-    Reads the current mode from ``state.theme_mode`` and calls
-    ``state.set_theme()`` on click.
-    """
 
     _BTN_W = 100
     _BTN_H = 34
@@ -60,7 +54,7 @@ class _ThemeToggle(QWidget):
         self._dark_btn.clicked.connect(lambda: self._select("dark"))
         self._light_btn.clicked.connect(lambda: self._select("light"))
 
-        # Draw initial state
+
         self._refresh_styles(state.theme_mode)
 
     def _select(self, mode: str) -> None:
@@ -68,13 +62,11 @@ class _ThemeToggle(QWidget):
         if mode == state.theme_mode:
             return
         state.set_theme(mode)
-        # ``state.set_theme`` calls ``_refresh_all_ui`` which calls our
-        # parent tab's ``refresh_ui``, which re-calls ``_refresh_styles``.
-        # Do it here too in case this widget is used standalone.
+
+
         self._refresh_styles(mode)
 
     def _refresh_styles(self, active: str) -> None:
-        """Re-paint both buttons to reflect the current active mode."""
         def _active_style(left: bool) -> str:
             r_left  = "8px 0 0 8px"
             r_right = "0 8px 8px 0"
@@ -118,19 +110,12 @@ class _ThemeToggle(QWidget):
             self._light_btn.setStyleSheet(_active_style(left=False))
 
 
-#  SETTINGS TAB  ─────────────────────────────────────────────────────────── #
-
 class SettingsTab(QWidget):
-    """
-    Full Settings tab — scrollable page with three card sections.
-    The widget tree is built ONCE in __init__ and never rebuilt.
-    refresh_ui() updates labels and styles in-place.
-    """
 
     def __init__(
         self,
         parent: QWidget,
-        # Accept same kwargs the ctk version accepted:
+
         main_container=None,
         menu_frame=None,
         menu_buttons: Dict = None,
@@ -146,16 +131,15 @@ class SettingsTab(QWidget):
         self._menu_buttons       = menu_buttons or {}
         self._switch_view_cb     = switch_view_callback
 
-        # Ensure the preview toggle state exists on the shared state object
+
         if not hasattr(state, 'texture_previews_enabled'):
             state.texture_previews_enabled = True
 
-        # Label references updated by refresh_ui()
+
         self._section_labels: list = []
 
         self._setup_ui()
 
-    # build (called ONCE)  ───────────────────────────────────────────────── #
 
     def _setup_ui(self):
         print(f"[DEBUG] _setup_ui() called")
@@ -174,13 +158,13 @@ class SettingsTab(QWidget):
         col.setSpacing(20)
         scroll.setWidget(page)
 
-        # main title
+
         self._main_title = QLabel(t("settings.title", default="Settings"))
         self._main_title.setFont(font(20, "bold"))
         self._main_title.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
         col.addWidget(self._main_title)
 
-        # PATH CONFIGURATION
+
         try:
             from gui.components.path_configuration import PathConfigurationSection
             self._path_section = PathConfigurationSection(
@@ -201,7 +185,7 @@ class SettingsTab(QWidget):
             path_stub.layout().addWidget(stub_lbl)
             col.addWidget(path_stub)
 
-        # APPEARANCE  ────────────────────────────────────────────────────── #
+
         appearance_card = self._card(page)
         a_col = appearance_card.layout()
 
@@ -243,7 +227,7 @@ class SettingsTab(QWidget):
         lang_row.addStretch(1)
         a_col.addLayout(lang_row)
 
-        # Texture Previews toggle
+
         preview_row = QHBoxLayout()
         preview_row.setSpacing(12)
         self._preview_label = QLabel("Texture Previews (.dds / .png):")
@@ -272,7 +256,7 @@ class SettingsTab(QWidget):
 
         col.addWidget(appearance_card)
 
-        # ADVANCED  ──────────────────────────────────────────────────────── #
+
         advanced_card = self._card(page)
         adv_col = advanced_card.layout()
 
@@ -297,7 +281,7 @@ class SettingsTab(QWidget):
         )
         adv_col.addWidget(self._debug_desc)
 
-        # ── Testing Mode ────────────────────────────────────────────────── #
+
         self._testing_checkbox = QCheckBox("🧪  Developer Testing Mode")
         self._testing_checkbox.setFont(font(13, "bold"))
         self._testing_checkbox.setStyleSheet(
@@ -321,7 +305,7 @@ class SettingsTab(QWidget):
 
         col.addWidget(advanced_card)
 
-        # UPDATES  ───────────────────────────────────────────────────────── #
+
         updates_card = self._card(page)
         upd_col = updates_card.layout()
 
@@ -329,7 +313,7 @@ class SettingsTab(QWidget):
             t("settings.updates", default="Updates"), upd_col
         )
 
-        # Current version row
+
         ver_row = QHBoxLayout()
         self._ver_label = QLabel(t("settings.current_version", default="Current version:"))
         self._ver_label.setFont(font(13, "bold"))
@@ -351,7 +335,7 @@ class SettingsTab(QWidget):
         ver_row.addStretch(1)
         upd_col.addLayout(ver_row)
 
-        # Check for Updates button
+
         check_row = QHBoxLayout()
         self._check_update_btn = QPushButton(
             t("settings.check_for_updates", default="🔍  Check for Updates")
@@ -365,7 +349,7 @@ class SettingsTab(QWidget):
         check_row.addStretch(1)
         upd_col.addLayout(check_row)
 
-        # Skipped version indicator (hidden unless a version is skipped)
+
         self._skip_row = QHBoxLayout()
         self._skip_row.setSpacing(8)
         self._skip_lbl = QLabel("")
@@ -394,7 +378,7 @@ class SettingsTab(QWidget):
         self._skip_row.addWidget(self._skip_clear_btn)
         self._skip_row.addStretch(1)
 
-        # Embed the row in a plain container so we can hide/show it
+
         skip_container = QWidget()
         skip_container.setStyleSheet("background:transparent;border:none;")
         skip_container.setLayout(self._skip_row)
@@ -407,9 +391,6 @@ class SettingsTab(QWidget):
 
         col.addStretch(1)
 
-    # stylesheet helpers ─────────────────────────────────────────────────── #
-
-    # updates ────────────────────────────────────────────────────────────── #
 
     def _primary_btn_style(self) -> str:
         return f"""
@@ -470,7 +451,6 @@ class SettingsTab(QWidget):
         )
 
     def _refresh_skip_indicator(self):
-        """Show or hide the 'Skipped version: X' indicator."""
         try:
             from core.updater import get_skipped_version
             skipped = get_skipped_version()
@@ -523,7 +503,6 @@ class SettingsTab(QWidget):
         layout.addWidget(lbl)
         return lbl
 
-    # debug mode ─────────────────────────────────────────────────────────── #
 
     def _on_debug_toggled(self, checked: bool):
         print(f"[DEBUG] _on_debug_toggled: debug mode -> {checked}")
@@ -540,19 +519,16 @@ class SettingsTab(QWidget):
                 self._debug_checkbox.blockSignals(False),
             ))
 
-    # testing mode ───────────────────────────────────────────────────────── #
 
     def _on_testing_toggled(self, checked: bool):
         print(f"[DEBUG] _on_testing_toggled: testing mode -> {checked}")
         state.set_testing_mode(checked)
 
-    # texture previews ───────────────────────────────────────────────────── #
 
     def _on_texture_previews_toggled(self, checked: bool):
         print(f"[DEBUG] _on_texture_previews_toggled: previews enabled -> {checked}")
         state.texture_previews_enabled = checked
 
-    # language selector ──────────────────────────────────────────────────── #
 
     def _open_language_selector(self):
         print(f"[DEBUG] _open_language_selector: opening language picker dialog")
@@ -574,14 +550,12 @@ class SettingsTab(QWidget):
                 else:
                     self.show_notification("error", f"Failed to set language: {new_lang}")
 
-    # notification ───────────────────────────────────────────────────────── #
 
     def show_notification(self, type: str, message: str):
         print(f"[DEBUG] show_notification: [{type}] {message!r}")
         if self._notify_cb:
-            # BeamSkinStudioApp.show_notification expects (message, type) —
-            # swap here so the toast displays the real message text and uses
-            # the correct colour/icon for the notification type.
+
+
             self._notify_cb(message, type)
         else:
             if type == "error":
@@ -591,7 +565,6 @@ class SettingsTab(QWidget):
             else:
                 QMessageBox.information(self, t("common.info", default="Info"), message)
 
-    # helpers ────────────────────────────────────────────────────────────── #
 
     def _find_root_app(self):
         print(f"[DEBUG] _find_root_app() called")
@@ -614,12 +587,7 @@ class SettingsTab(QWidget):
         if not root:
             return
 
-        # Prefer delegating to the root window's own implementation so that
-        # sidebar._mod_entry / _author_entry are always re-wired to the
-        # generator tab after the sidebar teardown-and-rebuild that
-        # sidebar.refresh_ui() performs.  This avoids the bug where the
-        # generator tab holds stale (deleteLater'd) widget references after
-        # a language change.
+
         if hasattr(root, "_refresh_all_tabs"):
             try:
                 root._refresh_all_tabs()
@@ -627,7 +595,7 @@ class SettingsTab(QWidget):
             except Exception as e:
                 print(f"[WARNING] _refresh_all_ui delegation failed: {e}")
 
-        # Fallback: replicate the logic manually.
+
         if hasattr(root, "tabs"):
             for name, tab in root.tabs.items():
                 if hasattr(tab, "refresh_ui"):
@@ -645,8 +613,8 @@ class SettingsTab(QWidget):
                 root.sidebar.refresh_ui(
                     getattr(root, "_add_vehicle_from_sidebar", None)
                 )
-                # Re-wire new sidebar entry widgets to the generator tab so
-                # that load_project() writes into the live QLineEdits.
+
+
                 gen = root.tabs.get("generator") if hasattr(root, "tabs") else None
                 if gen and hasattr(gen, "set_sidebar_references"):
                     gen.set_sidebar_references(
@@ -657,7 +625,6 @@ class SettingsTab(QWidget):
                 pass
 
     def showEvent(self, event):
-        """Reload paths whenever the settings tab becomes visible."""
         super().showEvent(event)
         if hasattr(self, "_path_section") and hasattr(self._path_section, "reload_paths"):
             try:
@@ -665,16 +632,9 @@ class SettingsTab(QWidget):
             except Exception as e:
                 print(f"[WARNING] path reload on show: {e}")
 
-    # refresh hook ───────────────────────────────────────────────────────── #
 
     def refresh_ui(self):
-        """
-        print(f"[DEBUG] showEvent() called")
-        Update translatable text and re-apply all stylesheets in-place
-        without rebuilding the widget tree.  Called after language changes
-        and after theme switches.
-        """
-        # Re-skin this tab's background
+
         self.setStyleSheet(f"background:{COLORS['app_bg']};")
 
         self._main_title.setText(t("settings.title", default="Settings"))
@@ -691,7 +651,7 @@ class SettingsTab(QWidget):
         self._theme_label.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
-        # Re-draw toggle buttons with fresh colours
+
         self._theme_toggle._refresh_styles(state.theme_mode)
 
         self._lang_label.setText(t("settings.language", default="Language:"))
@@ -702,7 +662,7 @@ class SettingsTab(QWidget):
         current   = get_current_language()
         lang_info = available.get(current, {"native": "English"})
 
-        # Texture previews row
+
         self._preview_label.setText("Texture Previews (.dds / .png):")
         self._preview_label.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
@@ -738,7 +698,7 @@ class SettingsTab(QWidget):
             f"color:{COLORS['text_secondary']};background:transparent;border:none;padding-left:22px;"
         )
 
-        # Testing mode checkbox keeps its hardcoded label (dev-only feature)
+
         self._testing_checkbox.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
@@ -749,7 +709,7 @@ class SettingsTab(QWidget):
             f"color:{COLORS['text_secondary']};background:transparent;border:none;padding-left:22px;"
         )
 
-        # Updates card
+
         self._updates_title.setText(t("settings.updates", default="Updates"))
         self._updates_title.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
@@ -780,13 +740,7 @@ class SettingsTab(QWidget):
         self._refresh_skip_indicator()
 
 
-#  LANGUAGE SELECTOR DIALOG  ─────────────────────────────────────────────── #
-
 class _LanguageSelectorDialog:
-    """
-    Simple language picker built from QDialog.
-    Returns after exec() — check .selected_lang.
-    """
 
     def __init__(self, parent: QWidget, available: dict, current: str):
         print(f"[DEBUG] __init__() called")

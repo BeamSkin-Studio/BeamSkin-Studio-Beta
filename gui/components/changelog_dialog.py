@@ -1,8 +1,3 @@
-"""
-changelog_dialog.py — PySide6 edition
-=======================================
-Animated "What's New" dialog shown on version update.
-"""
 
 from __future__ import annotations
 import threading
@@ -27,7 +22,7 @@ except ImportError:
     def t(key, **kw): return key
     def get_current_language(): return "en"
 
-# ── translation support ────────────────────────────────────────────────────── #
+
 try:
     from deep_translator import GoogleTranslator as _GT
     _TRANSLATE_AVAIL = True
@@ -54,8 +49,6 @@ def _target_lang() -> str:
 def _should_translate() -> bool:
     return _target_lang() not in ("en",)
 
-
-# ── seen-versions persistence ──────────────────────────────────────────────── #
 
 def _seen_path() -> str:
     return os.path.join("data", "seen_changelogs.json")
@@ -87,8 +80,6 @@ def has_seen_changelog(version: str) -> bool:
     return version in _load_seen()
 
 
-# ── remote changelog fetching ─────────────────────────────────────────────── #
-
 def _get_remote_changelog_url() -> str:
     import sys
     if sys.platform == "win32":
@@ -103,11 +94,6 @@ def _get_remote_changelog_url() -> str:
 
 
 def _exec_remote_changelog(source: str) -> list | None:
-    """
-    Execute the fetched changelog.py in a sandboxed namespace.
-    The file uses helper functions (title/item/etc.) rather than plain dicts,
-    so ast.literal_eval is not sufficient — we pre-supply those helpers.
-    """
     import builtins as _builtins
     from typing import TypedDict, Literal
 
@@ -125,9 +111,8 @@ def _exec_remote_changelog(source: str) -> list | None:
         "separator":    _separator,
         "TypedDict":    TypedDict,
         "Literal":      Literal,
-        # Pass the real builtins so any import statements inside
-        # changelog.py work correctly. An empty dict here was silently
-        # killing exec() and masking the failure as a network error.
+
+
         "__builtins__": _builtins,
     }
     try:
@@ -139,22 +124,11 @@ def _exec_remote_changelog(source: str) -> list | None:
 
 
 def _normalise_version(v: str) -> str:
-    """
-    Strip any suffix (Beta, Build N, Stable, …) and return only the
-    numeric x.y.z part so that "1.2.3.Beta" matches "1.2.3" in the
-    changelog, regardless of how either side formats the string.
-    """
     parts = v.strip().split(".")
     return ".".join(p for p in parts[:3] if p.isdigit())
 
 
 def fetch_remote_changelog_for_version(version: str) -> dict | None:
-    """
-    Fetch core/changelog.py from GitHub and return the entry whose
-    'version' field matches *version*.  Falls back to the latest entry
-    when an exact match is not found (e.g. the remote is already ahead).
-    Returns None on any network or parse error.
-    """
     import requests
 
     url = _get_remote_changelog_url()
@@ -170,8 +144,7 @@ def fetch_remote_changelog_for_version(version: str) -> dict | None:
     if not changelogs:
         return None
 
-    # Normalise both sides to "x.y.z" before comparing so that version
-    # strings like "1.2.3.Beta" (app) and "1.2.3" (changelog) still match.
+
     target = _normalise_version(version)
     print(f"[changelog] looking for version '{target}' (raw: '{version}')")
     for entry in changelogs:
@@ -181,23 +154,18 @@ def fetch_remote_changelog_for_version(version: str) -> dict | None:
                 print(f"[changelog] found matching entry for {target}")
                 return entry
 
-    # Version not yet in changelog — return the latest entry as best effort
+
     print(f"[changelog] no exact match for '{target}', falling back to latest entry")
     return changelogs[0] if changelogs else None
 
 
 class _FetchSignals(QObject):
-    done   = Signal(object)   # emits dict
+    done   = Signal(object)
     failed = Signal()
 
 
 def show_update_changelog(parent: "QWidget", version: str) -> None:
-    """
-    Open a ChangelogDialog immediately in a loading state, then populate
-    it with data fetched from GitHub on a background thread.
-    Never opens a browser — transitions to an error entry on failure.
-    """
-    # Open the dialog straight away with a loading placeholder
+
     loading_data = {
         "version": version,
         "date": "",
@@ -232,18 +200,12 @@ def show_update_changelog(parent: "QWidget", version: str) -> None:
             signals.failed.emit()
 
     threading.Thread(target=_worker, daemon=True).start()
-    dlg.show()   # runs exec() — event loop keeps signals live while open
+    dlg.show()
 
-
-# ── worker signal bridge ───────────────────────────────────────────────────── #
 
 class _TranslationSignals(QObject):
     done = Signal(list)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN  DIALOG
-# ─────────────────────────────────────────────────────────────────────────────
 
 class ChangelogDialog(QDialog):
 
@@ -261,8 +223,8 @@ class ChangelogDialog(QDialog):
         self._version      = changelog_data.get("version", "?")
         self._date         = changelog_data.get("date", "")
         self._translating  = False
-        self._preview_mode = preview_mode   # True = don't mark seen on close
-        self._sub_lbl: Optional[QLabel] = None  # updated by _update_remote_data
+        self._preview_mode = preview_mode
+        self._sub_lbl: Optional[QLabel] = None
         self._signals      = _TranslationSignals(self)
         self._signals.done.connect(self._apply_translation)
 
@@ -275,7 +237,6 @@ class ChangelogDialog(QDialog):
         drop_shadow(self._card, 36, (0, 10))
         fade_in(self._card, 220)
 
-    # ── layout ────────────────────────────────────────────────────────────── #
 
     def _build(self):
         self._loading_timer: Optional[QTimer] = None
@@ -295,7 +256,7 @@ class ChangelogDialog(QDialog):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ── header ────────────────────────────────────────────────────────── #
+
         hdr = QFrame()
         hdr.setObjectName("dlgHeader")
         hdr.setFixedHeight(100)
@@ -314,12 +275,11 @@ class ChangelogDialog(QDialog):
         """)
 
 
-
         hdr_row = QHBoxLayout(hdr)
         hdr_row.setContentsMargins(24, 8, 24, 0)
         hdr_row.setSpacing(16)
 
-        # accent icon badge
+
         badge = QFrame()
         badge.setFixedSize(50, 50)
         badge.setStyleSheet(f"""
@@ -340,7 +300,7 @@ class ChangelogDialog(QDialog):
         b_lay.addWidget(b_icon)
         hdr_row.addWidget(badge)
 
-        # title + version/date
+
         txt_col = QVBoxLayout()
         txt_col.setSpacing(5)
 
@@ -378,7 +338,7 @@ class ChangelogDialog(QDialog):
 
         root.addWidget(hdr)
 
-        # ── scroll area ───────────────────────────────────────────────────── #
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -411,7 +371,7 @@ class ChangelogDialog(QDialog):
         scroll.setWidget(self._content_w)
         root.addWidget(scroll, 1)
 
-        # ── footer ────────────────────────────────────────────────────────── #
+
         ftr = QFrame()
         ftr.setObjectName("dlgFooter")
         ftr.setFixedHeight(68)
@@ -449,10 +409,9 @@ class ChangelogDialog(QDialog):
 
         self._render_entries(self._entries)
 
-    # ── rendering ─────────────────────────────────────────────────────────── #
 
     def _clear_content(self):
-        # Stop loading animation before clearing
+
         if self._loading_timer is not None:
             self._loading_timer.stop()
             self._loading_timer = None
@@ -462,19 +421,9 @@ class ChangelogDialog(QDialog):
                 child.widget().deleteLater()
 
     def _render_entries(self, entries: list):
-        """
-        Group entries into sections.  Each `title` starts a new section card
-        that wraps its subtitle/item/note children so the whole block reads
-        as one connected unit, visually separated from the dialog background.
-        Entries that appear before the first title (loading placeholder, etc.)
-        are rendered flat as before.
-        """
         self._clear_content()
 
-        # ── split into sections ──────────────────────────────────────────── #
-        # preamble  = entries before the first title (_loading, stray items)
-        # sections  = list of {"title": entry, "children": [...]}
-        #             a bare {"separator": True} is also appended on separator
+
         preamble: list = []
         sections: list = []
         current: dict | None = None
@@ -498,11 +447,11 @@ class ChangelogDialog(QDialog):
         if current is not None:
             sections.append(current)
 
-        # ── render preamble (loading spinner, etc.) ──────────────────────── #
+
         for entry in preamble:
             self._render_preamble_entry(entry)
 
-        # ── render sections ───────────────────────────────────────────────── #
+
         for section in sections:
             if section.get("separator"):
                 self._content_layout.addSpacing(8)
@@ -511,7 +460,6 @@ class ChangelogDialog(QDialog):
 
         self._content_layout.addStretch()
 
-    # ── preamble (loading placeholder) ──────────────────────────────────── #
 
     def _render_preamble_entry(self, entry: dict):
         etype = entry.get("type", "item")
@@ -550,18 +498,11 @@ class ChangelogDialog(QDialog):
             self._loading_timer.timeout.connect(_tick)
             self._loading_timer.start(420)
 
-    # ── grouped section card ─────────────────────────────────────────────── #
 
     def _render_section_card(self, section: dict):
-        """
-        Render one section (title + children) as a single rounded card so
-        all its parts feel connected and stand out from the background.
-        """
         self._content_layout.addSpacing(12)
 
-        # Glow wrapper — a semi-transparent accent halo behind the card.
-        # QGraphicsDropShadowEffect gets clipped by QScrollArea's viewport,
-        # so we use a larger tinted frame instead.
+
         accent_c = QColor(COLORS['accent'])
         glow_color = f"rgba({accent_c.red()},{accent_c.green()},{accent_c.blue()},55)"
         glow_wrap = QFrame()
@@ -577,7 +518,7 @@ class ChangelogDialog(QDialog):
         glow_lay.setContentsMargins(5, 5, 5, 5)
         glow_lay.setSpacing(0)
 
-        # Outer card — gives the section its own background + border
+
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame#sectionCard {{
@@ -591,7 +532,7 @@ class ChangelogDialog(QDialog):
         card_lay.setContentsMargins(0, 0, 0, 0)
         card_lay.setSpacing(0)
 
-        # ── title header ─────────────────────────────────────────────────── #
+
         title_row = QFrame()
         title_row.setObjectName("titleRow")
         title_row.setStyleSheet(f"""
@@ -612,7 +553,7 @@ class ChangelogDialog(QDialog):
         tr_lay.addWidget(title_lbl)
         card_lay.addWidget(title_row)
 
-        # ── children (subtitle / item / note) ────────────────────────────── #
+
         if section["children"]:
             body = QWidget()
             body.setStyleSheet("background:transparent;border:none;")
@@ -624,7 +565,7 @@ class ChangelogDialog(QDialog):
                 ctype = child.get("type", "item")
                 ctext = child.get("text", "")
 
-                # subtitle — uppercase label, no extra card needed
+
                 if ctype == "subtitle":
                     lbl = QLabel(ctext.upper())
                     lbl.setFont(font(9, "bold"))
@@ -639,7 +580,7 @@ class ChangelogDialog(QDialog):
                     """)
                     body_lay.addWidget(lbl)
 
-                # bullet item
+
                 elif ctype == "item":
                     row = QFrame()
                     row.setStyleSheet(
@@ -667,7 +608,7 @@ class ChangelogDialog(QDialog):
                     rl.addWidget(item_lbl, 1)
                     body_lay.addWidget(row)
 
-                # note / tip
+
                 elif ctype == "note":
                     note_card = QFrame()
                     note_card.setStyleSheet(f"""
@@ -693,16 +634,13 @@ class ChangelogDialog(QDialog):
         glow_lay.addWidget(card)
         self._content_layout.addWidget(glow_wrap)
 
-    # ── remote data update ───────────────────────────────────────────────────── #
 
     def _update_remote_data(self, data: dict):
-        """Called on the main thread once the background fetch completes.
-        Refreshes the header subtitle and re-renders all entries."""
         self._version = data.get("version", self._version)
         self._date    = data.get("date", "")
         self._entries = list(data.get("entries", []))
 
-        # Refresh the version/date line in the header
+
         if self._sub_lbl is not None:
             sub_text = f"Version {self._version}"
             if self._date:
@@ -711,7 +649,6 @@ class ChangelogDialog(QDialog):
 
         self._render_entries(self._entries)
 
-    # ── translation ───────────────────────────────────────────────────────── #
 
     def _on_translate(self):
         if self._translating:
@@ -748,11 +685,10 @@ class ChangelogDialog(QDialog):
             )
             self._translate_btn.setEnabled(False)
 
-    # ── close ─────────────────────────────────────────────────────────────── #
 
     def _on_close(self):
-        # Don't mark as seen when previewing from the update dialog —
-        # the real post-install changelog must still show after updating.
+
+
         if not self._preview_mode:
             _mark_seen(self._version)
         self.accept()
@@ -765,10 +701,6 @@ class ChangelogDialog(QDialog):
             self._on_close()
         super().keyPressEvent(event)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC  HELPER
-# ─────────────────────────────────────────────────────────────────────────────
 
 def show_changelog_if_needed(
     parent: QWidget, version: str, *, force: bool = False

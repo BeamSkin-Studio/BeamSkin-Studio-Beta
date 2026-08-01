@@ -61,11 +61,6 @@ ScanResult = Tuple[List[DiscoveredVehicle], List[DiscoveredVariant], Optional[st
 
 
 def scan_mod(path: str, known_carids: Optional[set] = None) -> ScanResult:
-    """
-    Scan a BeamNG mod (zip or folder) for vehicles and variants.
-    Returns (vehicles, variants, temp_dir).
-    temp_dir is set for zip inputs and must be deleted by the caller.
-    """
     if not os.path.exists(path):
         return [], [], None
 
@@ -85,15 +80,6 @@ def scan_mod_for_multiselect(
     path: str,
     known_carids: Optional[set] = None,
 ) -> dict:
-    """
-    Scan a mod and return a dict ready for a multi-select UI.
-
-    Each item in "vehicles" / "variants" has:
-        key, type, carid, display_name, json_path, jbeam_path,
-        image_path, uv_map_paths, ready, warnings, from_zip, temp_dir
-
-    Caller must shutil.rmtree(result["temp_dir"]) when done if it's not None.
-    """
     vehicles_raw, variants_raw, temp_dir = scan_mod(path, known_carids)
 
     vehicles_out: List[dict] = []
@@ -204,7 +190,6 @@ def _scan_folder(
 
 
 def _find_vehicles_dir(root: str) -> Optional[str]:
-    """Search the full tree for the first vehicles/ directory."""
     for dirpath, _dirnames, _ in os.walk(root):
         if os.path.basename(dirpath).lower() == "vehicles":
             return dirpath
@@ -236,7 +221,6 @@ def _scan_vehicle_dir(carid: str, car_dir: str) -> Optional[DiscoveredVehicle]:
 
 
 def _scan_for_variants(carid: str, car_dir: str) -> List[DiscoveredVariant]:
-    """Find variant JBEAMs/JSONs matching {carid}_{suffix}.* patterns."""
     results: List[DiscoveredVariant] = []
 
     try:
@@ -282,7 +266,6 @@ def _scan_for_variants(carid: str, car_dir: str) -> List[DiscoveredVariant]:
 
 
 def _list_vehicle_files(car_dir: str, suffix: str) -> List[str]:
-    """Return files matching suffix anywhere under car_dir (full recursive walk)."""
     results: List[str] = []
     suffix_lower = suffix.lower()
     for dirpath, _dirs, filenames in os.walk(car_dir):
@@ -293,7 +276,6 @@ def _list_vehicle_files(car_dir: str, suffix: str) -> List[str]:
 
 
 def _json_is_skin_materials(path: str) -> bool:
-    """Check first 4 KB for .skin. key patterns."""
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             chunk = f.read(4096)
@@ -304,7 +286,6 @@ def _json_is_skin_materials(path: str) -> bool:
 
 
 def _find_skin_jsons_in_skins_dir(car_dir: str) -> List[str]:
-    """Recursively collect *.materials.json files from vehicles/{carid}/skins/."""
     results: List[str] = []
     skins_dir = os.path.join(car_dir, "skins")
     if not os.path.isdir(skins_dir):
@@ -317,14 +298,6 @@ def _find_skin_jsons_in_skins_dir(car_dir: str) -> List[str]:
 
 
 def _find_skin_json(car_dir: str, carid: str) -> Optional[str]:
-    """
-    Find the best skin materials JSON. Priority:
-    1. skins/*/skin.materials.json (validated)
-    2. Named candidates in car_dir / materials/
-    3. Any *.materials.json with "skin" in name (validated)
-    4. Any *.materials.json (validated)
-    5. main.materials.json (last resort)
-    """
     skins_jsons = _find_skin_jsons_in_skins_dir(car_dir)
     for p in skins_jsons:
         if os.path.basename(p).lower() == "skin.materials.json" and _json_is_skin_materials(p):
@@ -366,7 +339,6 @@ def _find_skin_json(car_dir: str, carid: str) -> Optional[str]:
 
 
 def _find_skin_jbeam(car_dir: str, carid: str) -> Optional[str]:
-    """Find the best skin JBEAM. Checks named candidates, then walks the tree."""
     candidates = [
         f"{carid}_skins.jbeam",
         f"{carid}_skin.jbeam",
@@ -426,7 +398,6 @@ _UV_MAX_UNDERSCORES = 3
 
 
 def _find_uv_maps(car_dir: str) -> List[str]:
-    """Return UV layout template images, filtering out typed/functional textures."""
     results: List[str] = []
     seen: set = set()
 
@@ -474,16 +445,14 @@ def _find_preview_image(car_dir: str) -> Optional[str]:
 
 
 def _strip_json_comments(text: str) -> str:
-    """Strip // comments, trailing commas, and missing commas between entries."""
     text = re.sub(r'(?<!:)//[^\n]*', '', text)
     text = re.sub(r',(\s*[}\]])', r'\1', text)
-    # Insert missing commas: value/closing-bracket on one line, quoted key on next
+
     text = re.sub(r'(["\d\w\]}])\s*\n(\s*")', r'\1,\n\2', text)
     return text
 
 
 def _read_display_name(car_dir: str, carid: str) -> str:
-    """Read display name from info.json (Brand + Name), or prettify carid."""
     candidates: List[str] = []
     try:
         for entry in os.scandir(car_dir):

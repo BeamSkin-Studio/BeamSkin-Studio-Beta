@@ -22,7 +22,6 @@ except ImportError:
 
 
 class StateManager:
-    """Singleton application state."""
 
     _instance: Optional["StateManager"] = None
 
@@ -38,8 +37,7 @@ class StateManager:
             return
         self._initialized = True
 
-        # ``self.colors`` IS the same live dict as ``theme.COLORS``.
-        # ThemeManager mutates COLORS in-place so both references stay in sync.
+
         self.colors: Dict[str, str] = COLORS
 
         self.app_settings        = app_settings
@@ -55,7 +53,7 @@ class StateManager:
             if not hasattr(self._settings_module, "added_vehicles"):
                 self._settings_module.added_vehicles = self._local_added_vehicles
 
-        # project
+
         self.project_data: Dict[str, Any] = {
             "mod_name":        "My Mod",
             "author_name":     "",
@@ -76,14 +74,14 @@ class StateManager:
         self.debug_mode:              bool = False
         self.output_icons:            Dict[str, Any] = {}
 
-        # Apply persisted theme on startup (before any window is shown).
+
         ThemeManager.instance().set_mode(self.theme_mode)
 
 
     def _load_theme_preference(self) -> str:
         print(f"[DEBUG] _load_theme_preference() called")
-        # app_settings is loaded from data/app_settings.json at import time,
-        # so reading it here gives the persisted value straight away.
+
+
         if self._settings_module is not None:
             return getattr(self._settings_module, "app_settings", {}).get(
                 "theme_mode", "dark"
@@ -103,7 +101,6 @@ class StateManager:
         return False
 
     def set_testing_mode(self, enabled: bool) -> None:
-        """Enable or disable developer testing mode and persist the preference."""
         print(f"[DEBUG] set_testing_mode() called: enabled={enabled}")
         self.testing_mode = enabled
         if self._settings_module is not None:
@@ -114,7 +111,7 @@ class StateManager:
                 print(f"[WARNING] Could not persist testing_mode: {e}")
         elif isinstance(self.app_settings, dict):
             self.app_settings["testing_mode"] = enabled
-        # Directly toggle the sidebar button — no full UI rebuild needed.
+
         from PySide6.QtWidgets import QApplication
         for top in QApplication.topLevelWidgets():
             if hasattr(top, "sidebar"):
@@ -124,23 +121,6 @@ class StateManager:
                     pass
 
     def set_theme(self, mode: str) -> None:
-        """
-        Switch the application theme.
-
-        Flow:
-          1. ``ThemeManager.set_mode()`` — mutates COLORS, re-applies app QSS,
-             patches every live widget's stylesheet via single-pass regex.
-          2. Persist the preference.
-          3. ``_refresh_all_ui()`` — rebuilds topbar/sidebar (they regenerate
-             their stylesheets from current COLORS) and calls refresh_ui() on
-             each tab (updates translated text + any remaining custom styles).
-
-        _refresh_all_ui is deferred via QTimer so that the current event
-        (e.g. a button click that triggered the theme switch) finishes
-        before sidebar.refresh_ui() tears down and deleteLater()s widgets.
-        Doing it synchronously risks accessing widgets scheduled for deletion
-        inside the same call stack as the originating click handler.
-        """
         print(f"[DEBUG] set_theme() called")
         if mode not in ("dark", "light"):
             raise ValueError(f"Unknown theme mode: {mode!r}")
@@ -154,10 +134,10 @@ class StateManager:
         print(f"[DEBUG] _save_theme_preference() called")
         if self._settings_module is not None:
             try:
-                # Write into the live dict so in-process reads are correct too.
+
                 self._settings_module.app_settings["theme_mode"] = mode
-                # save_settings() is the function that flushes to
-                # data/app_settings.json — NOT .save() (which doesn't exist).
+
+
                 self._settings_module.save_settings()
             except Exception as e:
                 print(f"[WARNING] Could not persist theme preference: {e}")
@@ -165,13 +145,10 @@ class StateManager:
             self.app_settings["theme_mode"] = mode
 
     def _refresh_all_ui(self) -> None:
-        """Rebuild chrome widgets and call refresh_ui() on all tabs."""
         from PySide6.QtWidgets import QApplication
         for top in QApplication.topLevelWidgets():
-            # Prefer the root window's own _refresh_all_tabs() so that
-            # sidebar._mod_entry / _author_entry are re-wired to the
-            # generator tab after the sidebar teardown-and-rebuild that
-            # sidebar.refresh_ui() performs.
+
+
             if hasattr(top, "_refresh_all_tabs"):
                 try:
                     top._refresh_all_tabs()
@@ -179,7 +156,7 @@ class StateManager:
                 except Exception as e:
                     print(f"[WARNING] _refresh_all_tabs delegation failed: {e}")
 
-            # Fallback path (e.g. during tests or alternative host windows).
+
             if hasattr(top, "tabs"):
                 for name, tab in top.tabs.items():
                     if hasattr(tab, "refresh_ui"):
@@ -197,7 +174,7 @@ class StateManager:
                     top.sidebar.refresh_ui(
                         getattr(top, "_add_vehicle_from_sidebar", None)
                     )
-                    # Re-wire new sidebar entry widgets to the generator tab.
+
                     gen = top.tabs.get("generator") if hasattr(top, "tabs") else None
                     if gen and hasattr(gen, "set_sidebar_references"):
                         gen.set_sidebar_references(
@@ -217,8 +194,8 @@ class StateManager:
 
     def reload_added_vehicles(self) -> bool:
         import json, os
-        # Resolve relative to this file rather than the process working
-        # directory, which varies depending on how the app is launched.
+
+
         _base = os.path.dirname(os.path.abspath(__file__))
         path  = os.path.join(_base, "vehicles", "added_vehicles.json")
         if not os.path.exists(path):

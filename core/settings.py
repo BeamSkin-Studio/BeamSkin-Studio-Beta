@@ -1,4 +1,3 @@
-"""Settings management"""
 import os
 import json
 
@@ -22,7 +21,6 @@ if os.path.exists(SETTINGS_FILE):
         pass
 
 def save_settings():
-    """Save app settings to file"""
     os.makedirs("data", exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(app_settings, f, indent=4)
@@ -43,12 +41,6 @@ with open(ADDED_VEHICLES_FILE, "r") as f:
         added_vehicles = {}
 
 def show_wip_warning(app=None, force=False):
-    """Show WIP warning on first launch using CustomTkinter
-
-    Args:
-        app: The main CTk app instance
-        force: If True, show the dialog even if not first launch (for testing)
-    """
     print(f"[DEBUG] show_wip_warning called with app={app}, force={force}")
     print(f"[DEBUG] first_launch setting: {app_settings.get('first_launch', True)}")
 
@@ -136,16 +128,6 @@ def show_wip_warning(app=None, force=False):
         print(f"[DEBUG] Skipping WIP warning (not first launch)")
 
 def set_beamng_paths(beamng_install: str = None, mods_folder: str = None):
-    """
-    Set BeamNG.drive installation and/or mods folder paths
-
-    Args:
-        beamng_install: Path to BeamNG.drive installation (optional)
-        mods_folder: Path to mods folder (optional)
-
-    Returns:
-        True if successful
-    """
     if beamng_install is not None:
         app_settings["beamng_install"] = beamng_install
         print(f"[DEBUG] BeamNG install path set to: {beamng_install}")
@@ -158,19 +140,15 @@ def set_beamng_paths(beamng_install: str = None, mods_folder: str = None):
     return True
 
 def get_beamng_install_path() -> str:
-    """Get the BeamNG.drive installation path"""
     return app_settings.get("beamng_install", "")
 
 def get_mods_folder_path() -> str:
-    """Get the BeamNG mods folder path"""
     return app_settings.get("mods_folder", "")
 
 def is_setup_complete() -> bool:
-    """Check if first-time setup has been completed"""
     return app_settings.get("setup_complete", False)
 
 def mark_setup_complete():
-    """Mark first-time setup as complete"""
     app_settings["setup_complete"] = True
     save_settings()
     print("[DEBUG] First-time setup marked as complete")

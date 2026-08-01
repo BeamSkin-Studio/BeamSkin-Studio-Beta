@@ -49,25 +49,16 @@ except ImportError:
 
 
 def _mods_start_dir() -> str:
-    """Return the configured mods folder if it exists, else an empty string."""
     p = _get_mods_folder_path()
     return p if p and os.path.isdir(p) else ""
 
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Duplicate-carid guard
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _carid_exists(carid: str) -> bool:
-    """Return True if carid is already taken — either as a built-in vehicle
-    or as a previously-added custom vehicle.  Used to block duplicates before
-    any file system work begins."""
-    # 1. Built-in vehicles shipped with BeamSkin Studio
-    builtin = state.vehicle_ids  # populated from core.config.VEHICLE_IDS
+
+    builtin = state.vehicle_ids
     if carid in builtin:
         return True
-    # 2. Custom vehicles the user has already imported
+
     if _BACKEND_OK:
         added = load_added_vehicles_json()
         if carid in added:
@@ -75,24 +66,11 @@ def _carid_exists(carid: str) -> bool:
     return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# UV-map copy helper (used by smart import)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _copy_uv_maps_to_images(carid: str, uv_map_paths: list) -> None:
-    """
-    Copy UV-layout images found during mod scanning into the vehicle's local
-    image folder (``gui/images/vehicles/{carid}/``) so that CarListTab can
-    offer a "Get UV Map" button for custom-added vehicles without requiring
-    BeamNG to be installed.
-
-    Files are only written if they do not already exist at the destination,
-    so repeated imports are safe.
-    """
     if not uv_map_paths:
         return
-    # add_vehicles.py lives at  gui/tabs/add_vehicles.py
-    # → two levels up is the gui/ package root
+
+
     _gui_dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dest_dir  = os.path.join(_gui_dir, "images", "vehicles", carid)
     os.makedirs(dest_dir, exist_ok=True)
@@ -105,10 +83,6 @@ def _copy_uv_maps_to_images(carid: str, uv_map_paths: list) -> None:
         except Exception as e:
             print(f"[WARNING] _copy_uv_maps_to_images: could not copy {src}: {e}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Small helpers / shared widgets
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _mk_action_btn(text: str, color_key: str = "accent") -> QPushButton:
     btn = QPushButton(text)
@@ -135,7 +109,6 @@ def _mk_action_btn(text: str, color_key: str = "accent") -> QPushButton:
 
 
 class _FilePicker(QWidget):
-    """Label + read-only entry + Browse button."""
 
     def __init__(self, label: str, placeholder: str = "", parent=None):
         super().__init__(parent)
@@ -192,7 +165,6 @@ class _FilePicker(QWidget):
 
 
 class _EntryField(QWidget):
-    """Label + editable QLineEdit."""
 
     def __init__(self, label: str, placeholder: str = "", parent=None):
         super().__init__(parent)
@@ -228,15 +200,7 @@ class _EntryField(QWidget):
     def clear(self):                      self.entry.clear()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Discovered vehicle row
-# ─────────────────────────────────────────────────────────────────────────────
-
 class _DiscoveredVehicleRow(QFrame):
-    """
-    One row inside the smart-import results list representing a discovered vehicle.
-    Shows: [checkbox] [carid badge] [editable display name] [file status] [warnings]
-    """
 
     def __init__(self, vehicle: DiscoveredVehicle, parent=None):
         super().__init__(parent)
@@ -254,7 +218,7 @@ class _DiscoveredVehicleRow(QFrame):
         row.setContentsMargins(10, 6, 10, 6)
         row.setSpacing(10)
 
-        # Checkbox
+
         self._chk = QCheckBox()
         self._chk.setChecked(vehicle.ready)
         self._chk.setEnabled(vehicle.ready)
@@ -272,7 +236,7 @@ class _DiscoveredVehicleRow(QFrame):
         """)
         row.addWidget(self._chk)
 
-        # carid badge
+
         carid_lbl = QLabel(vehicle.carid)
         carid_lbl.setFont(font(10, "bold"))
         carid_lbl.setStyleSheet(f"""
@@ -286,7 +250,7 @@ class _DiscoveredVehicleRow(QFrame):
         carid_lbl.setAlignment(Qt.AlignCenter)
         row.addWidget(carid_lbl)
 
-        # Display name (editable)
+
         self._name_edit = QLineEdit(vehicle.display_name)
         self._name_edit.setFont(font(12))
         self._name_edit.setFixedHeight(30)
@@ -301,7 +265,7 @@ class _DiscoveredVehicleRow(QFrame):
         """)
         row.addWidget(self._name_edit, 1)
 
-        # File status chips
+
         status_row = QHBoxLayout()
         status_row.setSpacing(4)
 
@@ -324,7 +288,7 @@ class _DiscoveredVehicleRow(QFrame):
         status_row.addWidget(_chip("IMG",   bool(vehicle.image_path)))
         row.addLayout(status_row)
 
-        # Warning icon if not ready
+
         if not vehicle.ready:
             warn_lbl = QLabel("⚠")
             warn_lbl.setFont(font(14))
@@ -342,7 +306,6 @@ class _DiscoveredVehicleRow(QFrame):
 
 
 class _DiscoveredVariantRow(QFrame):
-    """One row for a discovered body variant."""
 
     def __init__(self, variant: DiscoveredVariant, parent=None):
         super().__init__(parent)
@@ -377,7 +340,7 @@ class _DiscoveredVariantRow(QFrame):
         """)
         row.addWidget(self._chk)
 
-        # "carid + suffix" badge
+
         badge_lbl = QLabel(f"{variant.carid}  +  {variant.suffix}")
         badge_lbl.setFont(font(10, "bold"))
         badge_lbl.setStyleSheet(f"""
@@ -391,7 +354,7 @@ class _DiscoveredVariantRow(QFrame):
         badge_lbl.setAlignment(Qt.AlignCenter)
         row.addWidget(badge_lbl)
 
-        # Display name (editable)
+
         self._name_edit = QLineEdit(variant.display_name)
         self._name_edit.setFont(font(12))
         self._name_edit.setFixedHeight(30)
@@ -406,7 +369,7 @@ class _DiscoveredVariantRow(QFrame):
         """)
         row.addWidget(self._name_edit, 1)
 
-        # Folder preview
+
         folder_lbl = QLabel(f"SKINNAME_{variant.suffix}/")
         folder_lbl.setFont(font(10))
         folder_lbl.setStyleSheet(
@@ -414,7 +377,7 @@ class _DiscoveredVariantRow(QFrame):
         )
         row.addWidget(folder_lbl)
 
-        # File status
+
         def _chip(text: str, ok: bool) -> QLabel:
             lbl = QLabel(text)
             lbl.setFont(font(10, "bold"))
@@ -447,19 +410,10 @@ class _DiscoveredVariantRow(QFrame):
         return self._name_edit.text().strip() or self.variant.display_name
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Smart Import Card  (shared base logic for vehicles + variants)
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Background scan worker
-# ─────────────────────────────────────────────────────────────────────────────
-
 class _ScanWorker(QThread):
-    """Runs scan_mod on a background thread so the UI stays responsive."""
 
-    finished = Signal(list, list, object)   # vehicles, variants, temp_dir
-    failed   = Signal(str, str)             # error message, path
+    finished = Signal(list, list, object)
+    failed   = Signal(str, str)
 
     def __init__(self, path: str, known_carids, parent=None):
         super().__init__(parent)
@@ -474,22 +428,13 @@ class _ScanWorker(QThread):
             self.failed.emit(str(e), self._path)
 
 
-
 class _ImportWorker(QThread):
-    """
-    Runs process_custom_vehicle / process_custom_variant for each checked row
-    on a background thread so the UI stays responsive during bulk imports.
-    """
 
-    # (row_index, ok)
+
     item_done    = Signal(int, bool)
-    all_finished = Signal(int, int)   # added, skipped
+    all_finished = Signal(int, int)
 
     def __init__(self, tasks: list, mode: str, parent=None):
-        """
-        tasks : list of (row_index, item, display_name) tuples
-        mode  : "vehicles" or "variants"
-        """
         super().__init__(parent)
         self._tasks = tasks
         self._mode  = mode
@@ -542,29 +487,21 @@ class _ImportWorker(QThread):
 
 
 class _SmartImportCard(QFrame):
-    """
-    Card with two browse buttons (Folder / ZIP), a scan status label, and a
-    scrollable list of discovered items.  Sub-classed for Vehicles and Variants.
-    """
 
-    # Signal emitted after a successful add; used to refresh the parent list.
+
     items_added = Signal()
 
     def __init__(self, notify_fn, mode: str = "vehicles", parent=None):
-        """
-        mode : "vehicles"  → scans for new vehicles
-               "variants"  → scans for variants of existing vehicles
-        """
         super().__init__(parent)
         self._notify    = notify_fn
-        self._mode      = mode          # "vehicles" or "variants"
-        self._temp_dirs: List[str] = []  # one entry per scanned source
-        self._rows:      list = []       # _DiscoveredVehicleRow | _DiscoveredVariantRow
+        self._mode      = mode
+        self._temp_dirs: List[str] = []
+        self._rows:      list = []
         self._worker:    Optional[_ScanWorker] = None
-        self._pending_paths: List[str] = []   # queue for sequential multi-scan
+        self._pending_paths: List[str] = []
         self._import_worker: Optional[_ImportWorker] = None
 
-        # Animated dots timer for the "Scanning…" label
+
         self._dot_timer = QTimer(self)
         self._dot_timer.setInterval(400)
         self._dot_timer.timeout.connect(self._tick_dots)
@@ -583,7 +520,7 @@ class _SmartImportCard(QFrame):
         root.setContentsMargins(20, 18, 20, 18)
         root.setSpacing(12)
 
-        # ── Header ──────────────────────────────────────────────────────────
+
         title_text = (
             t("add_vehicles.smart_import_title_vehicles", default="🔍  Auto-Import Vehicles from Mod")
             if mode == "vehicles"
@@ -607,7 +544,7 @@ class _SmartImportCard(QFrame):
         self._sub_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
         root.addWidget(self._sub_lbl)
 
-        # ── Browse buttons ───────────────────────────────────────────────────
+
         browse_row = QHBoxLayout()
         browse_row.setSpacing(8)
 
@@ -624,8 +561,7 @@ class _SmartImportCard(QFrame):
         browse_row.addStretch()
         root.addLayout(browse_row)
 
-        # ── Scan progress panel ───────────────────────────────────────────────
-        # Active scan row: "🔍 Scanning filename.zip..."
+
         self._active_scan_frame = QFrame()
         self._active_scan_frame.setStyleSheet(
             f"background:{COLORS['frame_bg']};border:none;border-radius:8px;"
@@ -649,29 +585,29 @@ class _SmartImportCard(QFrame):
         active_row.addWidget(self._active_scan_dots)
         root.addWidget(self._active_scan_frame)
 
-        # Queue list: file status rows (shown for any scan, single or multi)
+
         self._queue_frame = QFrame()
         self._queue_frame.setStyleSheet("background:transparent;border:none;")
         _queue_outer = QVBoxLayout(self._queue_frame)
         _queue_outer.setContentsMargins(0, 0, 0, 0)
         _queue_outer.setSpacing(4)
 
-        # No inner scroll — the outer _VehiclesTab QScrollArea handles overflow.
+
         _queue_inner = QWidget()
         _queue_inner.setStyleSheet("background:transparent;")
         self._queue_col = QVBoxLayout(_queue_inner)
         self._queue_col.setContentsMargins(0, 2, 0, 2)
         self._queue_col.setSpacing(4)
-        self._queue_col.addStretch()      # keeps rows pinned to the top
+        self._queue_col.addStretch()
         _queue_outer.addWidget(_queue_inner)
 
         self._queue_frame.setVisible(False)
         root.addWidget(self._queue_frame)
-        # Dict: path → QFrame row widget (so we can update chips)
+
         self._queue_rows: dict = {}
         self._queue_hdr: Optional[QLabel] = None
 
-        # Summary / result status label
+
         self._status_lbl = QLabel("")
         self._status_lbl.setFont(font(11))
         self._status_lbl.setWordWrap(True)
@@ -679,8 +615,7 @@ class _SmartImportCard(QFrame):
         self._status_lbl.setVisible(False)
         root.addWidget(self._status_lbl)
 
-        # ── Discovered list ──────────────────────────────────────────────────
-        # No inner scroll — the outer _VehiclesTab QScrollArea handles overflow.
+
         self._list_frame = QFrame()
         self._list_frame.setStyleSheet("background:transparent;")
         self._list_col   = QVBoxLayout(self._list_frame)
@@ -689,7 +624,7 @@ class _SmartImportCard(QFrame):
         self._list_frame.setVisible(False)
         root.addWidget(self._list_frame)
 
-        # ── Bottom actions ───────────────────────────────────────────────────
+
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
 
@@ -709,11 +644,10 @@ class _SmartImportCard(QFrame):
 
         root.addLayout(btn_row)
 
-    # ── Browse ───────────────────────────────────────────────────────────────
 
     def _browse_folder(self):
-        # Use the native dialog (most reliable on Windows).
-        # Native dialogs only support single-folder selection, which is fine.
+
+
         path = QFileDialog.getExistingDirectory(
             self,
             t("add_vehicles.browse_folder_dialog", default="Select Mod Folder"),
@@ -732,10 +666,8 @@ class _SmartImportCard(QFrame):
         if paths:
             self._queue_scans(paths)
 
-    # ── Queue panel helpers ───────────────────────────────────────────────────
 
     def _make_queue_row(self, path: str, status: str = "queued") -> QFrame:
-        """Build one row in the queue panel for a given source path."""
         frame = QFrame()
         frame.setStyleSheet(
             f"background:{COLORS['frame_bg']};border:none;border-radius:7px;"
@@ -763,7 +695,6 @@ class _SmartImportCard(QFrame):
         return frame
 
     def _set_queue_chip(self, frame: QFrame, status: str):
-        """Update the status chip on a queue row."""
         chip = frame._chip  # type: ignore[attr-defined]
         if status == "queued":
             chip.setText("queued")
@@ -800,8 +731,7 @@ class _SmartImportCard(QFrame):
             )
 
     def _build_queue_panel(self, paths: List[str]):
-        """Populate the queue panel for a fresh batch of paths."""
-        # Clear old rows
+
         for w in list(self._queue_rows.values()):
             w.setParent(None)
             w.deleteLater()
@@ -811,8 +741,7 @@ class _SmartImportCard(QFrame):
             self._queue_frame.setVisible(False)
             return
 
-        # Header label — lives above the inner layout in the outer frame.
-        # Remove any stale header from a previous batch before inserting a fresh one.
+
         if self._queue_hdr is not None:
             self._queue_hdr.setParent(None)
             self._queue_hdr.deleteLater()
@@ -824,24 +753,21 @@ class _SmartImportCard(QFrame):
 
         for p in paths:
             row = self._make_queue_row(p, "queued")
-            # Insert before the trailing stretch so rows stay pinned to the top
+
             self._queue_col.insertWidget(self._queue_col.count() - 1, row)
             self._queue_rows[p] = row
 
         self._queue_frame.setVisible(True)
 
-    # ── Scan ─────────────────────────────────────────────────────────────────
 
     def _queue_scans(self, paths: List[str]):
-        """Enqueue one or more paths, build the queue panel, and kick off first scan."""
-        # Clear any previous results/state before a fresh batch
+
         self._clear_results()
         self._pending_paths = list(paths)
         self._build_queue_panel(paths)
         self._run_next_scan()
 
     def _run_next_scan(self):
-        """Pop the next path from the queue and scan it, or stop if empty."""
         if not self._pending_paths:
             return
         path = self._pending_paths.pop(0)
@@ -856,7 +782,7 @@ class _SmartImportCard(QFrame):
             self._worker.quit()
             self._worker.wait(500)
 
-        # ── Known carids for variant detection ───────────────────────────────
+
         known: Optional[set] = None
         if self._mode == "variants":
             try:
@@ -867,31 +793,30 @@ class _SmartImportCard(QFrame):
             except Exception:
                 known = set()
 
-        # ── Active scan panel ─────────────────────────────────────────────────
+
         name = os.path.basename(path)
         self._active_scan_name.setText(f"Scanning  {name}")
         self._active_scan_dots.setText("")
         self._active_scan_frame.setVisible(True)
         self._set_scanning(True)
 
-        # Mark this path as "scanning" in the queue panel
+
         if path in self._queue_rows:
             self._set_queue_chip(self._queue_rows[path], "scanning")
 
-        # ── Launch background worker ──────────────────────────────────────────
+
         self._worker = _ScanWorker(path, known, parent=self)
         self._worker.finished.connect(
             lambda veh, var, tmp, p=path: self._on_scan_finished(veh, var, tmp, p)
         )
         self._worker.failed.connect(lambda err, pth, p=path: self._on_scan_failed(err, p))
-        # Auto-cleanup: disconnect signals and schedule deletion once the
-        # thread finishes so no stale connections fire on reuse.
+
+
         self._worker.finished.connect(self._worker.deleteLater)
         self._worker.failed.connect(self._worker.deleteLater)
         self._worker.start()
 
     def _set_scanning(self, active: bool):
-        """Enable/disable browse buttons and drive the animated dots."""
         self._btn_folder.setEnabled(not active)
         self._btn_zip.setEnabled(not active)
         if active:
@@ -915,11 +840,11 @@ class _SmartImportCard(QFrame):
         mod_label = os.path.basename(path)
         found     = len(items)
 
-        # Mark finished row as "done" in the queue panel (keep it visible)
+
         if path in self._queue_rows:
             self._set_queue_chip(self._queue_rows[path], "done")
 
-        # Update active scan label to show result before hiding/moving on
+
         if found:
             self._active_scan_name.setText(
                 f"✓  {mod_label}  —  {found} item(s) found"
@@ -940,9 +865,7 @@ class _SmartImportCard(QFrame):
             self._run_next_scan()
             return
 
-        # ── Filter out already-existing vehicles ──────────────────────────────
-        # Skip any item whose carid already exists as a built-in or
-        # previously-imported vehicle so duplicates never appear in the list.
+
         new_items: list = []
         skipped_existing: int = 0
         for item in items:
@@ -953,7 +876,7 @@ class _SmartImportCard(QFrame):
                 new_items.append(item)
 
         if skipped_existing and not new_items:
-            # Everything was filtered — silently move on
+
             print(f"[add_vehicles] All vehicles in \"{mod_label}\" already exist, skipping.")
             if not self._pending_paths:
                 self._active_scan_frame.setVisible(False)
@@ -961,7 +884,7 @@ class _SmartImportCard(QFrame):
             self._run_next_scan()
             return
 
-        # ── Append rows ───────────────────────────────────────────────────────
+
         for item in new_items:
             if self._mode == "vehicles":
                 row = _DiscoveredVehicleRow(item, self._list_frame)
@@ -974,7 +897,7 @@ class _SmartImportCard(QFrame):
         total = len(self._rows)
         ready = sum(1 for r in self._rows if self._row_item(r).ready)
 
-        # Hide active scan and queue panels once the whole queue is exhausted
+
         if not self._pending_paths:
             self._active_scan_frame.setVisible(False)
             self._queue_frame.setVisible(False)
@@ -1007,17 +930,13 @@ class _SmartImportCard(QFrame):
             self._active_scan_frame.setVisible(False)
         self._run_next_scan()
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
 
     @staticmethod
     def _row_item(row):
-        """Return the DiscoveredVehicle or DiscoveredVariant attached to a row."""
         return row.vehicle if hasattr(row, "vehicle") else row.variant
 
-    # ── Actions ──────────────────────────────────────────────────────────────
 
     def _select_all(self):
-        """Toggle between Select All and Deselect All."""
         ready_rows = [r for r in self._rows if self._row_item(r).ready]
         all_checked = all(r.is_checked for r in ready_rows)
         for row in ready_rows:
@@ -1037,13 +956,13 @@ class _SmartImportCard(QFrame):
             self._notify(t("add_vehicles.no_items_selected", default="No items selected."), "warning")
             return
 
-        # Build task list: (original row index, item, display_name)
+
         tasks = [
             (self._rows.index(r), self._row_item(r), r.display_name)
             for r in checked
         ]
 
-        # Lock UI during import
+
         self._add_btn.setEnabled(False)
         self._add_btn.setText(
             t("add_vehicles.importing_btn", count=len(tasks),
@@ -1060,15 +979,13 @@ class _SmartImportCard(QFrame):
         self._import_worker.start()
 
     def _on_item_imported(self, row_index: int, ok: bool):
-        """Called on the main thread after each item finishes importing."""
         if ok and row_index < len(self._rows):
             row = self._rows[row_index]
-            # Grey the row out visually so it's clear it's done
+
             row.setEnabled(False)
             row.setStyleSheet(row.styleSheet() + " opacity: 0.4;")
 
     def _on_import_finished(self, added: int, skipped: int):
-        """Called on the main thread once all items have been processed."""
         self._btn_folder.setEnabled(True)
         self._btn_zip.setEnabled(True)
 
@@ -1099,18 +1016,18 @@ class _SmartImportCard(QFrame):
         self._select_all_btn.setVisible(False)
         self._status_lbl.setVisible(False)
         self._active_scan_frame.setVisible(False)
-        # Tear down queue panel rows
+
         for w in list(self._queue_rows.values()):
             w.setParent(None)
             w.deleteLater()
         self._queue_rows.clear()
-        # Remove the header label from the outer frame layout
+
         if self._queue_hdr is not None:
             self._queue_hdr.setParent(None)
             self._queue_hdr.deleteLater()
             self._queue_hdr = None
-        # Remove row widgets from the inner layout.
-        # Count-1 keeps the trailing stretch in place so the layout stays valid.
+
+
         while self._queue_col.count() > 1:
             item = self._queue_col.takeAt(0)
             if item and item.widget():
@@ -1131,10 +1048,8 @@ class _SmartImportCard(QFrame):
     def __del__(self):
         self._cleanup_temp()
 
-    # ── Translations ─────────────────────────────────────────────────────────
 
     def retranslate_ui(self):
-        """Update all translatable strings without rebuilding the widget tree."""
         if self._mode == "vehicles":
             self._title_lbl.setText(
                 t("add_vehicles.smart_import_title_vehicles",
@@ -1156,20 +1071,15 @@ class _SmartImportCard(QFrame):
         self._btn_folder.setText(t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"))
         self._btn_zip.setText(t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"))
         self._select_all_btn.setText(t("add_vehicles.select_all_btn", default="Select All"))
-        # Only retranslate the "Add Checked" button if it doesn't show a
-        # live count (i.e. no scan results are currently displayed).
+
+
         if not self._rows:
             self._add_btn.setText(t("add_vehicles.add_checked_btn", default="Add Checked"))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Existing-vehicle list cards
-# ─────────────────────────────────────────────────────────────────────────────
-
 class _VehicleListCard(QFrame):
-    """A row showing a custom vehicle with a Delete button."""
 
-    delete_requested = Signal(str)   # carid
+    delete_requested = Signal(str)
 
     def __init__(self, carid: str, carname: str, parent=None):
         super().__init__(parent)
@@ -1208,9 +1118,8 @@ class _VehicleListCard(QFrame):
 
 
 class _VariantListCard(QFrame):
-    """A row showing a custom variant with a Delete button."""
 
-    delete_requested = Signal(str, str)   # carid, suffix
+    delete_requested = Signal(str, str)
 
     def __init__(self, carid: str, suffix: str, parent=None):
         super().__init__(parent)
@@ -1257,17 +1166,11 @@ class _VariantListCard(QFrame):
         self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Manual entry section (collapsible)
-# ─────────────────────────────────────────────────────────────────────────────
-
 class _ManualEntryCard(QFrame):
-    """Collapsible card wrapping the original manual file-picker form."""
 
-    submitted = Signal(str, str, str, str, str)   # carid, carname, json, jbeam, img
+    submitted = Signal(str, str, str, str, str)
 
     def __init__(self, mode: str = "vehicle", parent=None):
-        """mode : "vehicle" or "variant" """
         super().__init__(parent)
         self._mode     = mode
         self._expanded = False
@@ -1285,7 +1188,7 @@ class _ManualEntryCard(QFrame):
         self._root_col.setContentsMargins(20, 14, 20, 14)
         self._root_col.setSpacing(10)
 
-        # ── Toggle header ────────────────────────────────────────────────────
+
         toggle_row = QHBoxLayout()
         _plain_label = (
             t("add_vehicles.manual_entry_text", default="Manual Entry")
@@ -1316,7 +1219,7 @@ class _ManualEntryCard(QFrame):
         toggle_row.addWidget(self._toggle_btn)
         self._root_col.addLayout(toggle_row)
 
-        # ── Collapsible body ─────────────────────────────────────────────────
+
         self._body = QWidget()
         self._body.setStyleSheet("background:transparent;")
         body_col = QVBoxLayout(self._body)
@@ -1351,7 +1254,7 @@ class _ManualEntryCard(QFrame):
             id_row.addWidget(self._suffix_field)
             body_col.addLayout(id_row)
 
-            # Live preview
+
             self._preview_lbl = QLabel("")
             self._preview_lbl.setFont(font(11))
             self._preview_lbl.setStyleSheet(
@@ -1386,7 +1289,7 @@ class _ManualEntryCard(QFrame):
         body_col.addWidget(self._jbeam_picker)
         body_col.addWidget(self._img_picker)
 
-        # UV map picker — vehicle mode only (variants share the parent vehicle's UV map)
+
         if mode == "vehicle":
             self._uv_picker = _FilePicker(
                 t("add_vehicles.uv_map_label", default="UV Map (optional)"),
@@ -1414,7 +1317,6 @@ class _ManualEntryCard(QFrame):
 
         self._root_col.addWidget(self._body)
 
-    # ── Collapse / Expand ────────────────────────────────────────────────────
 
     def _toggle(self):
         self._expanded = not self._expanded
@@ -1431,7 +1333,6 @@ class _ManualEntryCard(QFrame):
         )
         self._toggle_lbl.setText(f"{sym}  {plain}")
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _browse_file(self, picker: _FilePicker, file_filter: str):
         path, _ = QFileDialog.getOpenFileName(
@@ -1478,7 +1379,7 @@ class _ManualEntryCard(QFrame):
             self._uv_picker.clear()
 
     def retranslate_ui(self):
-        # Re-translate the toggle header and expand/collapse button.
+
         sym = "－" if self._expanded else "＋"
         plain = (
             t("add_vehicles.manual_entry_text", default="Manual Entry")
@@ -1516,10 +1417,6 @@ class _ManualEntryCard(QFrame):
             self._add_btn.setText(t("add_vehicles.variants_add_btn", default="Add Variant"))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Vehicles sub-tab
-# ─────────────────────────────────────────────────────────────────────────────
-
 class _VehiclesTab(QWidget):
     vehicle_added   = Signal()
     vehicle_deleted = Signal()
@@ -1541,17 +1438,17 @@ class _VehiclesTab(QWidget):
         col.setContentsMargins(20, 20, 20, 20)
         col.setSpacing(16)
 
-        # ── Smart import card ────────────────────────────────────────────────
+
         self._smart_card = _SmartImportCard(notify_fn, mode="vehicles", parent=inner)
         self._smart_card.items_added.connect(self._on_items_added)
         col.addWidget(self._smart_card)
 
-        # ── Manual entry card (collapsible) ──────────────────────────────────
+
         self._manual_card = _ManualEntryCard(mode="vehicle", parent=inner)
         self._manual_card.submitted.connect(self._on_manual_submit)
         col.addWidget(self._manual_card)
 
-        # ── Added vehicles list ──────────────────────────────────────────────
+
         self._list_hdr = QLabel(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
         self._list_hdr.setFont(font(14, "bold"))
         self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
@@ -1579,7 +1476,6 @@ class _VehiclesTab(QWidget):
 
         self._reload_list()
 
-    # ── Handlers ─────────────────────────────────────────────────────────────
 
     def _on_items_added(self):
         self._reload_list()
@@ -1627,8 +1523,8 @@ class _VehiclesTab(QWidget):
                   carname=carname, default=f"Added '{carname}' successfully."),
                 "success",
             )
-            # Copy any manually-selected UV map so CarListTab can show
-            # the "Get UV Map" button for this vehicle without BeamNG installed.
+
+
             uv_path = self._manual_card._uv_picker.path() if self._manual_card._uv_picker else ""
             if uv_path:
                 _copy_uv_maps_to_images(carid, [uv_path])
@@ -1676,7 +1572,6 @@ class _VehiclesTab(QWidget):
             self._cards.append(card)
             fade_in(card, 150)
 
-    # ── Translations ──────────────────────────────────────────────────────────
 
     def retranslate_ui(self):
         self._list_hdr.setText(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
@@ -1690,10 +1585,6 @@ class _VehiclesTab(QWidget):
         self.retranslate_ui()
         self._reload_list()
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Variants sub-tab
-# ─────────────────────────────────────────────────────────────────────────────
 
 class _VariantsTab(QWidget):
     variant_added   = Signal()
@@ -1716,7 +1607,7 @@ class _VariantsTab(QWidget):
         col.setContentsMargins(20, 20, 20, 20)
         col.setSpacing(16)
 
-        # ── Info banner ───────────────────────────────────────────────────────
+
         self._info_lbl = QLabel(t("add_vehicles.variants_info_banner",
                                    default="Variants add extra body types to an existing vehicle."))
         self._info_lbl.setWordWrap(True)
@@ -1730,17 +1621,17 @@ class _VariantsTab(QWidget):
         """)
         col.addWidget(self._info_lbl)
 
-        # ── Smart import card ─────────────────────────────────────────────────
+
         self._smart_card = _SmartImportCard(notify_fn, mode="variants", parent=inner)
         self._smart_card.items_added.connect(self._on_items_added)
         col.addWidget(self._smart_card)
 
-        # ── Manual entry card (collapsible) ───────────────────────────────────
+
         self._manual_card = _ManualEntryCard(mode="variant", parent=inner)
         self._manual_card.submitted.connect(self._on_manual_submit)
         col.addWidget(self._manual_card)
 
-        # ── Added variants list ───────────────────────────────────────────────
+
         self._list_hdr = QLabel(t("add_vehicles.variants_added_header", default="Added Variants"))
         self._list_hdr.setFont(font(14, "bold"))
         self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
@@ -1768,7 +1659,6 @@ class _VariantsTab(QWidget):
 
         self._reload_list()
 
-    # ── Handlers ──────────────────────────────────────────────────────────────
 
     def _on_items_added(self):
         self._reload_list()
@@ -1865,7 +1755,6 @@ class _VariantsTab(QWidget):
             self._cards.append(card)
             fade_in(card, 150)
 
-    # ── Translations ──────────────────────────────────────────────────────────
 
     def retranslate_ui(self):
         self._info_lbl.setText(t("add_vehicles.variants_info_banner",
@@ -1882,12 +1771,7 @@ class _VariantsTab(QWidget):
         self._reload_list()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Public tab
-# ─────────────────────────────────────────────────────────────────────────────
-
 def load_added_vehicles_at_startup():
-    """Called from main.py to warm up the added vehicles list."""
     try:
         if _BACKEND_OK:
             load_added_vehicles_json()
@@ -1896,10 +1780,6 @@ def load_added_vehicles_at_startup():
 
 
 class AddVehiclesTab(QWidget):
-    """
-    Public tab shown in the main navigation.
-    Contains two sub-tabs: Vehicles and Variants.
-    """
 
     def __init__(
         self,
@@ -1918,7 +1798,7 @@ class AddVehiclesTab(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ── Page header ───────────────────────────────────────────────────────
+
         hdr_frame = QFrame()
         hdr_frame.setStyleSheet(f"background:{COLORS['frame_bg']};border:none;")
         hdr_frame.setFixedHeight(60)
@@ -1932,7 +1812,7 @@ class AddVehiclesTab(QWidget):
         hdr_row.addStretch()
         root.addWidget(hdr_frame)
 
-        # ── Tab widget ────────────────────────────────────────────────────────
+
         self._tabs = QTabWidget()
         self._tabs.setStyleSheet(f"""
             QTabWidget::pane {{

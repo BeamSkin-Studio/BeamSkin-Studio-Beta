@@ -1,4 +1,3 @@
-"""Debug utilities — PySide6 edition"""
 import sys
 import io
 from datetime import datetime
@@ -16,32 +15,25 @@ _debug_window: "QDialog | None" = None
 _debug_textbox: "QTextEdit | None" = None
 
 
-# ── stdout redirect ─────────────────────────────────────────────────────────
-
 class DebugOutput(io.StringIO):
-    """
-    Custom stdout that echoes to the real terminal AND posts each write to the
-    debug console via QTimer.singleShot so it is always delivered on the main
-    thread, regardless of which thread calls print().
-    """
 
     def __init__(self):
         super().__init__()
-        # Keep a direct reference to the real terminal so we can always write
-        # even after sys.stdout has been replaced.
+
+
         self._terminal = sys.__stdout__
 
     def write(self, message: str) -> int:
-        # Always echo to the real terminal first.
+
         if self._terminal is not None:
             try:
                 self._terminal.write(message)
             except Exception:
                 pass
 
-        # Forward to the GUI on the main thread.
+
         if debug_mode_enabled and _debug_textbox is not None:
-            # Capture the value now; the lambda must not close over a mutable.
+
             _msg = message
             QTimer.singleShot(0, lambda m=_msg: _append_debug_text(m))
 
@@ -52,14 +44,13 @@ class DebugOutput(io.StringIO):
             self._terminal.flush()
 
 
-_COLOR_NORMAL = QColor("#FF8C00")   # orange — all regular debug output
-_COLOR_ERROR  = QColor("#FF3333")   # red   — lines that contain error/warning markers
+_COLOR_NORMAL = QColor("#FF8C00")
+_COLOR_ERROR  = QColor("#FF3333")
 
 _ERROR_MARKERS = ("[ERROR]", "[WARN]", "[WARNING]", "ERROR", "CRITICAL", "Traceback")
 
 
 def _append_debug_text(message: str) -> None:
-    """Appends coloured text to the debug textbox. MUST be called from the main thread."""
     global _debug_textbox
     if _debug_textbox is None:
         return
@@ -80,13 +71,10 @@ def _append_debug_text(message: str) -> None:
         pass
 
 
-# ── window ───────────────────────────────────────────────────────────────────
-
 def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
-    """Create (or raise) the debug console window using PySide6."""
     global _debug_window, _debug_textbox, debug_mode_enabled
 
-    # If already open, just bring it to the front.
+
     if _debug_window is not None and _debug_window.isVisible():
         _debug_window.raise_()
         _debug_window.activateWindow()
@@ -94,11 +82,11 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
 
     debug_mode_enabled = True
 
-    # ── window ──
+
     win = QDialog(parent)
     win.setWindowTitle("Debug Console")
     win.resize(800, 600)
-    # Allow the dialog to be maximised / minimised like a normal window.
+
     win.setWindowFlags(
         win.windowFlags()
         | Qt.WindowMaximizeButtonHint
@@ -113,7 +101,7 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     col.setContentsMargins(10, 10, 10, 10)
     col.setSpacing(6)
 
-    # ── header bar ──
+
     header = QFrame()
     header.setStyleSheet(
         f"QFrame {{"
@@ -164,9 +152,7 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
 
     col.addWidget(header)
 
-    # ── text area ──
-    # Always use a dark terminal background regardless of the app theme —
-    # orange-on-white in light mode is nearly unreadable.
+
     textbox = QTextEdit()
     textbox.setReadOnly(True)
     textbox.setFont(QFont("Consolas", 10))
@@ -181,13 +167,13 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     col.addWidget(textbox)
     _debug_textbox = textbox
 
-    # ── close handler ──
+
     def _on_close():
         global debug_mode_enabled, _debug_window, _debug_textbox
         debug_mode_enabled = False
         _debug_window = None
         _debug_textbox = None
-        # Restore the real stdout if we replaced it.
+
         if isinstance(sys.stdout, DebugOutput):
             sys.stdout = sys.__stdout__
         if on_close_callback and callable(on_close_callback):
@@ -200,18 +186,15 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     print("[DEBUG] Debug console opened")
 
 
-# ── public toggle ─────────────────────────────────────────────────────────────
-
 def toggle_debug_mode(app, colors: dict, on_close=None) -> None:
-    """Toggle the debug console on or off."""
     global debug_mode_enabled, _debug_window
 
     if debug_mode_enabled:
-        # Close if it's open.
+
         if _debug_window is not None and _debug_window.isVisible():
-            _debug_window.close()   # triggers finished → _on_close
+            _debug_window.close()
         else:
-            # Window was already gone; clean up state manually.
+
             debug_mode_enabled = False
             if isinstance(sys.stdout, DebugOutput):
                 sys.stdout = sys.__stdout__
@@ -219,17 +202,11 @@ def toggle_debug_mode(app, colors: dict, on_close=None) -> None:
                 on_close()
     else:
         create_debug_window(app, colors, on_close_callback=on_close)
-        # Redirect stdout only if not already redirected.
+
         if not isinstance(sys.stdout, DebugOutput):
             sys.stdout = DebugOutput()
         print("[DEBUG] Debug console activated — output redirection enabled")
 
 
-# ── scroll helper (kept for compatibility) ────────────────────────────────────
-
 def setup_universal_scroll_handler(app) -> None:
-    """
-    No-op in the PySide6 build — QScrollArea handles wheel events natively.
-    Kept so any call sites that import this function don't break.
-    """
     pass

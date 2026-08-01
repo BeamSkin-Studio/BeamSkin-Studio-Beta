@@ -87,14 +87,7 @@ def _get_current_locale_path() -> Optional[str]:
     return None
 
 
-#  ABOUT TAB
-
 class AboutTab(QWidget):
-    """
-    About tab showing logo, credits, translators, and donation options.
-
-    FIX — blank on return: the widget tree is built once and persisted.
-    """
 
     def __init__(self, parent: QWidget):
         print(f"[DEBUG] __init__() called")
@@ -103,7 +96,7 @@ class AboutTab(QWidget):
         self.setStyleSheet(f"background:{COLORS['app_bg']};")
 
         self._payment_overlay: Optional[QWidget] = None
-        self._logo_lbl:        Optional[QLabel] = None   # kept for theme-switch updates
+        self._logo_lbl:        Optional[QLabel] = None
         self._translators_lbl: Optional[QLabel] = None
         self._version_lbl:     Optional[QLabel] = None
         self._credits_lbl:     Optional[QLabel] = None
@@ -213,7 +206,7 @@ class AboutTab(QWidget):
             }
             QPushButton:hover { background: #4752C4; }
         """)
-        # Discord icon sits inside the button to the left of the text
+
         discord_icon = QLabel("", self._discord_btn)
         discord_icon.setPixmap(self._load_discord_icon())
         discord_icon.setFixedSize(24, 24)
@@ -241,8 +234,8 @@ class AboutTab(QWidget):
         suffix   = "White" if state.theme_mode == "dark" else "Black"
         path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
         if os.path.exists(path):
-            # Logo is 2:1 (width × height). Scale to a 400×200 bounding box so
-            # the rendered pixmap is 400×200 rather than the old undersized 200×100.
+
+
             return QPixmap(path).scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         return None
 
@@ -299,7 +292,7 @@ class AboutTab(QWidget):
         overlay.show()
         self._payment_overlay = overlay
 
-        # Center dialog
+
         dialog = QFrame(overlay)
         dialog.setStyleSheet(f"""
             QFrame {{
@@ -352,7 +345,7 @@ class AboutTab(QWidget):
             (overlay.height() - dialog.height()) // 2,
         )
 
-        # close when clicking the dim overlay (but not the dialog)
+
         def _maybe_close(event):
             if not dialog.geometry().contains(event.pos()):
                 self._close_payment_options()
@@ -371,11 +364,10 @@ class AboutTab(QWidget):
             self._payment_overlay.setGeometry(self.rect())
 
     def _load_discord_icon(self) -> QPixmap:
-        """Return the Discord logo from the Icons folder."""
         path = os.path.join("gui", "Icons", "discord_logo_white.png")
         if os.path.exists(path):
             return QPixmap(path).scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        return QPixmap()  # empty fallback — no icon rather than a fake 'D'
+        return QPixmap()
 
     def _open_discord(self):
         webbrowser.open("https://discord.gg/mbr3YxZzrr")
@@ -394,7 +386,6 @@ class AboutTab(QWidget):
 
 
     def refresh_ui(self):
-        """Update translatable strings without rebuilding the widget tree."""
         print(f"[DEBUG] _load_discord_icon() called")
         if self._logo_lbl is not None:
             new_px = self._load_logo_pixmap()

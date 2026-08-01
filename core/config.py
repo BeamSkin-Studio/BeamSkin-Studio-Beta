@@ -1,4 +1,4 @@
-# config.py
+
 
 VEHICLE_IDS = {
     "autobello": "Autobello Piccolina",
@@ -43,3 +43,34 @@ VEHICLE_IDS = {
     "wigeon": "Ibishu Wigeon",
     "wl40": "Hirochi WL-40"
 }
+
+
+SINGLE_LAYER_VARIANTS = {
+    "vivace:ardente": True,
+}
+
+
+def is_single_layer_variant(carid: str, variant_suffix: str) -> bool:
+    if not variant_suffix:
+        return True
+    key = f"{carid.lower()}:{variant_suffix.strip().lower()}"
+    return SINGLE_LAYER_VARIANTS.get(key, False)
+
+
+REBADGE_VEHICLES = {
+    "vivace:ardente": "Cherrier Ardente",
+}
+
+
+def get_rebadges_for(base_carid: str) -> dict:
+    prefix = f"{base_carid.lower()}:"
+    return {
+        key[len(prefix):]: name
+        for key, name in REBADGE_VEHICLES.items()
+        if key.startswith(prefix)
+    }
+
+
+def is_rebadge_suffix(base_carid: str, suffix: str) -> bool:
+    key = f"{base_carid.lower()}:{suffix.strip().lower()}"
+    return key in REBADGE_VEHICLES

@@ -4,16 +4,6 @@ import platform
 
 def load_config_types(config_file=None):
     print(f"[DEBUG] load_config_types called")
-    """
-    Load config types from carconfigs.txt file in vehicles folder.
-    Returns a list of config types.
-
-    Args:
-        config_file: Optional custom path to the config types file
-
-    Returns:
-        List of config type strings
-    """
     config_types = ["Factory", "Custom", "Police"]
 
     if config_file is None:
@@ -41,13 +31,6 @@ def load_config_types(config_file=None):
 
 def get_beamng_vehicles_path():
     print(f"[DEBUG] get_beamng_vehicles_path called")
-    """
-    Get the path to BeamNG.drive vehicles folder.
-    Cross-platform implementation.
-
-    Returns:
-        Path to BeamNG vehicles folder based on OS
-    """
     system = platform.system()
 
     if system == "Windows":
@@ -96,13 +79,6 @@ def get_beamng_vehicles_path():
         return os.path.join(home, ".beamng", "current", "vehicles")
 
 def get_beamng_default_install_paths():
-    """
-    Get list of common BeamNG.drive installation paths based on OS.
-    Used for the file browser initial directory.
-
-    Returns:
-        List of potential installation paths
-    """
     system = platform.system()
     paths = []
 
@@ -149,12 +125,6 @@ def get_beamng_default_install_paths():
     return existing_paths if existing_paths else [os.path.expanduser("~")]
 
 def get_beamng_mods_default_paths():
-    """
-    Get list of common BeamNG.drive mods folder paths based on OS.
-
-    Returns:
-        List of potential mods folder paths
-    """
     system = platform.system()
     home = os.path.expanduser("~")
     paths = []
@@ -163,13 +133,13 @@ def get_beamng_mods_default_paths():
         import getpass
         username = getpass.getuser()
         paths.extend([
-            # Version-specific paths (newer structure)
+
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "0.33", "mods"),
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "mods"),
-            # Current/mods path (alternative structure)
+
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG", "BeamNG.drive", "current", "mods"),
             os.path.join("C:\\Users", username, "AppData", "Local", "BeamNG.drive", "current", "mods"),
-            # Documents location
+
             os.path.join("C:\\Users", username, "Documents", "BeamNG.drive", "mods")
         ])
 
@@ -177,7 +147,7 @@ def get_beamng_mods_default_paths():
         paths.extend([
             os.path.join(home, ".local", "share", "BeamNG.drive", "0.33", "mods"),
             os.path.join(home, ".local", "share", "BeamNG.drive", "mods"),
-            # Current/mods path
+
             os.path.join(home, ".local", "share", "BeamNG", "BeamNG.drive", "current", "mods"),
             os.path.join(home, ".local", "share", "BeamNG.drive", "current", "mods"),
             os.path.join(home, "Documents", "BeamNG.drive", "mods"),
@@ -189,7 +159,7 @@ def get_beamng_mods_default_paths():
         paths.extend([
             os.path.join(home, "Library", "Application Support", "BeamNG.drive", "0.33", "mods"),
             os.path.join(home, "Library", "Application Support", "BeamNG.drive", "mods"),
-            # Current/mods path
+
             os.path.join(home, "Library", "Application Support", "BeamNG", "BeamNG.drive", "current", "mods"),
             os.path.join(home, "Library", "Application Support", "BeamNG.drive", "current", "mods"),
             os.path.join(home, "Documents", "BeamNG.drive", "mods")

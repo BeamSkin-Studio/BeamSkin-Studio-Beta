@@ -39,7 +39,6 @@ except ImportError:
 
 
 class PathConfigurationSection(QFrame):
-    """Embeddable widget for the settings tab."""
 
     def __init__(
         self,
@@ -54,8 +53,8 @@ class PathConfigurationSection(QFrame):
 
     def _build(self):
         print(f"[DEBUG] _build() called")
-        # Use an object-name selector so the rule targets ONLY this frame and
-        # does not cascade down to every nested QFrame child inside it.
+
+
         self.setObjectName("pathConfigSection")
         self.setStyleSheet(f"""
             #pathConfigSection {{
@@ -68,7 +67,7 @@ class PathConfigurationSection(QFrame):
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(16)
 
-        # header
+
         hdr_row = QHBoxLayout()
         self._hdr_lbl = QLabel(t("settings.beamng_paths"))
         self._hdr_lbl.setFont(font(17, "bold"))
@@ -95,7 +94,7 @@ class PathConfigurationSection(QFrame):
         root.addWidget(self._desc_lbl)
         root.addWidget(HSeparator())
 
-        # BeamNG install path
+
         root.addWidget(self._path_row(
             label=t("settings.beamng_install"),
             desc=t("settings.beamng_uvpath_desc"),
@@ -103,7 +102,7 @@ class PathConfigurationSection(QFrame):
             browse_cb=self._browse_beamng,
         ))
 
-        # Mods folder path
+
         root.addWidget(self._path_row(
             label=t("settings.beamng_modpath"),
             desc=t("settings.beamng_modpath_desc"),
@@ -118,10 +117,9 @@ class PathConfigurationSection(QFrame):
         attr_name: str,
         browse_cb: Callable,
     ) -> QFrame:
-        """Build a single path input row."""
         row_frame = QFrame()
         row_frame.setObjectName("pathRow")
-        # Scoped to #pathRow so the rule does not bleed into nested children.
+
         row_frame.setStyleSheet(f"""
             #pathRow {{
                 background-color: {COLORS['frame_bg']};
@@ -178,7 +176,7 @@ class PathConfigurationSection(QFrame):
         status.setStyleSheet("background:transparent;border:none;")
         inner.addWidget(status)
 
-        # stash refs — label/desc/browse button stored for refresh_ui()
+
         setattr(self, f"_{attr_name}_entry",      entry)
         setattr(self, f"_{attr_name}_status",     status)
         setattr(self, f"_{attr_name}_row_label",  lbl)
@@ -189,7 +187,6 @@ class PathConfigurationSection(QFrame):
 
     def refresh_ui(self):
         print(f"[DEBUG] PathConfigurationSection.refresh_ui: updating labels and reloading paths")
-        """Update all translatable strings in-place (called on language change)."""
         self._hdr_lbl.setText(t("settings.beamng_paths"))
         self._desc_lbl.setText(t("settings.beamng_paths_desc"))
 
@@ -201,8 +198,7 @@ class PathConfigurationSection(QFrame):
         self._mods_row_desc.setText(t("settings.beamng_modpath_desc"))
         self._mods_browse_btn.setText(t("common.browse"))
 
-        # Reload saved path values — they may have been set by the setup
-        # wizard after this widget was first initialised.
+
         self._load_current_paths()
 
 

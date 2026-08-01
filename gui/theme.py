@@ -11,7 +11,6 @@ from PySide6.QtGui   import (QColor, QPalette, QFont, QFontDatabase,
 from PySide6.QtWidgets import (QWidget, QGraphicsDropShadowEffect,
                                 QGraphicsOpacityEffect, QApplication)
 
-# COLOUR PALETTES
 
 DARK_COLORS: dict[str, str] = {
     "app_bg":               "#0a0a0a",
@@ -73,26 +72,9 @@ LIGHT_COLORS: dict[str, str] = {
     "glass_bg":             "rgba(255,255,255,0.85)",
 }
 
-# Live colour dict — the only object the rest of the codebase imports.
+
 COLORS: dict[str, str] = dict(DARK_COLORS)
 
-# STYLESHEET REPLACEMENT MAPS
-# Used by ThemeManager to patch every live widget's styleSheet() string when
-# the user switches theme.  One map per direction.
-#
-# Disambiguation notes for values shared between semantic roles:
-#   #0a0a0a = app_bg AND accent_text in dark.
-#     → Mapped to app_bg light (#f2f2f2).  accent_text on rebuilt widgets
-#       (topbar/sidebar) picks up the correct #ffffff via their rebuild.
-#       On remaining widgets it becomes near-white which is acceptable on
-#       orange buttons.
-#   #141414 = frame_bg AND tab_unselected in dark.
-#     → Mapped to frame_bg light (#eeeeee).  Tab nav rebuilds anyway.
-#   #1e1e1e = card_bg AND tab_unselected_hover in dark.
-#     → Mapped to card_bg light (#ffffff).  Tab nav rebuilds.
-#   #ffffff = topbar_bg AND card_bg in light.
-#     → For L2D, mapped to card_bg dark (#1e1e1e) because that's by far
-#       the most common role in non-chrome widgets; topbar rebuilds.
 
 _DARK_TO_LIGHT: dict[str, str] = {
     "#0a0a0a":                "#f2f2f2",
@@ -121,7 +103,7 @@ _DARK_TO_LIGHT: dict[str, str] = {
 
 _LIGHT_TO_DARK: dict[str, str] = {
     "#f2f2f2":                "#0a0a0a",
-    "#ffffff":                "#1e1e1e",   # topbar_bg/card_bg → card_bg dark
+    "#ffffff":                "#1e1e1e",
     "#e8e8e8":                "#121212",
     "#eeeeee":                "#141414",
     "#f5f5f5":                "#282828",
@@ -143,7 +125,6 @@ _LIGHT_TO_DARK: dict[str, str] = {
 
 
 def _build_pattern(mapping: dict[str, str]) -> re.Pattern:
-    """Compile a single regex that matches all keys (longest first)."""
     keys = sorted(mapping.keys(), key=len, reverse=True)
     return re.compile("|".join(re.escape(k) for k in keys), re.IGNORECASE)
 
@@ -151,28 +132,18 @@ def _build_pattern(mapping: dict[str, str]) -> re.Pattern:
 _PATTERN_D2L: re.Pattern = _build_pattern(_DARK_TO_LIGHT)
 _PATTERN_L2D: re.Pattern = _build_pattern(_LIGHT_TO_DARK)
 
-# Lowercased lookup tables for the case-insensitive match callback.
+
 _D2L_LOWER: dict[str, str] = {k.lower(): v for k, v in _DARK_TO_LIGHT.items()}
 _L2D_LOWER: dict[str, str] = {k.lower(): v for k, v in _LIGHT_TO_DARK.items()}
 
 
 def _apply_mapping(ss: str, pattern: re.Pattern, lower_map: dict[str, str]) -> str:
-    """Replace all matching colour tokens in *ss* in one regex pass."""
     if not ss:
         return ss
     return pattern.sub(lambda m: lower_map.get(m.group(0).lower(), m.group(0)), ss)
 
 
-# THEME MANAGER
-
 class ThemeManager:
-    """
-    Singleton that owns the current theme mode and switches it.
-
-    After ``set_mode()`` is called the global ``COLORS`` dict is mutated,
-    the app QSS is re-applied, and every live widget's inline stylesheet is
-    patched in-place — no per-widget or per-tab refresh hook required.
-    """
 
     _inst: Optional["ThemeManager"] = None
 
@@ -213,10 +184,10 @@ class ThemeManager:
         if not app:
             return
 
-        # Step 1 — re-apply the global QSS (scrollbars, tooltips, base bg).
+
         app.setStyleSheet(build_app_qss())
 
-        # Step 2 — patch every live widget's baked-in stylesheet string.
+
         if self._mode == "light":
             pattern, lower_map = _PATTERN_D2L, _D2L_LOWER
         else:
@@ -231,7 +202,6 @@ def _restyle_subtree(
     pattern: re.Pattern,
     lower_map: dict[str, str],
 ) -> None:
-    """Patch ``root`` and all its QWidget descendants in-place."""
     _restyle_one(root, pattern, lower_map)
     for child in root.findChildren(QWidget):
         _restyle_one(child, pattern, lower_map)
@@ -245,8 +215,6 @@ def _restyle_one(w: QWidget, pattern: re.Pattern, lower_map: dict[str, str]) -> 
     if new_ss != ss:
         w.setStyleSheet(new_ss)
 
-
-# TYPOGRAPHY
 
 FONT_FAMILY = "Segoe UI"
 FONT_MONO   = "Consolas"
@@ -262,10 +230,7 @@ def font(size: int = 13, weight: str = "normal", italic: bool = False) -> QFont:
     return f
 
 
-# GLOBAL QSS
-
 def build_app_qss() -> str:
-    """Generate the global QSS from the *current* COLORS dict."""
     return f"""
 QWidget {{
     background-color: {COLORS['app_bg']};
@@ -314,11 +279,8 @@ QToolTip {{
 """
 
 
-# Backward-compat constant — dark-theme snapshot.  Use build_app_qss() for
-# anything that needs the current theme's QSS.
 APP_QSS = build_app_qss()
 
-# WIDGET-SPECIFIC STYLESHEET GENERATORS
 
 def card_style(radius: int = 12, border: bool = True) -> str:
     b = f"1px solid {COLORS['border']};" if border else "none;"
@@ -466,8 +428,6 @@ def checkbox_style() -> str:
     """
 
 
-# EFFECTS  &  ANIMATIONS
-
 def drop_shadow(
     widget: QWidget,
     blur: int = 20,
@@ -502,9 +462,8 @@ def fade_in(
     anim.setStartValue(start)
     anim.setEndValue(end)
     anim.setEasingCurve(QEasingCurve.OutCubic)
-    # Remove the opacity effect once the animation is done.
-    # QGraphicsEffect uses an offscreen render buffer that breaks widget
-    # painting inside QScrollArea during scrolling — cards disappear.
+
+
     anim.finished.connect(lambda: widget.setGraphicsEffect(None))
     anim.start(QPropertyAnimation.DeleteWhenStopped)
     return anim

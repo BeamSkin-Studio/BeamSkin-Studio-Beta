@@ -1,65 +1,61 @@
-"""
-Localization Manager - Multi-language support for BeamSkin Studio
-"""
 import os
 import json
 from typing import Dict, Optional, Any
 
-# Language configuration
+
 LANGUAGES_DIR = "core/localization/languages"
 DEFAULT_LANGUAGE = "en_US"
 
-# Available languages will be loaded dynamically from language files
+
 AVAILABLE_LANGUAGES = {}
 
 def _load_available_languages():
-    """Dynamically load available languages from the languages directory"""
     global AVAILABLE_LANGUAGES
     AVAILABLE_LANGUAGES = {}
-    
-    # Get program root directory
+
+
     import sys
     if getattr(sys, 'frozen', False):
 
         program_root = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
     else:
-        # Try to get the actual program root
+
         try:
-            # This file is in core/localization.py, so go up 2 levels to root
+
             current_file = os.path.abspath(__file__)
             program_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
         except:
-            # Fallback if __file__ doesn't work
+
             program_root = os.getcwd()
-    
+
     languages_path = os.path.join(program_root, LANGUAGES_DIR)
-    
+
     print(f"[DEBUG] Looking for languages in: {languages_path}")
-    
+
     if not os.path.exists(languages_path):
         print(f"[WARNING] Languages directory not found: {languages_path}")
-        # Set default English as fallback
+
         AVAILABLE_LANGUAGES["en_US"] = {"name": "English", "native": "English", "flag": "US"}
         return
-    
-    # Scan for .json files in the languages directory
+
+
     try:
         files = os.listdir(languages_path)
     except Exception as e:
         print(f"[ERROR] Cannot read languages directory: {e}")
         AVAILABLE_LANGUAGES["en_US"] = {"name": "English", "native": "English", "flag": "US"}
         return
-    
+
     for filename in files:
         if filename.endswith('.json'):
-            lang_code = filename[:-5]  # Remove .json extension
+            lang_code = filename[:-5]
             file_path = os.path.join(languages_path, filename)
-            
+
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    
-                # Check if the file has language metadata
+
+
                 if 'language_info' in data:
                     info = data['language_info']
                     AVAILABLE_LANGUAGES[lang_code] = {
@@ -69,68 +65,67 @@ def _load_available_languages():
                     }
                     print(f"[DEBUG] Loaded language: {lang_code} - {info.get('native', lang_code)}")
                 else:
-                    # Fallback if no language_info in the file
+
                     AVAILABLE_LANGUAGES[lang_code] = {
                         "name": lang_code,
                         "native": lang_code,
                         "flag": lang_code.split('_')[1] if '_' in lang_code else "US"
                     }
                     print(f"[WARNING] No language_info in {filename}, using defaults")
-                    
+
             except Exception as e:
                 print(f"[ERROR] Failed to load language file {filename}: {e}")
-    
-    # Ensure at least default language exists
+
+
     if not AVAILABLE_LANGUAGES:
         print("[WARNING] No languages loaded, using default English")
         AVAILABLE_LANGUAGES["en_US"] = {"name": "English", "native": "English", "flag": "US"}
     elif "en_US" not in AVAILABLE_LANGUAGES and len(AVAILABLE_LANGUAGES) > 0:
-        # If we loaded languages but en_US is missing, add it
+
         print("[WARNING] en_US not found, adding default English")
         AVAILABLE_LANGUAGES["en_US"] = {"name": "English", "native": "English", "flag": "US"}
-    
+
     print(f"[DEBUG] Total languages loaded: {len(AVAILABLE_LANGUAGES)}")
 
-# Load languages on module import
+
 _load_available_languages()
 
 class LocalizationManager:
-    """Manages application translations and language switching"""
-    
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(LocalizationManager, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
         self._initialized = True
-        
+
         self.current_language = DEFAULT_LANGUAGE
         self.translations: Dict[str, Any] = {}
         self.fallback_translations: Dict[str, Any] = {}
-        
-        # Get program root directory
+
+
         import sys
         if getattr(sys, 'frozen', False):
 
             program_root = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         else:
-            # Try to get the actual program root
+
             try:
-                # This file is in core/localization.py, so go up 2 levels to root
+
                 current_file = os.path.abspath(__file__)
                 program_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
             except:
-                # Fallback if __file__ doesn't work
+
                 program_root = os.getcwd()
-        
+
         self.languages_dir = os.path.join(program_root, LANGUAGES_DIR)
-        
+
         print(f"[DEBUG] LocalizationManager languages directory: {self.languages_dir}")
 
         import sys as _sys
@@ -138,128 +133,122 @@ class LocalizationManager:
             try:
                 os.makedirs(self.languages_dir, exist_ok=True)
             except OSError:
-                pass  # non-fatal — we'll just work with whatever is there
-        
-        # Load default English translations (fallback)
+                pass
+
+
         self._load_language(DEFAULT_LANGUAGE, fallback=True)
-        
-        # Load user's language from settings
+
+
         from core.settings import app_settings
         saved_language = app_settings.get("language", DEFAULT_LANGUAGE)
         self.set_language(saved_language)
-    
+
     def _load_language(self, language_code: str, fallback: bool = False) -> bool:
-        """Load translation file for a specific language"""
         file_path = os.path.join(self.languages_dir, f"{language_code}.json")
-        
+
         try:
             if os.path.exists(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     translations = json.load(f)
-                    
+
                 if fallback:
                     self.fallback_translations = translations
                 else:
                     self.translations = translations
-                    
+
                 print(f"[DEBUG] Loaded language file: {language_code}")
                 return True
             else:
                 print(f"[WARNING] Language file not found: {file_path}")
-                
-                # Create default English file if it doesn't exist
+
+
                 if language_code == DEFAULT_LANGUAGE:
                     self._create_default_language_file()
                     return self._load_language(language_code, fallback)
-                    
+
                 return False
         except Exception as e:
             print(f"[ERROR] Failed to load language {language_code}: {e}")
             return False
-    
+
     def set_language(self, language_code: str) -> bool:
-        """Change the current language"""
         if language_code not in AVAILABLE_LANGUAGES:
             print(f"[WARNING] Language {language_code} not available, using default")
             language_code = DEFAULT_LANGUAGE
-        
+
         if self._load_language(language_code):
             self.current_language = language_code
-            
-            # Save to settings
+
+
             from core.settings import app_settings, save_settings
             app_settings["language"] = language_code
             save_settings()
-            
+
             print(f"[DEBUG] Language changed to: {language_code}")
             return True
-        
+
         return False
-    
+
     def get(self, key: str, **kwargs) -> str:
 
-        # Navigate nested dictionary using dot notation
+
         keys = key.split('.')
         value = self.translations
-        
-        # Try to get value from current language
+
+
         for k in keys:
             if isinstance(value, dict) and k in value:
                 value = value[k]
             else:
-                # Fallback to English
+
                 value = self.fallback_translations
                 for k in keys:
                     if isinstance(value, dict) and k in value:
                         value = value[k]
                     else:
-                        # Return key if not found
+
                         return f"[{key}]"
                 break
-        
-        # If value is not a string, return key
+
+
         if not isinstance(value, str):
             return f"[{key}]"
-        
-        # Format string with kwargs if provided
+
+
         if kwargs:
             try:
                 return value.format(**kwargs)
             except KeyError as e:
                 print(f"[WARNING] Missing format key {e} for translation: {key}")
                 return value
-        
+
         return value
-    
+
     def get_current_language_info(self) -> Dict[str, str]:
-        """Get information about the current language"""
         return AVAILABLE_LANGUAGES.get(self.current_language, AVAILABLE_LANGUAGES[DEFAULT_LANGUAGE])
-    
+
     def get_available_languages(self) -> Dict[str, Dict[str, str]]:
-        """Get all available languages"""
         return AVAILABLE_LANGUAGES
-    
+
     def _create_default_language_file(self):
-        """Create the default English translation file"""
         default_translations = self._get_default_translations()
-        
+
         file_path = os.path.join(self.languages_dir, f"{DEFAULT_LANGUAGE}.json")
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(default_translations, f, indent=2, ensure_ascii=False)
-        
+
         print(f"[DEBUG] Created default language file: {file_path}")
-    
+
     def _get_default_translations(self) -> Dict[str, Any]:
-        """Get the default English translations"""
         return {
-            # Language metadata
+
             "language_info": {
                 "name": "English",
                 "native": "English",
                 "flag": "US"
             },
-            
-            # Common
+
+
             "common": {
                 "yes": "Yes",
                 "no": "No",
@@ -282,14 +271,14 @@ class LocalizationManager:
                 "apply": "Apply",
                 "reset": "Reset"
             },
-            
-            # Main Window
+
+
             "window": {
                 "title": "BeamSkin Studio",
                 "closing": "Shutting down BeamSkin Studio..."
             },
-            
-            # Top Menu Bar
+
+
             "menu": {
                 "generator": "Generator",
                 "carlist": "Car List",
@@ -299,8 +288,8 @@ class LocalizationManager:
                 "about": "About",
                 "generate": "Generate Mod"
             },
-            
-            # Sidebar
+
+
             "sidebar": {
                 "mod_info": "Mod Information",
                 "mod_name": "Mod Name:",
@@ -319,8 +308,8 @@ class LocalizationManager:
                 "add_to_project": "Add to Project",
                 "in_project": "In Project"
             },
-            
-            # Generator Tab
+
+
             "generator": {
                 "title": "Mod Generator",
                 "project": "Current Project",
@@ -349,8 +338,8 @@ class LocalizationManager:
                 "generate_success": "Mod generated successfully!",
                 "generate_error": "Failed to generate mod"
             },
-            
-            # Car List Tab
+
+
             "carlist": {
                 "title": "Vehicle Library",
                 "search_placeholder": "Search by name or ID...",
@@ -360,8 +349,8 @@ class LocalizationManager:
                 "stock_vehicles": "Stock Vehicles",
                 "custom_vehicles": "Custom Vehicles"
             },
-            
-            # How To Tab
+
+
             "howto": {
                 "title": "How To Use",
                 "welcome": "Welcome to BeamSkin Studio",
@@ -379,8 +368,8 @@ class LocalizationManager:
                 "support_title": "Need Help?",
                 "support_text": "Visit the GitHub page for documentation and support"
             },
-            
-            # Add Vehicles Tab
+
+
             "add_vehicles": {
                 "title": "Add Custom Vehicles",
                 "description": "Add your own custom vehicles to BeamSkin Studio",
@@ -404,8 +393,8 @@ class LocalizationManager:
                 "error_message": "Could not add vehicle. Please check the files and try again.",
                 "validation_error": "Please fill in all required fields"
             },
-            
-            # Settings Tab
+
+
             "settings": {
                 "title": "Settings",
                 "appearance": "Appearance",
@@ -431,8 +420,8 @@ class LocalizationManager:
                 "version": "Version:",
                 "check_updates": "Check for Updates"
             },
-            
-            # About Tab
+
+
             "about": {
                 "title": "About BeamSkin Studio",
                 "subtitle": "Professional Skin Modding Tool",
@@ -442,8 +431,8 @@ class LocalizationManager:
                 "donate": "Donate via PayPal",
                 "version": "Version: {version}"
             },
-            
-            # Dialogs
+
+
             "dialogs": {
                 "update_available": "Update Available!",
                 "current_version": "Current Version: {version}",
@@ -451,27 +440,27 @@ class LocalizationManager:
                 "update_prompt": "Would you like to open the GitHub page to download it?",
                 "download_update": "Download Update",
                 "maybe_later": "Maybe Later",
-                
+
                 "wip_warning_title": "Work-In-Progress Software",
                 "wip_warning_message": "Welcome to BeamSkin Studio!\n\nThis application is currently in active development.\nWhile I strive to provide a stable experience, some features may not work\n\nPlease note:\n• Some features may be incomplete\n• Occasional bugs or unexpected behavior may occur\n• Updates and improvements are being made\n\nYour feedback helps me improve the software!\nIf you encounter any issues, please report them on my GitHub page.\n\nI appreciate your understanding and support!",
                 "dont_show_again": "Don't show this message again",
                 "i_understand": "I Understand",
-                
+
                 "setup_wizard_title": "First-Time Setup",
                 "setup_welcome": "Welcome to BeamSkin Studio",
                 "setup_description": "Let's get you started by configuring some basic settings",
                 "setup_complete": "Setup Complete",
                 "setup_skip": "Skip for Now"
             },
-            
-            # Language Selection Dialog
+
+
             "language_dialog": {
                 "title": "Select Your Language",
                 "description": "Choose your preferred language for BeamSkin Studio",
                 "continue": "Continue"
             },
-            
-            # Notifications
+
+
             "notifications": {
                 "mod_generated": "Mod generated successfully!",
                 "vehicle_added": "Vehicle added to project",
@@ -485,8 +474,8 @@ class LocalizationManager:
                 "file_copied": "File copied to clipboard",
                 "restart_required": "Restart required for changes to take effect"
             },
-            
-            # Errors
+
+
             "errors": {
                 "no_vehicles": "No vehicles in project",
                 "invalid_path": "Invalid path",
@@ -499,11 +488,10 @@ class LocalizationManager:
             }
         }
 
-# Global localization manager instance
+
 _localization = None
 
 def get_localization() -> LocalizationManager:
-    """Get the global localization manager instance"""
     global _localization
     if _localization is None:
         _localization = LocalizationManager()
@@ -514,13 +502,10 @@ def t(key: str, **kwargs) -> str:
     return get_localization().get(key, **kwargs)
 
 def set_language(language_code: str) -> bool:
-    """Change the application language"""
     return get_localization().set_language(language_code)
 
 def get_current_language() -> str:
-    """Get the current language code"""
     return get_localization().current_language
 
 def get_available_languages() -> Dict[str, Dict[str, str]]:
-    """Get all available languages"""
     return get_localization().get_available_languages()
