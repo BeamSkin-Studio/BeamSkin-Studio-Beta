@@ -28,6 +28,17 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.8.4.Beta",
+        "date": "03-08-2026",
+        "entries": [
+            title("🐛 Bug Fixes"),
+            subtitle("Wentward DT40L"),
+            item("Fixed the material file having the wrong normalmap"),
+        ]
+    },
+
+
+    {
         "version": "0.8.3.Beta",
         "date": "01-08-2026",
         "entries": [

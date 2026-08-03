@@ -11,7 +11,7 @@
         "metallicMap": "/vehicles/citybus/citybus_main_m.data.png",
         "metallicFactor": 1,
         "roughnessFactor": 1,
-        "normalMap": "vehicles/citybus/citybus_n.dds",
+        "normalMap": "/vehicles/citybus/citybus_main_n.normal.png",
         "roughnessMap": "/vehicles/citybus/citybus_main_r.data.png",
         "useAnisotropic": true
       },
@@ -23,7 +23,7 @@
         "clearCoatRoughnessFactor":0.05,
         "metallicFactor": 0.7,
         "clearCoatMap": "/vehicles/citybus/citybus_main_cc.data.png",
-        "normalMap": "/vehicles/citybus/citybus_n.dds",
+        "normalMap": "/vehicles/citybus/citybus_main_n.normal.png",
         "opacityMap": "/vehicles/citybus/citybus_main_c.data.png",
         "baseColorMap": "vehicles/citybus/SKINNAME/citybus_skin_SKINNAME.dds",
       },
