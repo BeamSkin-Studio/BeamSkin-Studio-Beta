@@ -1,3 +1,6 @@
+"""
+BeamSkin Studio - PyInstaller Runtime Hook
+"""
 import sys
 import os
 

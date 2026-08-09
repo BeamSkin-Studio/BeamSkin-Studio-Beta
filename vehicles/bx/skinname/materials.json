@@ -25,19 +25,14 @@
         "metallicFactor": 0.5,
         "normalMap": "/vehicles/bx/bx_main_nm.normal.png",
         "opacityMap": "/vehicles/bx/bx_main_c.data.png",
-        "roughnessFactor": 0
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
+        "roughnessFactor": 0,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,
@@ -63,6 +58,7 @@
       },
       {
         "ambientOcclusionMap": "/vehicles/bx/bx_aftermarket_ao.data.png",
+		"baseColorMap": "vehicles/bx/skinname/bx_skin_skinname.dds",
         "useAnisotropic": true,
         "diffuseMapUseUV": 1,
         "clearCoatFactor": 1,
@@ -72,10 +68,14 @@
         "clearCoatMap": "/vehicles/bx/bx_aftermarket_cc.data.png",
         "normalMap": "/vehicles/bx/bx_aftermarket_nm.normal.png",
         "opacityMap": "/vehicles/bx/bx_aftermarket_c.data.png",
-        "baseColorMap": "vehicles/bx/skinname/bx_skin_skinname.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

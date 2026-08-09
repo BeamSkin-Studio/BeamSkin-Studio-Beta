@@ -5,9 +5,40 @@ import json
 import re
 
 
+_copied_file_cache: dict[str, dict[str, str]] = {}
+
+
+def _copy_dedup(src: str, dest_folder: str, dest_filename: str) -> str:
+    src_key = os.path.normcase(os.path.abspath(src))
+    folder_cache = _copied_file_cache.setdefault(dest_folder, {})
+
+    existing_fn = folder_cache.get(src_key)
+    if existing_fn is not None:
+        existing_path = os.path.join(dest_folder, existing_fn)
+        if os.path.exists(existing_path):
+            print(f"[DEBUG] Reusing already-copied file for {os.path.basename(src)}: "
+                  f"{existing_fn} (skipped duplicate copy as {dest_filename})")
+            return existing_fn
+
+    shutil.copy2(src, os.path.join(dest_folder, dest_filename))
+    folder_cache[src_key] = dest_filename
+    print(f"[DEBUG] _copy_dedup: copied {src!r} -> {os.path.join(dest_folder, dest_filename)!r}")
+    return dest_filename
+
+
+def reset_copy_dedup_cache(dest_folder: str | None = None) -> None:
+    print(f"[DEBUG] reset_copy_dedup_cache: dest_folder={dest_folder!r}")
+    if dest_folder is None:
+        _copied_file_cache.clear()
+    else:
+        _copied_file_cache.pop(dest_folder, None)
+
+
 def sanitize_skin_id(name: str) -> str:
     name = name.replace(" ", "")
-    return re.sub(r"[^a-zA-Z0-9\-]", "", name)
+    result = re.sub(r"[^a-zA-Z0-9\-]", "", name)
+    print(f"[DEBUG] sanitize_skin_id: -> {result!r}")
+    return result
 
 
 _ILLEGAL_WIN_CHARS = re.compile(r'[\\/:*?"<>|]')
@@ -15,26 +46,30 @@ _ILLEGAL_WIN_CHARS = re.compile(r'[\\/:*?"<>|]')
 def sanitize_folder_name(name: str) -> str:
     name = name.replace(" ", "_")
     name = _ILLEGAL_WIN_CHARS.sub("", name)
-
     name = re.sub(r"_+", "_", name)
-    return name.strip("_")
+    result = name.strip("_")
+    print(f"[DEBUG] sanitize_folder_name: -> {result!r}")
+    return result
 
 
 def _copy_texture_files(data_map_source, color_map_source, dest_folder, skin_id):
+    print(f"[DEBUG] _copy_texture_files: dest_folder={dest_folder!r} skin_id={skin_id!r}")
     os.makedirs(dest_folder, exist_ok=True)
 
     data_map_fn  = f"{skin_id}_b.color.png"
     color_map_fn = f"{skin_id}_cp.color.png"
 
-    for src, fn, label in [
-        (data_map_source,  data_map_fn,  "data map"),
-        (color_map_source, color_map_fn, "color map"),
-    ]:
-        if src and os.path.exists(src):
-            shutil.copy2(src, os.path.join(dest_folder, fn))
-            print(f"[DEBUG] Copied {label}: {src} -> {os.path.join(dest_folder, fn)}")
-        else:
-            print(f"[WARNING] {label} source not found: {src}")
+    if data_map_source and os.path.exists(data_map_source):
+        data_map_fn = _copy_dedup(data_map_source, dest_folder, data_map_fn)
+        print(f"[DEBUG] Copied data map: {data_map_source} -> {os.path.join(dest_folder, data_map_fn)}")
+    else:
+        print(f"[WARNING] data map source not found: {data_map_source}")
+
+    if color_map_source and os.path.exists(color_map_source):
+        color_map_fn = _copy_dedup(color_map_source, dest_folder, color_map_fn)
+        print(f"[DEBUG] Copied color map: {color_map_source} -> {os.path.join(dest_folder, color_map_fn)}")
+    else:
+        print(f"[WARNING] color map source not found: {color_map_source}")
 
     return data_map_fn, color_map_fn
 
@@ -44,6 +79,8 @@ def _copy_texture_files_variant(
     data_map_source_2,  color_map_source_2,
     dest_folder, skin_id, variant_suffix,
 ):
+    print(f"[DEBUG] _copy_texture_files_variant: dest_folder={dest_folder!r} skin_id={skin_id!r} "
+          f"variant_suffix={variant_suffix!r}")
     os.makedirs(dest_folder, exist_ok=True)
 
     car_data_fn    = f"{skin_id}_b.color.png"
@@ -51,23 +88,55 @@ def _copy_texture_files_variant(
     var_data_fn    = f"{skin_id}_{variant_suffix}_b.color.png"
     var_palette_fn = f"{skin_id}_{variant_suffix}_cp.color.png"
 
-    for src, fn, label in [
-        (data_map_source,   car_data_fn,    "car body – data map"),
-        (color_map_source,  car_palette_fn, "car body – palette map"),
-        (data_map_source_2, var_data_fn,    f"{variant_suffix} body – data map"),
-        (color_map_source_2,var_palette_fn, f"{variant_suffix} body – palette map"),
-    ]:
-        if src and os.path.exists(src):
-            shutil.copy2(src, os.path.join(dest_folder, fn))
-            print(f"[DEBUG] Copied {label}: {fn}")
-        else:
-            print(f"[WARNING] Source not found for {label}: {src}")
+    if data_map_source and os.path.exists(data_map_source):
+        car_data_fn = _copy_dedup(data_map_source, dest_folder, car_data_fn)
+        print(f"[DEBUG] Copied car body – data map: {car_data_fn}")
+    else:
+        print(f"[WARNING] Source not found for car body – data map: {data_map_source}")
+
+    if color_map_source and os.path.exists(color_map_source):
+        car_palette_fn = _copy_dedup(color_map_source, dest_folder, car_palette_fn)
+        print(f"[DEBUG] Copied car body – palette map: {car_palette_fn}")
+    else:
+        print(f"[WARNING] Source not found for car body – palette map: {color_map_source}")
+
+    if data_map_source_2 and os.path.exists(data_map_source_2):
+        var_data_fn = _copy_dedup(data_map_source_2, dest_folder, var_data_fn)
+        print(f"[DEBUG] Copied {variant_suffix} body – data map: {var_data_fn}")
+    else:
+        print(f"[WARNING] Source not found for {variant_suffix} body – data map: {data_map_source_2}")
+
+    if color_map_source_2 and os.path.exists(color_map_source_2):
+        var_palette_fn = _copy_dedup(color_map_source_2, dest_folder, var_palette_fn)
+        print(f"[DEBUG] Copied {variant_suffix} body – palette map: {var_palette_fn}")
+    else:
+        print(f"[WARNING] Source not found for {variant_suffix} body – palette map: {color_map_source_2}")
 
     return car_data_fn, car_palette_fn, var_data_fn, var_palette_fn
 
 
+def _apply_skin_reference_regexes(content: str, skin_id: str) -> str:
+    def _val(m):  return f'"{m.group(1)}{skin_id}"'
+    def _name(m): return f'{m.group(1)}{skin_id}"'
+
+    print(f"[DEBUG] _apply_skin_reference_regexes: skin_id={skin_id!r}")
+
+    content = re.sub(r'"([^"]+\.skin\.)[^"]+"',                     _val,  content)
+    content = re.sub(r'"([^"]+\.skin_[^.]*\.)[^"]+"',               _val,  content)
+    content = re.sub(r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',        _name, content)
+    content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',       _name, content)
+    content = re.sub(r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',  _name, content)
+    content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"', _name, content)
+    content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',                _val,  content)
+    content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',   _name, content)
+    content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',  _name, content)
+    return content
+
+
 def _process_jbeam_files(folder_path, vehicle_id, skin_id,
                           skin_name=None, author_name=None):
+    print(f"[DEBUG] _process_jbeam_files: folder_path={folder_path!r} vehicle_id={vehicle_id!r} "
+          f"skin_id={skin_id!r} skin_name={skin_name!r} author_name={author_name!r}")
     for root_dir, _, files in os.walk(folder_path):
         for filename in files:
             if not filename.endswith(".jbeam"):
@@ -77,28 +146,15 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
             with open(file_path, "r", encoding="utf-8") as fh:
                 content = fh.read()
 
-            def _val(m):  return f'"{m.group(1)}{skin_id}"'
-            def _name(m): return f'{m.group(1)}{skin_id}"'
-
-            content = re.sub(r'"([^"]+\.skin\.)[^"]+"',                     _val,  content)
-            content = re.sub(r'"([^"]+\.skin_[^.]*\.)[^"]+"',               _val,  content)
-            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',        _name, content)
-            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',       _name, content)
-            content = re.sub(r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',  _name, content)
-            content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"', _name, content)
-            content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',                _val,  content)
-            content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',   _name, content)
-            content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',  _name, content)
+            content = _apply_skin_reference_regexes(content, skin_id)
             content = re.sub(r'_skin_SKINNAME\w*', f'_skin_{skin_id}',
                              content, flags=re.IGNORECASE)
             content = re.sub(r'("globalSkin"\s*:\s*")SKINNAME\w*(")',
                              lambda m: m.group(1) + skin_id + m.group(2),
                              content, flags=re.IGNORECASE)
-
             content = re.sub(r'("skinName"\s*:\s*")SKINNAME\w*(")',
                              lambda m: m.group(1) + skin_id + m.group(2),
                              content, flags=re.IGNORECASE)
-
 
             if author_name:
                 content = re.sub(r'("authors"\s*:\s*")[^"]*"',
@@ -106,8 +162,6 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
             else:
                 print(f"[WARNING] author_name not provided — author left unchanged in {file_path}")
             if skin_name:
-
-
                 content = re.sub(
                     r'("name"\s*:\s*")(?![^"]*\.skin\.)[^"]*"',
                     rf'\g<1>{skin_name}"', content,
@@ -124,18 +178,9 @@ def _process_jbeam_files(folder_path, vehicle_id, skin_id,
 
 def _apply_skin_id_regexes(content: str, skin_id: str,
                              skin_folder_name: str, vehicle_id: str) -> str:
-    def _val(m):  return f'"{m.group(1)}{skin_id}"'
-    def _name(m): return f'{m.group(1)}{skin_id}"'
-
-    content = re.sub(r'"([^"]+\.skin\.)[^"]+"',                     _val,  content)
-    content = re.sub(r'"([^"]+\.skin_[^.]*\.)[^"]+"',               _val,  content)
-    content = re.sub(r'("name"\s*:\s*"[^"]+\.skin\.)[^"]+"',        _name, content)
-    content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin\.)[^"]+"',       _name, content)
-    content = re.sub(r'("name"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"',  _name, content)
-    content = re.sub(r'("mapTo"\s*:\s*"[^"]+\.skin_[^.]*\.)[^"]+"', _name, content)
-    content = re.sub(r'"([^"]*_extra\.skin\.)[^"]+"',                _val,  content)
-    content = re.sub(r'("name"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',   _name, content)
-    content = re.sub(r'("mapTo"\s*:\s*"[^"]*_extra\.skin\.)[^"]+"',  _name, content)
+    print(f"[DEBUG] _apply_skin_id_regexes: skin_id={skin_id!r} "
+          f"skin_folder_name={skin_folder_name!r} vehicle_id={vehicle_id!r}")
+    content = _apply_skin_reference_regexes(content, skin_id)
     content = re.sub(r'/SKINNAME/', f'/{skin_folder_name}/',
                      content, flags=re.IGNORECASE)
     content = re.sub(r'_skin_SKINNAME(\.[^"]+)', f'_skin_{skin_id}\\1',
@@ -151,6 +196,9 @@ def _process_json_files(
 ):
     data_path    = f"vehicles/{vehicle_id}/{skin_folder_name}/{data_map_filename}"
     palette_path = f"vehicles/{vehicle_id}/{skin_folder_name}/{color_map_filename}"
+
+    print(f"[DEBUG] _process_json_files: folder_path={folder_path!r} vehicle_id={vehicle_id!r} "
+          f"data_path={data_path!r} palette_path={palette_path!r}")
 
     for root_dir, _, files in os.walk(folder_path):
         for filename in files:
@@ -176,10 +224,10 @@ def _process_json_files(
                     for idx in (0, 1):
                         if idx >= len(stages) or not isinstance(stages[idx], dict):
                             continue
-                        stages[idx]["baseColorMap"] = data_path
                         if idx == 0:
                             stages[idx]["colorPaletteMapUseUV"] = None
                         else:
+                            stages[idx]["baseColorMap"]         = data_path
                             stages[idx]["diffuseMapUseUV"]      = 1
                             stages[idx]["colorPaletteMap"]      = palette_path
                             stages[idx]["colorPaletteMapUseUV"] = 1
@@ -206,6 +254,10 @@ def _process_json_files_variant(
 
     var_prefix = f"{variant_suffix}.skin."
 
+    print(f"[DEBUG] _process_json_files_variant: folder_path={folder_path!r} "
+          f"vehicle_id={vehicle_id!r} var_prefix={var_prefix!r} "
+          f"car_data_path={car_data_path!r} var_data_path={var_data_path!r}")
+
     for root_dir, _, files in os.walk(folder_path):
         for filename in files:
             if not filename.endswith(".json") or filename.startswith("info"):
@@ -229,7 +281,6 @@ def _process_json_files_variant(
                     if not isinstance(stages, list):
                         continue
 
-
                     is_var   = mat_key.lower().startswith(var_prefix.lower())
                     d_path   = var_data_path    if is_var else car_data_path
                     p_path   = var_palette_path if is_var else car_palette_path
@@ -240,11 +291,11 @@ def _process_json_files_variant(
                     for idx in (0, 1):
                         if idx >= len(stages) or not isinstance(stages[idx], dict):
                             continue
-                        stages[idx]["baseColorMap"] = d_path
                         if idx == 0:
                             stages[idx]["colorPaletteMapUseUV"] = None
-                            print(f"[DEBUG]     Stage 0 baseColorMap = {d_path}")
+                            print("[DEBUG]     Stage 0 baseColorMap preserved (unchanged)")
                         else:
+                            stages[idx]["baseColorMap"]         = d_path
                             stages[idx]["diffuseMapUseUV"]      = 1
                             stages[idx]["colorPaletteMap"]      = p_path
                             stages[idx]["colorPaletteMapUseUV"] = 1
@@ -263,6 +314,7 @@ def _process_json_files_variant(
 
 def _process_material_properties(folder_path, material_props, skin_id):
     if not material_props:
+        print(f"[DEBUG] _process_material_properties: no material_props for {skin_id!r}, skipping")
         return True
     print(f"[DEBUG] ===== _process_material_properties for {skin_id} =====")
 
@@ -272,11 +324,15 @@ def _process_material_properties(folder_path, material_props, skin_id):
             if fn.endswith(".materials.json") or fn == "materials.json":
                 mat_files.append(os.path.join(root_dir, fn))
 
+    print(f"[DEBUG] _process_material_properties: found {len(mat_files)} materials.json file(s)")
+
     if not mat_files:
         print(f"[WARNING] No .materials.json found in {folder_path}")
         return False
 
     try:
+        failed_files = []
+
         for mat_file in mat_files:
             with open(mat_file, "r", encoding="utf-8") as fh:
                 raw = fh.read()
@@ -285,6 +341,7 @@ def _process_material_properties(folder_path, material_props, skin_id):
                 mat_data = json.loads(raw_clean)
             except json.JSONDecodeError as exc:
                 print(f"[ERROR] JSON decode error in {os.path.basename(mat_file)}: {exc}")
+                failed_files.append(os.path.basename(mat_file))
                 continue
 
             modified = False
@@ -297,7 +354,8 @@ def _process_material_properties(folder_path, material_props, skin_id):
                 for stage_str, props in stages.items():
                     try:
                         idx = int(stage_str)
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as _exc:
+                        print(f"[WARNING] _process_material_properties: {type(_exc).__name__}: {_exc}")
                         continue
                     if idx >= len(mat_data[actual]["Stages"]):
                         continue
@@ -310,7 +368,15 @@ def _process_material_properties(folder_path, material_props, skin_id):
                 with open(mat_file, "w", encoding="utf-8") as fh:
                     json.dump(mat_data, fh, indent=2)
 
-        print(f"[DEBUG] ===== _process_material_properties complete =====")
+        print("[DEBUG] ===== _process_material_properties complete =====")
+
+        if failed_files:
+            print(f"[WARNING] _process_material_properties: "
+                  f"{len(failed_files)}/{len(mat_files)} materials.json file(s) "
+                  f"could not be parsed and were left unmodified: "
+                  f"{', '.join(failed_files)}")
+            return False
+
         return True
 
     except Exception as exc:
@@ -330,9 +396,15 @@ def generate_colorable_skin(
     color_map_source,
     author_name=None,
     material_properties=None,
+    skin_data_ref=None,
 ):
+    from core.file_ops import apply_emissive_glow
+
     skin_id = sanitize_skin_id(skin_name)
     print(f"[DEBUG] generate_colorable_skin: '{skin_name}' folder='{skin_folder}' id='{skin_id}'")
+    print(f"[DEBUG] generate_colorable_skin: vehicle_id={vehicle_id!r} template_path={template_path!r} "
+          f"dest_skin_folder={dest_skin_folder!r} data_map_source={data_map_source!r} "
+          f"color_map_source={color_map_source!r} author_name={author_name!r}")
 
     shutil.copytree(
         template_path, dest_skin_folder,
@@ -354,6 +426,10 @@ def generate_colorable_skin(
         if not _process_material_properties(dest_skin_folder, material_properties, skin_id):
             print(f"[WARNING] Material properties processing failed for {skin_folder}")
 
+    if skin_data_ref and skin_data_ref.get("emissive_dds_path"):
+        if not apply_emissive_glow(skin_data_ref, vehicle_id, skin_folder, dest_skin_folder):
+            print(f"[WARNING] Emissive glow failed for {skin_folder}")
+
     print(f"[DEBUG] generate_colorable_skin complete: {skin_folder}")
 
 
@@ -370,10 +446,16 @@ def generate_colorable_skin_variant(
     color_map_source_2,
     author_name=None,
     material_properties=None,
+    skin_data_ref=None,
 ):
+    from core.file_ops import apply_emissive_glow
+
     skin_id = sanitize_skin_id(skin_name)
     print(f"[DEBUG] generate_colorable_skin_variant: '{skin_name}' "
           f"({variant_suffix}) → 4 PNGs, single folder")
+    print(f"[DEBUG] generate_colorable_skin_variant: vehicle_id={vehicle_id!r} "
+          f"template_path={template_path!r} dest_skin_folder={dest_skin_folder!r} "
+          f"author_name={author_name!r}")
 
     shutil.copytree(
         template_path, dest_skin_folder,
@@ -397,5 +479,9 @@ def generate_colorable_skin_variant(
     if material_properties:
         if not _process_material_properties(dest_skin_folder, material_properties, skin_id):
             print(f"[WARNING] Material properties processing failed for {skin_folder}")
+
+    if skin_data_ref and skin_data_ref.get("emissive_dds_path"):
+        if not apply_emissive_glow(skin_data_ref, vehicle_id, skin_folder, dest_skin_folder):
+            print(f"[WARNING] Emissive glow failed for {skin_folder}")
 
     print(f"[DEBUG] generate_colorable_skin_variant complete: {skin_folder}")

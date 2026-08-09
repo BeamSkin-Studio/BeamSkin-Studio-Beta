@@ -26,9 +26,14 @@
         "normalMap": "/vehicles/wendover/wendover_n.normal.png",
         "opacityMap": "/vehicles/wendover/wendover_main_c.data.png",
         "baseColorMap": "vehicles/wendover/SKINNAME/wendover_skin_SKINNAME.png",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

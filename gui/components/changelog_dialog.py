@@ -8,25 +8,27 @@ from PySide6.QtCore    import Qt, QTimer, Signal, QObject
 from PySide6.QtGui     import QColor
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QWidget,
+    QScrollArea, QWidget, QPushButton, QComboBox,
 )
 
 from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import AnimButton, GhostButton, Spinner, HSeparator
+from gui.widgets import AnimButton
 from gui.icon_helper import set_window_icon
-from gui.state   import state
 
 try:
     from core.localization import t, get_current_language
-except ImportError:
-    def t(key, **kw): return key
-    def get_current_language(): return "en"
-
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
+    def get_current_language():
+        return 'en'
 
 try:
     from deep_translator import GoogleTranslator as _GT
     _TRANSLATE_AVAIL = True
-except ImportError:
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     _TRANSLATE_AVAIL = False
 
 _LOCALE_MAP = {
@@ -42,16 +44,25 @@ def _target_lang() -> str:
     try:
         code = get_current_language()
         return _LOCALE_MAP.get(code, code[:2].lower())
-    except Exception:
-        return "en"
+    except Exception as _exc:
+        print(f"[WARNING] _target_lang: {type(_exc).__name__}: {_exc}")
+        return 'en'
 
 
 def _should_translate() -> bool:
     return _target_lang() not in ("en",)
 
 
+try:
+    from core.settings import get_data_dir
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def get_data_dir() -> str:
+        return 'data'
+
+
 def _seen_path() -> str:
-    return os.path.join("data", "seen_changelogs.json")
+    return os.path.join(get_data_dir(), "seen_changelogs.json")
 
 
 def _load_seen() -> list:
@@ -59,8 +70,8 @@ def _load_seen() -> list:
         if os.path.exists(_seen_path()):
             with open(_seen_path(), encoding="utf-8") as f:
                 return json.load(f)
-    except Exception:
-        pass
+    except Exception as _exc:
+        print(f"[WARNING] _load_seen: {type(_exc).__name__}: {_exc}")
     return []
 
 
@@ -72,8 +83,8 @@ def _mark_seen(version: str):
     try:
         with open(_seen_path(), "w", encoding="utf-8") as f:
             json.dump(seen, f)
-    except Exception:
-        pass
+    except Exception as _exc:
+        print(f"[WARNING] _mark_seen: {type(_exc).__name__}: {_exc}")
 
 
 def has_seen_changelog(version: str) -> bool:
@@ -111,8 +122,6 @@ def _exec_remote_changelog(source: str) -> list | None:
         "separator":    _separator,
         "TypedDict":    TypedDict,
         "Literal":      Literal,
-
-
         "__builtins__": _builtins,
     }
     try:
@@ -144,7 +153,6 @@ def fetch_remote_changelog_for_version(version: str) -> dict | None:
     if not changelogs:
         return None
 
-
     target = _normalise_version(version)
     print(f"[changelog] looking for version '{target}' (raw: '{version}')")
     for entry in changelogs:
@@ -153,7 +161,6 @@ def fetch_remote_changelog_for_version(version: str) -> dict | None:
             if entry_ver == target:
                 print(f"[changelog] found matching entry for {target}")
                 return entry
-
 
     print(f"[changelog] no exact match for '{target}', falling back to latest entry")
     return changelogs[0] if changelogs else None
@@ -165,7 +172,6 @@ class _FetchSignals(QObject):
 
 
 def show_update_changelog(parent: "QWidget", version: str) -> None:
-
     loading_data = {
         "version": version,
         "date": "",
@@ -208,13 +214,12 @@ class _TranslationSignals(QObject):
 
 
 class ChangelogDialog(QDialog):
-
     def __init__(self, parent: QWidget, changelog_data: dict,
-                 *, preview_mode: bool = False):
+                 *, preview_mode: bool = False, browsable: bool = False):
         super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
         set_window_icon(self)
         self.setModal(True)
-        self.setFixedSize(620, 600)
+        self.setFixedSize(620, 720)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background:transparent;")
 
@@ -228,14 +233,65 @@ class ChangelogDialog(QDialog):
         self._signals      = _TranslationSignals(self)
         self._signals.done.connect(self._apply_translation)
 
+        self._browsable     = browsable
+        self._all_versions: list[str] = []
+        self._version_index = 0
+        self._prev_btn: Optional[QPushButton] = None
+        self._next_btn: Optional[QPushButton] = None
+        self._version_combo: Optional[QComboBox] = None
+        if browsable:
+            self._all_versions = self._load_all_versions()
+            try:
+                self._version_index = self._all_versions.index(self._version)
+            except ValueError as _exc:
+                print(f"[WARNING] __init__: {type(_exc).__name__}: {_exc}")
+                self._version_index = 0
+
         if parent:
-            pg = parent.frameGeometry()
+            top = parent.window()
+            pg = top.frameGeometry()
             self.move(pg.x() + (pg.width()  - 620) // 2,
-                      pg.y() + (pg.height() - 600) // 2)
+                      pg.y() + (pg.height() - 720) // 2)
 
         self._build()
         drop_shadow(self._card, 36, (0, 10))
         fade_in(self._card, 220)
+
+
+    def _load_all_versions(self) -> list:
+        try:
+            from core.changelog import get_all_versions
+            return get_all_versions()
+        except Exception as e:
+            print(f"[changelog] could not load version list: {e}")
+            return [self._version] if self._version else []
+
+    def _go_to_version(self, index: int):
+        if not self._all_versions:
+            return
+        index = index % len(self._all_versions)
+        version = self._all_versions[index]
+        try:
+            from core.changelog import get_changelog_for_version
+            data = get_changelog_for_version(version)
+        except Exception as e:
+            print(f"[changelog] could not load version {version!r}: {e}")
+            data = None
+        if data is None:
+            return
+        self._version_index = index
+        self._update_remote_data(data)
+        self._refresh_nav_buttons()
+
+    def _refresh_nav_buttons(self):
+        if not self._browsable or self._prev_btn is None:
+            return
+        self._prev_btn.setEnabled(True)
+        self._next_btn.setEnabled(True)
+        if self._version_combo is not None:
+            self._version_combo.blockSignals(True)
+            self._version_combo.setCurrentIndex(self._version_index)
+            self._version_combo.blockSignals(False)
 
 
     def _build(self):
@@ -243,7 +299,7 @@ class ChangelogDialog(QDialog):
 
         self._card = QFrame(self)
         self._card.setObjectName("mainCard")
-        self._card.setGeometry(0, 0, 620, 600)
+        self._card.setGeometry(0, 0, 620, 720)
         self._card.setStyleSheet(f"""
             QFrame#mainCard {{
                 background-color: {COLORS['app_bg']};
@@ -255,7 +311,6 @@ class ChangelogDialog(QDialog):
         root = QVBoxLayout(self._card)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-
 
         hdr = QFrame()
         hdr.setObjectName("dlgHeader")
@@ -279,7 +334,6 @@ class ChangelogDialog(QDialog):
         hdr_row.setContentsMargins(24, 8, 24, 0)
         hdr_row.setSpacing(16)
 
-
         badge = QFrame()
         badge.setFixedSize(50, 50)
         badge.setStyleSheet(f"""
@@ -299,7 +353,6 @@ class ChangelogDialog(QDialog):
         b_icon.setStyleSheet("color:white;background:transparent;border:none;")
         b_lay.addWidget(b_icon)
         hdr_row.addWidget(badge)
-
 
         txt_col = QVBoxLayout()
         txt_col.setSpacing(5)
@@ -323,6 +376,88 @@ class ChangelogDialog(QDialog):
         hdr_row.addLayout(txt_col, 1)
         self._sub_lbl = sub_lbl
 
+        if self._browsable:
+            nav_row = QHBoxLayout()
+            nav_row.setSpacing(4)
+
+            def _nav_btn(arrow: str) -> QPushButton:
+                b = QPushButton(arrow)
+                b.setFixedSize(30, 30)
+                b.setFont(font(13, "bold"))
+                b.setCursor(Qt.PointingHandCursor)
+                b.setStyleSheet(f"""
+                    QPushButton {{
+                        background:{COLORS['card_bg']};
+                        color:{COLORS['text']};
+                        border:1px solid {COLORS['border']};
+                        border-radius:8px;
+                    }}
+                    QPushButton:hover:enabled {{
+                        background:{COLORS.get('card_hover', COLORS['card_bg'])};
+                        border-color:{COLORS['accent']};
+                    }}
+                    QPushButton:disabled {{
+                        color:{COLORS['text_secondary']};
+                    }}
+                """)
+                return b
+
+            self._prev_btn = _nav_btn("‹")
+            self._prev_btn.setToolTip(t("changelog.older", default="Older version"))
+            self._prev_btn.clicked.connect(
+                lambda: self._go_to_version(self._version_index + 1)
+            )
+            nav_row.addWidget(self._prev_btn)
+
+            self._version_combo = QComboBox()
+            self._version_combo.addItems(self._all_versions)
+            self._version_combo.setCurrentIndex(self._version_index)
+            self._version_combo.setFixedHeight(30)
+            self._version_combo.setFont(font(11))
+            self._version_combo.setCursor(Qt.PointingHandCursor)
+            self._version_combo.setStyleSheet(f"""
+                QComboBox {{
+                    background:{COLORS['card_bg']};
+                    color:{COLORS['text']};
+                    border:1px solid {COLORS['border']};
+                    border-radius:8px;
+                    padding:0 8px;
+                    min-width:110px;
+                }}
+                QComboBox:hover {{
+                    border-color:{COLORS['accent']};
+                }}
+                QComboBox::drop-down {{
+                    border:none;
+                    width:18px;
+                }}
+                QComboBox::down-arrow {{
+                    width:10px;
+                    height:10px;
+                }}
+                QComboBox QAbstractItemView {{
+                    background:{COLORS['card_bg']};
+                    color:{COLORS['text']};
+                    border:1px solid {COLORS['border']};
+                    border-radius:8px;
+                    selection-background-color:{COLORS['accent']};
+                    selection-color:{COLORS.get('accent_text','white')};
+                    padding:4px;
+                }}
+            """)
+            self._version_combo.currentIndexChanged.connect(self._go_to_version)
+            nav_row.addWidget(self._version_combo)
+
+            self._next_btn = _nav_btn("›")
+            self._next_btn.setToolTip(t("changelog.newer", default="Newer version"))
+            self._next_btn.clicked.connect(
+                lambda: self._go_to_version(self._version_index - 1)
+            )
+            nav_row.addWidget(self._next_btn)
+
+            hdr_row.addLayout(nav_row)
+            self._refresh_nav_buttons()
+
         if _TRANSLATE_AVAIL and _should_translate():
             self._translate_btn = AnimButton(
                 t("changelog.translate", default="Translate"),
@@ -337,7 +472,6 @@ class ChangelogDialog(QDialog):
             self._translate_btn = None
 
         root.addWidget(hdr)
-
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -370,7 +504,6 @@ class ChangelogDialog(QDialog):
         self._content_layout.setSpacing(0)
         scroll.setWidget(self._content_w)
         root.addWidget(scroll, 1)
-
 
         ftr = QFrame()
         ftr.setObjectName("dlgFooter")
@@ -411,7 +544,6 @@ class ChangelogDialog(QDialog):
 
 
     def _clear_content(self):
-
         if self._loading_timer is not None:
             self._loading_timer.stop()
             self._loading_timer = None
@@ -422,7 +554,6 @@ class ChangelogDialog(QDialog):
 
     def _render_entries(self, entries: list):
         self._clear_content()
-
 
         preamble: list = []
         sections: list = []
@@ -447,10 +578,8 @@ class ChangelogDialog(QDialog):
         if current is not None:
             sections.append(current)
 
-
         for entry in preamble:
             self._render_preamble_entry(entry)
-
 
         for section in sections:
             if section.get("separator"):
@@ -502,7 +631,6 @@ class ChangelogDialog(QDialog):
     def _render_section_card(self, section: dict):
         self._content_layout.addSpacing(12)
 
-
         accent_c = QColor(COLORS['accent'])
         glow_color = f"rgba({accent_c.red()},{accent_c.green()},{accent_c.blue()},55)"
         glow_wrap = QFrame()
@@ -518,7 +646,6 @@ class ChangelogDialog(QDialog):
         glow_lay.setContentsMargins(5, 5, 5, 5)
         glow_lay.setSpacing(0)
 
-
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame#sectionCard {{
@@ -531,7 +658,6 @@ class ChangelogDialog(QDialog):
         card_lay = QVBoxLayout(card)
         card_lay.setContentsMargins(0, 0, 0, 0)
         card_lay.setSpacing(0)
-
 
         title_row = QFrame()
         title_row.setObjectName("titleRow")
@@ -553,7 +679,6 @@ class ChangelogDialog(QDialog):
         tr_lay.addWidget(title_lbl)
         card_lay.addWidget(title_row)
 
-
         if section["children"]:
             body = QWidget()
             body.setStyleSheet("background:transparent;border:none;")
@@ -564,7 +689,6 @@ class ChangelogDialog(QDialog):
             for child in section["children"]:
                 ctype = child.get("type", "item")
                 ctext = child.get("text", "")
-
 
                 if ctype == "subtitle":
                     lbl = QLabel(ctext.upper())
@@ -579,7 +703,6 @@ class ChangelogDialog(QDialog):
                         padding-top: 2px;
                     """)
                     body_lay.addWidget(lbl)
-
 
                 elif ctype == "item":
                     row = QFrame()
@@ -607,7 +730,6 @@ class ChangelogDialog(QDialog):
                     )
                     rl.addWidget(item_lbl, 1)
                     body_lay.addWidget(row)
-
 
                 elif ctype == "note":
                     note_card = QFrame()
@@ -640,12 +762,18 @@ class ChangelogDialog(QDialog):
         self._date    = data.get("date", "")
         self._entries = list(data.get("entries", []))
 
-
         if self._sub_lbl is not None:
             sub_text = f"Version {self._version}"
             if self._date:
                 sub_text += f"  ·  {self._date}"
             self._sub_lbl.setText(sub_text)
+
+        self._translating = False
+        if self._translate_btn:
+            self._translate_btn.setText(
+                "🌐  " + t("changelog.translate", default="Translate")
+            )
+            self._translate_btn.setEnabled(True)
 
         self._render_entries(self._entries)
 
@@ -670,7 +798,8 @@ class ChangelogDialog(QDialog):
                 try:
                     translated = _GT(source="en", target=target).translate(entry["text"])
                     out.append({**entry, "text": translated or entry["text"]})
-                except Exception:
+                except Exception as _exc:
+                    print(f"[WARNING] _worker: {type(_exc).__name__}: {_exc}")
                     out.append(entry)
             self._signals.done.emit(out)
 
@@ -687,8 +816,6 @@ class ChangelogDialog(QDialog):
 
 
     def _on_close(self):
-
-
         if not self._preview_mode:
             _mark_seen(self._version)
         self.accept()
@@ -714,3 +841,16 @@ def show_changelog_if_needed(
         return False
     ChangelogDialog(parent, data).show()
     return True
+
+
+def show_changelog_browser(parent: QWidget, version: Optional[str] = None) -> None:
+    from core.changelog import get_latest_changelog, get_changelog_for_version
+
+    data = get_changelog_for_version(version) if version else None
+    if data is None:
+        data = get_latest_changelog()
+    if data is None:
+        print("[changelog] show_changelog_browser: no changelog entries available")
+        return
+
+    ChangelogDialog(parent, data, preview_mode=True, browsable=True).show()

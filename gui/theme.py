@@ -2,12 +2,8 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from PySide6.QtCore  import (QPropertyAnimation, QEasingCurve,
-                              QRect, QPoint, QSize, Qt, QTimer,
-                              QParallelAnimationGroup, QSequentialAnimationGroup)
-from PySide6.QtGui   import (QColor, QPalette, QFont, QFontDatabase,
-                              QLinearGradient, QBrush, QPainter, QPen,
-                              QPixmap, QIcon)
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect, QSequentialAnimationGroup
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (QWidget, QGraphicsDropShadowEffect,
                                 QGraphicsOpacityEffect, QApplication)
 
@@ -72,7 +68,6 @@ LIGHT_COLORS: dict[str, str] = {
     "glass_bg":             "rgba(255,255,255,0.85)",
 }
 
-
 COLORS: dict[str, str] = dict(DARK_COLORS)
 
 
@@ -132,7 +127,6 @@ def _build_pattern(mapping: dict[str, str]) -> re.Pattern:
 _PATTERN_D2L: re.Pattern = _build_pattern(_DARK_TO_LIGHT)
 _PATTERN_L2D: re.Pattern = _build_pattern(_LIGHT_TO_DARK)
 
-
 _D2L_LOWER: dict[str, str] = {k.lower(): v for k, v in _DARK_TO_LIGHT.items()}
 _L2D_LOWER: dict[str, str] = {k.lower(): v for k, v in _LIGHT_TO_DARK.items()}
 
@@ -144,7 +138,6 @@ def _apply_mapping(ss: str, pattern: re.Pattern, lower_map: dict[str, str]) -> s
 
 
 class ThemeManager:
-
     _inst: Optional["ThemeManager"] = None
 
     @classmethod
@@ -154,7 +147,6 @@ class ThemeManager:
         return cls._inst
 
     def __init__(self) -> None:
-        print(f"[DEBUG] __init__() called")
         self._mode = "dark"
 
     @property
@@ -173,7 +165,7 @@ class ThemeManager:
         self._apply_to_app()
 
     def toggle(self) -> str:
-        print(f"[DEBUG] ThemeManager.toggle: toggling theme")
+        print("[DEBUG] ThemeManager.toggle: toggling theme")
         new = "light" if self._mode == "dark" else "dark"
         self.set_mode(new)
         return new
@@ -184,9 +176,7 @@ class ThemeManager:
         if not app:
             return
 
-
         app.setStyleSheet(build_app_qss())
-
 
         if self._mode == "light":
             pattern, lower_map = _PATTERN_D2L, _D2L_LOWER
@@ -210,6 +200,8 @@ def _restyle_subtree(
 def _restyle_one(w: QWidget, pattern: re.Pattern, lower_map: dict[str, str]) -> None:
     ss = w.styleSheet()
     if not ss:
+        return
+    if not pattern.search(ss):
         return
     new_ss = _apply_mapping(ss, pattern, lower_map)
     if new_ss != ss:
@@ -383,6 +375,9 @@ def radio_style() -> str:
         QRadioButton {{
             color:{COLORS['text']};font-size:13px;spacing:8px;
         }}
+        QRadioButton:disabled {{
+            color:{COLORS['text_muted']};
+        }}
         QRadioButton::indicator {{
             width:16px;height:16px;border-radius:8px;
             border:2px solid {COLORS['border']};background:{COLORS['frame_bg']};
@@ -391,6 +386,12 @@ def radio_style() -> str:
             border-color:{COLORS['accent']};background:{COLORS['accent']};
         }}
         QRadioButton::indicator:hover {{ border-color:{COLORS['accent']}; }}
+        QRadioButton::indicator:disabled {{
+            border-color:{COLORS['border']};background:{COLORS['frame_bg']};
+        }}
+        QRadioButton::indicator:checked:disabled {{
+            border-color:{COLORS['text_muted']};background:{COLORS['text_muted']};
+        }}
     """
 
 
@@ -418,12 +419,21 @@ def checkbox_style() -> str:
         QCheckBox {{
             color:{COLORS['text']};font-size:13px;spacing:8px;
         }}
+        QCheckBox:disabled {{
+            color:{COLORS['text_muted']};
+        }}
         QCheckBox::indicator {{
             width:16px;height:16px;border-radius:4px;
             border:2px solid {COLORS['border']};background:{COLORS['frame_bg']};
         }}
         QCheckBox::indicator:checked {{
             background:{COLORS['accent']};border-color:{COLORS['accent']};
+        }}
+        QCheckBox::indicator:disabled {{
+            border-color:{COLORS['border']};background:{COLORS['frame_bg']};
+        }}
+        QCheckBox::indicator:checked:disabled {{
+            background:{COLORS['text_muted']};border-color:{COLORS['text_muted']};
         }}
     """
 
@@ -462,8 +472,6 @@ def fade_in(
     anim.setStartValue(start)
     anim.setEndValue(end)
     anim.setEasingCurve(QEasingCurve.OutCubic)
-
-
     anim.finished.connect(lambda: widget.setGraphicsEffect(None))
     anim.start(QPropertyAnimation.DeleteWhenStopped)
     return anim
@@ -513,5 +521,3 @@ def pulse_scale(widget: QWidget, duration: int = 150) -> QSequentialAnimationGro
     grp.addAnimation(a2)
     grp.start(QSequentialAnimationGroup.DeleteWhenStopped)
     return grp
-
-

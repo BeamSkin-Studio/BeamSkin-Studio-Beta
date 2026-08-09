@@ -16,32 +16,29 @@ _debug_textbox: "QTextEdit | None" = None
 
 
 class DebugOutput(io.StringIO):
-
     def __init__(self):
         super().__init__()
-
-
-        self._terminal = sys.__stdout__
+        self._previous_stdout = sys.stdout
 
     def write(self, message: str) -> int:
-
-        if self._terminal is not None:
+        if self._previous_stdout is not None:
             try:
-                self._terminal.write(message)
-            except Exception:
-                pass
-
+                self._previous_stdout.write(message)
+            except Exception as _exc:
+                print(f"[WARNING] write: {type(_exc).__name__}: {_exc}")
 
         if debug_mode_enabled and _debug_textbox is not None:
-
             _msg = message
             QTimer.singleShot(0, lambda m=_msg: _append_debug_text(m))
 
         return len(message)
 
     def flush(self):
-        if self._terminal and hasattr(self._terminal, "flush"):
-            self._terminal.flush()
+        if self._previous_stdout and hasattr(self._previous_stdout, "flush"):
+            try:
+                self._previous_stdout.flush()
+            except Exception as _exc:
+                print(f"[WARNING] flush: {type(_exc).__name__}: {_exc}")
 
 
 _COLOR_NORMAL = QColor("#FF8C00")
@@ -51,7 +48,6 @@ _ERROR_MARKERS = ("[ERROR]", "[WARN]", "[WARNING]", "ERROR", "CRITICAL", "Traceb
 
 
 def _append_debug_text(message: str) -> None:
-    global _debug_textbox
     if _debug_textbox is None:
         return
     try:
@@ -67,13 +63,12 @@ def _append_debug_text(message: str) -> None:
         cursor.insertText(f"[{timestamp}] {message}", fmt)
         _debug_textbox.setTextCursor(cursor)
         _debug_textbox.ensureCursorVisible()
-    except Exception:
-        pass
+    except Exception as _exc:
+        print(f"[WARNING] _append_debug_text: {type(_exc).__name__}: {_exc}")
 
 
 def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     global _debug_window, _debug_textbox, debug_mode_enabled
-
 
     if _debug_window is not None and _debug_window.isVisible():
         _debug_window.raise_()
@@ -82,11 +77,9 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
 
     debug_mode_enabled = True
 
-
     win = QDialog(parent)
     win.setWindowTitle("Debug Console")
     win.resize(800, 600)
-
     win.setWindowFlags(
         win.windowFlags()
         | Qt.WindowMaximizeButtonHint
@@ -100,7 +93,6 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     col = QVBoxLayout(win)
     col.setContentsMargins(10, 10, 10, 10)
     col.setSpacing(6)
-
 
     header = QFrame()
     header.setStyleSheet(
@@ -152,7 +144,6 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
 
     col.addWidget(header)
 
-
     textbox = QTextEdit()
     textbox.setReadOnly(True)
     textbox.setFont(QFont("Consolas", 10))
@@ -167,15 +158,13 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
     col.addWidget(textbox)
     _debug_textbox = textbox
 
-
     def _on_close():
         global debug_mode_enabled, _debug_window, _debug_textbox
         debug_mode_enabled = False
         _debug_window = None
         _debug_textbox = None
-
         if isinstance(sys.stdout, DebugOutput):
-            sys.stdout = sys.__stdout__
+            sys.stdout = sys.stdout._previous_stdout
         if on_close_callback and callable(on_close_callback):
             on_close_callback()
 
@@ -187,22 +176,19 @@ def create_debug_window(parent, colors: dict, on_close_callback=None) -> None:
 
 
 def toggle_debug_mode(app, colors: dict, on_close=None) -> None:
-    global debug_mode_enabled, _debug_window
+    global debug_mode_enabled
 
     if debug_mode_enabled:
-
         if _debug_window is not None and _debug_window.isVisible():
             _debug_window.close()
         else:
-
             debug_mode_enabled = False
             if isinstance(sys.stdout, DebugOutput):
-                sys.stdout = sys.__stdout__
+                sys.stdout = sys.stdout._previous_stdout
             if on_close and callable(on_close):
                 on_close()
     else:
         create_debug_window(app, colors, on_close_callback=on_close)
-
         if not isinstance(sys.stdout, DebugOutput):
             sys.stdout = DebugOutput()
         print("[DEBUG] Debug console activated — output redirection enabled")

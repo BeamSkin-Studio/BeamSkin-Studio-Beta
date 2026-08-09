@@ -26,19 +26,14 @@
         "metallicFactor": 0.75,
         "normalMap": "/vehicles/us_semi/cabover_main_nm.normal.png",
         "opacityMap": "/vehicles/us_semi/cabover_main_c.data.png",
-		"roughnessFactor": 1
-      },
-      {
-        "clearCoatFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null
-      },
-      {
-        "clearCoatFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null
+		"roughnessFactor": 1,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.20,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,
@@ -74,19 +69,14 @@
         "metallicFactor": 0.75,
         "normalMap": "/vehicles/us_semi/longnose_main_nm.normal.png",
         "opacityMap": "/vehicles/us_semi/longnose_main_c.data.png",
-        "roughnessFactor": 1
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
+        "roughnessFactor": 1,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.20,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,
@@ -117,17 +107,14 @@
         "metallicFactor": 0.800000012,
         "normalMap": "vehicles/common/us_semi_cargobox/cargobox_nm.normal.png",
         "opacityMap": "/vehicles/common/us_semi_cargobox/cargobox_c.data.png",
-        "roughnessFactor": 0.600000024
-      },
-      {
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
-      },
-      {
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
+        "roughnessFactor": 0.600000024,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.20,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,

@@ -1,28 +1,30 @@
 from __future__ import annotations
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, Optional, Any
 
 from gui.theme import COLORS, ThemeManager
 
 try:
     from core.settings import app_settings
     import core.settings as _settings_module
-except ImportError:
-    app_settings     = {}
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    app_settings = {}
     _settings_module = None  # type: ignore
 
 try:
     from core.config import VEHICLE_IDS
-except ImportError:
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     VEHICLE_IDS: dict = {}
 
 try:
     from core.updater import CURRENT_VERSION
-except ImportError:
-    CURRENT_VERSION = "1.0.0"
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    CURRENT_VERSION = '1.0.0'
 
 
 class StateManager:
-
     _instance: Optional["StateManager"] = None
 
     def __new__(cls):
@@ -32,11 +34,9 @@ class StateManager:
         return cls._instance
 
     def __init__(self):
-        print(f"[DEBUG] __init__() called")
         if self._initialized:
             return
         self._initialized = True
-
 
         self.colors: Dict[str, str] = COLORS
 
@@ -47,12 +47,12 @@ class StateManager:
 
         self.theme_mode: str = self._load_theme_preference()
         self.testing_mode: bool = self._load_testing_mode_preference()
+        self.confirm_on_save: bool = self._load_confirm_on_save_preference()
 
         self._local_added_vehicles: Dict[str, str] = {}
         if self._settings_module is not None:
             if not hasattr(self._settings_module, "added_vehicles"):
                 self._settings_module.added_vehicles = self._local_added_vehicles
-
 
         self.project_data: Dict[str, Any] = {
             "mod_name":        "My Mod",
@@ -74,14 +74,10 @@ class StateManager:
         self.debug_mode:              bool = False
         self.output_icons:            Dict[str, Any] = {}
 
-
         ThemeManager.instance().set_mode(self.theme_mode)
 
 
     def _load_theme_preference(self) -> str:
-        print(f"[DEBUG] _load_theme_preference() called")
-
-
         if self._settings_module is not None:
             return getattr(self._settings_module, "app_settings", {}).get(
                 "theme_mode", "dark"
@@ -91,7 +87,6 @@ class StateManager:
         return "dark"
 
     def _load_testing_mode_preference(self) -> bool:
-        print(f"[DEBUG] _load_testing_mode_preference() called")
         if self._settings_module is not None:
             return bool(getattr(self._settings_module, "app_settings", {}).get(
                 "testing_mode", False
@@ -100,8 +95,29 @@ class StateManager:
             return bool(self.app_settings.get("testing_mode", False))
         return False
 
+    def _load_confirm_on_save_preference(self) -> bool:
+        if self._settings_module is not None:
+            return bool(getattr(self._settings_module, "app_settings", {}).get(
+                "confirm_on_save", True
+            ))
+        if isinstance(self.app_settings, dict):
+            return bool(self.app_settings.get("confirm_on_save", True))
+        return True
+
+    def set_confirm_on_save(self, enabled: bool) -> None:
+        print(f"[DEBUG] set_confirm_on_save: enabled={enabled}")
+        self.confirm_on_save = enabled
+        if self._settings_module is not None:
+            try:
+                self._settings_module.app_settings["confirm_on_save"] = enabled
+                self._settings_module.save_settings()
+            except Exception as e:
+                print(f"[WARNING] Could not persist confirm_on_save: {e}")
+        elif isinstance(self.app_settings, dict):
+            self.app_settings["confirm_on_save"] = enabled
+
     def set_testing_mode(self, enabled: bool) -> None:
-        print(f"[DEBUG] set_testing_mode() called: enabled={enabled}")
+        print(f"[DEBUG] set_testing_mode: enabled={enabled}")
         self.testing_mode = enabled
         if self._settings_module is not None:
             try:
@@ -111,17 +127,15 @@ class StateManager:
                 print(f"[WARNING] Could not persist testing_mode: {e}")
         elif isinstance(self.app_settings, dict):
             self.app_settings["testing_mode"] = enabled
-
         from PySide6.QtWidgets import QApplication
         for top in QApplication.topLevelWidgets():
             if hasattr(top, "sidebar"):
                 try:
                     top.sidebar._add_all_btn.setVisible(enabled)
-                except Exception:
-                    pass
+                except Exception as _exc:
+                    print(f"[WARNING] set_testing_mode: {type(_exc).__name__}: {_exc}")
 
     def set_theme(self, mode: str) -> None:
-        print(f"[DEBUG] set_theme() called")
         if mode not in ("dark", "light"):
             raise ValueError(f"Unknown theme mode: {mode!r}")
         self.theme_mode = mode
@@ -131,13 +145,9 @@ class StateManager:
         QTimer.singleShot(0, self._refresh_all_ui)
 
     def _save_theme_preference(self, mode: str) -> None:
-        print(f"[DEBUG] _save_theme_preference() called")
         if self._settings_module is not None:
             try:
-
                 self._settings_module.app_settings["theme_mode"] = mode
-
-
                 self._settings_module.save_settings()
             except Exception as e:
                 print(f"[WARNING] Could not persist theme preference: {e}")
@@ -147,15 +157,12 @@ class StateManager:
     def _refresh_all_ui(self) -> None:
         from PySide6.QtWidgets import QApplication
         for top in QApplication.topLevelWidgets():
-
-
             if hasattr(top, "_refresh_all_tabs"):
                 try:
                     top._refresh_all_tabs()
                     continue
                 except Exception as e:
                     print(f"[WARNING] _refresh_all_tabs delegation failed: {e}")
-
 
             if hasattr(top, "tabs"):
                 for name, tab in top.tabs.items():
@@ -167,22 +174,21 @@ class StateManager:
             if hasattr(top, "topbar") and hasattr(top.topbar, "refresh_ui"):
                 try:
                     top.topbar.refresh_ui()
-                except Exception:
-                    pass
+                except Exception as _exc:
+                    print(f"[WARNING] _refresh_all_ui: {type(_exc).__name__}: {_exc}")
             if hasattr(top, "sidebar") and hasattr(top.sidebar, "refresh_ui"):
                 try:
                     top.sidebar.refresh_ui(
                         getattr(top, "_add_vehicle_from_sidebar", None)
                     )
-
                     gen = top.tabs.get("generator") if hasattr(top, "tabs") else None
                     if gen and hasattr(gen, "set_sidebar_references"):
                         gen.set_sidebar_references(
                             top.sidebar._mod_entry,
                             top.sidebar._author_entry,
                         )
-                except Exception:
-                    pass
+                except Exception as _exc:
+                    print(f"[WARNING] _refresh_all_ui: {type(_exc).__name__}: {_exc}")
 
 
     @property
@@ -194,17 +200,21 @@ class StateManager:
 
     def reload_added_vehicles(self) -> bool:
         import json, os
-
-
-        _base = os.path.dirname(os.path.abspath(__file__))
-        path  = os.path.join(_base, "vehicles", "added_vehicles.json")
+        try:
+            from core.settings import get_vehicles_dir
+            path = os.path.join(get_vehicles_dir(), "added_vehicles.json")
+        except ImportError as _exc:
+            print(f"[WARNING] reload_added_vehicles: {type(_exc).__name__}: {_exc}")
+            _base = os.path.dirname(os.path.abspath(__file__))
+            path = os.path.join(_base, 'vehicles', 'added_vehicles.json')
         if not os.path.exists(path):
             return False
         try:
             with open(path, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
-            self.added_vehicles.clear()
-            self.added_vehicles.update(loaded)
+            target = self.added_vehicles
+            target.clear()
+            target.update(loaded)
             for cid, name in loaded.items():
                 if cid not in self.vehicle_ids:
                     self.vehicle_ids[cid] = name

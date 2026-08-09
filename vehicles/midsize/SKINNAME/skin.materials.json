@@ -23,10 +23,15 @@
         "metallicMapUseUV": 1,
         "normalMap": "/vehicles/midsize/midsize_body_nm.normal.png",
         "roughnessMap": "/vehicles/midsize/midsize_body_skin_old_r.data.png",
-        "roughnessMapUseUV": 1
-      },
-      {},
-      {}
+        "roughnessMapUseUV": 1,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

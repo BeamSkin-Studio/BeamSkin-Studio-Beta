@@ -1,7 +1,7 @@
 { 
-  "ambulance.skin.SKINNAMEAMB" : {
-    "name" : "ambulance.skin.SKINNAMEAMB",
-    "mapTo" : "ambulance.skin.SKINNAMEAMB",
+  "ambulance.skin.skinnameambulance" : {
+    "name" : "ambulance.skin.skinnameambulance",
+    "mapTo" : "ambulance.skin.skinnameambulance",
     "class" : "Material",
     "persistentId" : "38c3bd1a-65b9-4d23-86d5-1689115b78e9",
     "Stages": [
@@ -25,10 +25,15 @@
         "clearCoatMap": "/vehicles/common/pickup/ambulance/ambulance_main_cc.data.png",
         "normalMap": "/vehicles/common/pickup/ambulance/ambulance_n.dds",
         "opacityMap": "/vehicles/common/pickup/ambulance/ambulance_main_c.data.png",
-        "baseColorMap": "vehicles/van/SKINNAMEAMB/ambulance_skin_SKINNAMEAMB",
-      },
-      {},
-      {}
+        "baseColorMap": "vehicles/van/skinnameambulance/ambulance_skin_skinnameambulance",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -37,9 +42,9 @@
     "order_simset": 0,
     "version": 1.5
   },
-  "van.skin.SKINNAMEAMB" : {
-    "name" : "van.skin.SKINNAMEAMB",
-    "mapTo" : "van.skin.SKINNAMEAMB",
+  "van.skin.skinnameambulance" : {
+    "name" : "van.skin.skinnameambulance",
+    "mapTo" : "van.skin.skinnameambulance",
     "class" : "Material",
     "persistentId" : "2c1716b6-6515-4920-a39c-202ee48ec78c",
     "Stages": [
@@ -63,10 +68,15 @@
         "clearCoatMap": "/vehicles/van/van_main_cc.data.png",
         "normalMap": "//vehicles/van/van_main_nm.normal.png",
         "opacityMap": "/vehicles/van/van_main_c.data.png",
-        "baseColorMap": "vehicles/van/SKINNAMEAMB/van_skin_SKINNAMEAMB.dds",
-      },
-      {},
-      {}
+        "baseColorMap": "vehicles/van/skinnameambulance/van_skin_skinnameambulance.dds",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

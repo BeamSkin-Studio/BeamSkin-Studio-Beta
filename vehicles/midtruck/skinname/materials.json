@@ -22,10 +22,15 @@
         "clearCoatRoughnessFactor":0.1,
         "metallicFactor": 0,
         "normalMap": "/vehicles/midtruck/midtruck_main_nm.normal.png",
-        "opacityMap": "/vehicles/midtruck/midtruck_main_c.data.png"
-      },
-      {},
-      {}
+        "opacityMap": "/vehicles/midtruck/midtruck_main_c.data.png",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          64,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

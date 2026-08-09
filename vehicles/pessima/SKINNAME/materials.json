@@ -25,9 +25,14 @@
         "normalMap": "/vehicles/pessima/pessima_n.dds",
         "opacityMap": "/vehicles/pessima/pessima_main_c.data.png",
         "baseColorMap": "vehicles/pessima/SKINNAME/pessima_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

@@ -18,19 +18,40 @@ from gui.state import state
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return kw.get("default", key)
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return kw.get('default', key)
 
 try:
     from utils.file_ops import load_added_vehicles_json
-except ImportError:
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     def load_added_vehicles_json():
         return {}
 
 
-_APP_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_IMAGES_DIR = os.path.join(_APP_DIR, "gui", "images", "vehicles")
-_SETTINGS   = os.path.join(_APP_DIR, "data", "app_settings.json")
+try:
+    from core.settings import (
+        get_bundle_path, get_vehicles_dir, get_vehicle_previews_dir,
+        get_settings_path,
+    )
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    _APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    def get_bundle_path():
+        return _APP_DIR
+    def get_vehicles_dir():
+        return os.path.join(_APP_DIR, 'vehicles')
+    def get_vehicle_previews_dir():
+        return os.path.join(_APP_DIR, 'gui', 'images', 'vehicles')
+    def get_settings_path():
+        return os.path.join(_APP_DIR, 'data', 'app_settings.json')
+
+_IMAGES_DIR = get_vehicle_previews_dir()
+_BUNDLED_IMAGES_DIR = os.path.join(get_bundle_path(), "gui", "images", "vehicles")
+
+_VEHICLES_DIR = get_vehicles_dir()
 
 CARD_IMG_H  = 160
 CARD_W      = 280
@@ -40,16 +61,11 @@ GLOW_PAD    = 7
 
 _UV_KEYWORDS = ("uv", "uvmap", "uv_map", "uv_layout", "uv1_layout")
 _UV_EXTS     = (".dds", ".png", ".jpg", ".jpeg", ".pdn")
-
-
 _UV_TYPE_QUALIFIERS = (
     ".color", ".colour", ".data", ".normal", ".nrm",
     ".metallic", ".roughness", ".alpha", ".ao",
 )
 _UV_MAX_UNDERSCORES = 3
-
-
-_VEHICLES_DIR = os.path.join(_APP_DIR, "vehicles")
 
 
 def _is_uv_map_file(fn: str) -> bool:
@@ -83,6 +99,10 @@ def _get_local_uv_map_paths(carid: str) -> List[str]:
     if os.path.isdir(images_dir):
         _scan_tree(images_dir)
 
+    bundled_images_dir = os.path.join(_BUNDLED_IMAGES_DIR, carid)
+    if os.path.isdir(bundled_images_dir):
+        _scan_tree(bundled_images_dir)
+
     vehicles_dir = os.path.join(_VEHICLES_DIR, carid)
     if os.path.isdir(vehicles_dir):
         _scan_tree(vehicles_dir)
@@ -94,12 +114,15 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
     try:
         from core.config import get_rebadges_for
         rebadge_suffixes = set(get_rebadges_for(carid).keys())
-    except ImportError:
+    except ImportError as _exc:
+        print(f"[WARNING] _get_variant_images: {type(_exc).__name__}: {_exc}")
         rebadge_suffixes = set()
 
     vehicle_dir = os.path.join(_IMAGES_DIR, carid)
     if not os.path.isdir(vehicle_dir):
-        return []
+        vehicle_dir = os.path.join(_BUNDLED_IMAGES_DIR, carid)
+        if not os.path.isdir(vehicle_dir):
+            return []
     entries: List[Tuple[str, str]] = []
     for fn in sorted(os.listdir(vehicle_dir)):
         if not fn.lower().endswith((".jpg", ".jpeg", ".png")):
@@ -108,13 +131,10 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
             continue
         stem = os.path.splitext(fn)[0]
         stem_l = stem.lower()
-
-
         if any(stem_l == suf or stem_l.endswith(f"_{suf}") for suf in rebadge_suffixes):
             continue
         label = "Default" if stem_l == "default" else stem.replace("_", " ").title()
         entries.append((label, os.path.join(vehicle_dir, fn)))
-
     entries.sort(key=lambda x: (x[0] != "Default", x[0].lower()))
     return entries
 
@@ -122,7 +142,9 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
 def _get_rebadge_images(carid: str, suffix: str) -> List[Tuple[str, str]]:
     vehicle_dir = os.path.join(_IMAGES_DIR, carid)
     if not os.path.isdir(vehicle_dir):
-        return []
+        vehicle_dir = os.path.join(_BUNDLED_IMAGES_DIR, carid)
+        if not os.path.isdir(vehicle_dir):
+            return []
     suf_l = suffix.lower()
     candidates = [f"{suf_l}", f"default_{suf_l}"]
     for fn in sorted(os.listdir(vehicle_dir)):
@@ -252,17 +274,14 @@ class _UVSelectDialog(QDialog):
         return btn
 
     def _select_all(self):
-        print(f"[DEBUG] _select_all() called")
         for cb in self._checkboxes.values():
             cb.setChecked(True)
 
     def _deselect_all(self):
-        print(f"[DEBUG] _deselect_all() called")
         for cb in self._checkboxes.values():
             cb.setChecked(False)
 
     def _on_ok(self):
-        print(f"[DEBUG] _on_ok() called")
         self.selected_files = [
             file_info
             for file_info, cb in self._checkboxes.items()
@@ -287,11 +306,8 @@ def _lerp_color(c1: str, c2: str, t: float) -> QColor:
 
 
 class AnimatedCard(QFrame):
-
     def __init__(self, parent: QWidget | None = None):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
-
         self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self.setStyleSheet("AnimatedCard { background: transparent; border: none; }")
         self._t = 0.0
@@ -301,7 +317,6 @@ class AnimatedCard(QFrame):
         self._tick.timeout.connect(self._step)
 
     def _step(self):
-        print(f"[DEBUG] _step() called")
         target = 1.0 if self._hovered else 0.0
         self._t += (target - self._t) * 0.20
         self.update()
@@ -311,24 +326,20 @@ class AnimatedCard(QFrame):
             self.update()
 
     def enterEvent(self, event):
-        print(f"[DEBUG] enterEvent() called")
         super().enterEvent(event)
         self._hovered = True
         if not self._tick.isActive():
             self._tick.start()
 
     def leaveEvent(self, event):
-        print(f"[DEBUG] leaveEvent() called")
         super().leaveEvent(event)
         self._hovered = False
         if not self._tick.isActive():
             self._tick.start()
 
     def paintEvent(self, _event):
-        print(f"[DEBUG] paintEvent() called")
         t  = self._t
         w, h = self.width(), self.height()
-
 
         grow  = int(t * 3)
         inset = max(0, GLOW_PAD - grow)
@@ -339,7 +350,6 @@ class AnimatedCard(QFrame):
 
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-
 
         if t > 0.01:
             num_layers = 7
@@ -352,7 +362,6 @@ class AnimatedCard(QFrame):
                 p.drawRoundedRect(layer_inset, layer_inset,
                                   w - 2 * layer_inset, h - 2 * layer_inset,
                                   r, r)
-
 
         bg     = _lerp_color(COLORS["card_bg"], COLORS.get("card_hover", COLORS["card_bg"]), t)
         border = _lerp_color(COLORS["border"],  COLORS["accent"], t)
@@ -367,45 +376,57 @@ class AnimatedCard(QFrame):
 
 class CarListTab(QWidget):
     def __init__(self, parent: QWidget, **_):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
         self.setStyleSheet(f"background:{COLORS['app_bg']};")
 
         self._items: List[Tuple[QWidget, str, str]] = []
         self._modern_row = 0
         self._modern_col = 0
-        self._modern_cols_current = 0
+        self._modern_cols_current = 0   
         self._view_mode: str = self._load_view_mode()
 
         self._setup_ui()
         self._populate()
 
     def _load_view_mode(self) -> str:
-        print(f"[DEBUG] _load_view_mode() called")
         try:
-            if os.path.exists(_SETTINGS):
-                with open(_SETTINGS, "r", encoding="utf-8") as f:
+            from core.settings import app_settings
+            return app_settings.get("carlist_view_mode", "classic")
+        except ImportError as _exc:
+            print(f"[WARNING] _load_view_mode: {type(_exc).__name__}: {_exc}")
+        try:
+            settings_path = get_settings_path()
+            if os.path.exists(settings_path):
+                with open(settings_path, "r", encoding="utf-8") as f:
                     return json.load(f).get("carlist_view_mode", "classic")
-        except Exception:
-            pass
+        except Exception as _exc:
+            print(f"[WARNING] _load_view_mode: {type(_exc).__name__}: {_exc}")
         return "classic"
 
     def _save_view_mode(self):
-        print(f"[DEBUG] _save_view_mode() called")
         try:
+            from core.settings import app_settings, save_settings
+            app_settings["carlist_view_mode"] = self._view_mode
+            save_settings()
+            return
+        except ImportError as _exc:
+            print(f"[WARNING] _save_view_mode: {type(_exc).__name__}: {_exc}")
+        except Exception as e:
+            print(f"[DEBUG] CarListTab: failed to save view mode via core.settings: {e}")
+        try:
+            settings_path = get_settings_path()
             data: dict = {}
-            if os.path.exists(_SETTINGS):
-                with open(_SETTINGS, "r", encoding="utf-8") as f:
+            if os.path.exists(settings_path):
+                with open(settings_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
             data["carlist_view_mode"] = self._view_mode
-            os.makedirs(os.path.dirname(_SETTINGS), exist_ok=True)
-            with open(_SETTINGS, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+            with open(settings_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             print(f"[DEBUG] CarListTab: failed to save view mode: {e}")
 
     def _setup_ui(self):
-        print(f"[DEBUG] _setup_ui() called")
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
@@ -458,7 +479,6 @@ class CarListTab(QWidget):
         root.addWidget(self._scroll, 1)
 
     def _rebuild_inner(self):
-        print(f"[DEBUG] _rebuild_inner() called")
         outer = QWidget()
         outer.setStyleSheet("background:transparent;")
         outer_vbox = QVBoxLayout(outer)
@@ -490,7 +510,6 @@ class CarListTab(QWidget):
         self._modern_cols_current = 0
 
     def _update_toggle_style(self):
-        print(f"[DEBUG] _update_toggle_style() called")
         def _style(active: bool) -> str:
             bg  = COLORS["accent"]       if active else COLORS["card_bg"]
             bgh = COLORS["accent_hover"] if active else COLORS.get("card_hover", COLORS["card_bg"])
@@ -515,22 +534,22 @@ class CarListTab(QWidget):
         self.refresh_ui()
 
     def _populate(self):
-        print(f"[DEBUG] _populate() called")
         added = load_added_vehicles_json()
         state.added_vehicles.clear()
         state.added_vehicles.update(added)
 
         try:
             from core.config import get_rebadges_for
-        except ImportError:
-            def get_rebadges_for(_c): return {}
+        except ImportError as _exc:
+            print(f"[WARNING] _populate: {type(_exc).__name__}: {_exc}")
+            def get_rebadges_for(_c):
+                return {}
 
         base_vehicles: List[Tuple[str, str, bool]] = []
         for carid, name in _BUILTIN_VEHICLES:
             base_vehicles.append((carid, name, False))
         for carid, name in state.added_vehicles.items():
             base_vehicles.append((carid, name, True))
-
 
         all_vehicles: List[Tuple[str, str, bool, str]] = [
             (carid, name, dev_added, "") for carid, name, dev_added in base_vehicles
@@ -545,7 +564,6 @@ class CarListTab(QWidget):
             self._add_card(carid, name, developer_added=dev_added, variant_suffix=suffix)
 
     def _add_card(self, carid: str, name: str, developer_added: bool, variant_suffix: str = ""):
-        print(f"[DEBUG] _add_card() called")
         if self._view_mode == "modern":
             card = self._build_modern_card(carid, name, developer_added, variant_suffix)
             self._items.append((card, carid, name))
@@ -564,7 +582,6 @@ class CarListTab(QWidget):
                 self._list_layout.takeAt(0)
             for i, (w, _, _) in enumerate(self._items):
                 self._list_layout.insertWidget(i, w)
-
 
             img_path = None
             if variant_suffix:
@@ -601,11 +618,11 @@ class CarListTab(QWidget):
         path = QPainterPath()
         path.moveTo(radius, 0)
         path.lineTo(w - radius, 0)
-        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)
+        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)   
         path.lineTo(w, h)
         path.lineTo(0, h)
         path.lineTo(0, radius)
-        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)
+        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)                
         path.closeSubpath()
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, cropped)
@@ -613,18 +630,15 @@ class CarListTab(QWidget):
         return result
 
     def _cols_for_width(self, viewport_width: int) -> int:
-        print(f"[DEBUG] _cols_for_width() called")
-        available = max(viewport_width - 8, CARD_W)
+        available = max(viewport_width - 8, CARD_W)   
         return max(1, available // (CARD_W + CARD_SPACING))
 
     def _card_width_for(self, viewport_width: int, cols: int) -> int:
-        print(f"[DEBUG] _card_width_for() called")
-        margins = 8
+        margins = 8   
         spacing = CARD_SPACING * (cols - 1)
         return max(CARD_W, (viewport_width - margins - spacing) // cols) - 2
 
     def _reflow_modern_grid(self):
-        print(f"[DEBUG] _reflow_modern_grid() called")
         if self._view_mode != "modern" or not self._items:
             return
         vw = self._scroll.viewport().width()
@@ -655,20 +669,17 @@ class CarListTab(QWidget):
                     img_lbl.resize(inner_w, CARD_IMG_H)
 
     def showEvent(self, event):
-        print(f"[DEBUG] showEvent() called")
         super().showEvent(event)
         self._modern_cols_current = 0
         self._modern_card_w = 0
         self._reflow_modern_grid()
 
     def resizeEvent(self, event):
-        print(f"[DEBUG] resizeEvent() called")
         super().resizeEvent(event)
         self._reflow_modern_grid()
 
     def _build_card(self, carid: str, name: str, developer_added: bool,
                     variant_suffix: str = "") -> QFrame:
-        print(f"[DEBUG] _build_card() called")
         card = QFrame()
         card.setObjectName("vehicle_card")
         card.setStyleSheet(f"""
@@ -704,7 +715,6 @@ class CarListTab(QWidget):
         )
         text_col.addWidget(name_lbl)
 
-
         id_text = f"{carid} ({variant_suffix})" if variant_suffix else carid
         id_lbl = QLabel(id_text)
         id_lbl.setFont(font(12))
@@ -726,8 +736,6 @@ class CarListTab(QWidget):
             )
             btn_row.addWidget(uv_btn)
         else:
-
-
             local_uvs = _get_local_uv_map_paths(carid)
             if local_uvs:
                 uv_btn = self._mk_btn(
@@ -749,20 +757,16 @@ class CarListTab(QWidget):
 
     def _build_modern_card(self, carid: str, name: str, developer_added: bool,
                            variant_suffix: str = "") -> AnimatedCard:
-        print(f"[DEBUG] _build_modern_card() called")
         card = AnimatedCard()
         card.setObjectName("vehicle_card")
         card.setFixedWidth(CARD_W)
 
         if variant_suffix:
-
-
             variants = _get_rebadge_images(carid, variant_suffix)
         else:
             variants = _get_variant_images(carid)
         card._variants    = variants
         card._variant_idx = 0
-
 
         inner_w = CARD_W - 2 * GLOW_PAD
         col = QVBoxLayout(card)
@@ -810,20 +814,17 @@ class CarListTab(QWidget):
                 QPushButton:hover {{ background: rgba(0,0,0,210); }}
             """
 
-
             prev_btn = QPushButton("‹", img_container)
             prev_btn.setFixedSize(26, 38)
             prev_btn.setStyleSheet(_NAV_BTN.format(r=6))
             prev_btn.setCursor(Qt.PointingHandCursor)
             prev_btn.raise_()
 
-
             next_btn = QPushButton("›", img_container)
             next_btn.setFixedSize(26, 38)
             next_btn.setStyleSheet(_NAV_BTN.format(r=6))
             next_btn.setCursor(Qt.PointingHandCursor)
             next_btn.raise_()
-
 
             var_lbl = QLabel(variants[0][0], img_container)
             var_lbl.setObjectName("variant_label")
@@ -839,7 +840,6 @@ class CarListTab(QWidget):
             """)
             var_lbl.adjustSize()
             var_lbl.raise_()
-
 
             dot_size   = 6
             dot_gap    = 4
@@ -869,9 +869,7 @@ class CarListTab(QWidget):
                 for di, dw in enumerate(dws):
                     dw.move(dx + di * (ds + dg), dy)
 
-
             _reposition(img_container.width() or inner_w, CARD_IMG_H)
-
 
             img_container.resizeEvent = lambda ev, rp=_reposition: rp(
                 ev.size().width(), ev.size().height()
@@ -991,14 +989,13 @@ class CarListTab(QWidget):
         return btn
 
     def _notify(self, msg: str, kind: str = "info", duration: int = 3000):
-        print(f"[DEBUG] _notify() called")
         try:
             mw = self.window()
             if hasattr(mw, "show_notification"):
                 mw.show_notification(msg, type=kind, duration=duration)
                 return
-        except Exception:
-            pass
+        except Exception as _exc:
+            print(f"[WARNING] _notify: {type(_exc).__name__}: {_exc}")
         print(f"[{kind.upper()}] {msg}")
 
     def _filter(self, text: str):
@@ -1021,7 +1018,6 @@ class CarListTab(QWidget):
         self._scroll.verticalScrollBar().setValue(0)
 
     def _relayout_all(self):
-        print(f"[DEBUG] _relayout_all() called")
         if self._view_mode == "modern":
             for card, _, _ in self._items:
                 self._list_layout.removeWidget(card)
@@ -1035,7 +1031,6 @@ class CarListTab(QWidget):
                 self._list_layout.insertWidget(i, w)
 
     def _relayout_order(self, ordered: list):
-        print(f"[DEBUG] _relayout_order() called")
         if self._view_mode == "modern":
             for card, _, _ in self._items:
                 self._list_layout.removeWidget(card)
@@ -1049,7 +1044,6 @@ class CarListTab(QWidget):
                 self._list_layout.insertWidget(i, w)
 
     def refresh_ui(self):
-        print(f"[DEBUG] refresh_ui() called")
         self._search.setPlaceholderText(t("car_list.search_placeholder"))
         self._btn_classic.setText(t("car_list.view_classic"))
         self._btn_modern.setText(t("car_list.view_modern"))
@@ -1061,7 +1055,7 @@ class CarListTab(QWidget):
         self._reflow_modern_grid()
 
     def refresh_vehicle_list(self):
-        print(f"[DEBUG] refresh_vehicle_list: refreshing car list UI")
+        print("[DEBUG] refresh_vehicle_list: refreshing car list UI")
         self.refresh_ui()
         print(f"[DEBUG] CarListTab: Vehicle list refreshed with {len(self._items)} vehicles")
 
@@ -1082,7 +1076,6 @@ class CarListTab(QWidget):
         if len(uv_paths) == 1:
             selected = [(uv_paths[0], "")]
         else:
-
             found_files = [(p, p) for p in uv_paths]
             dlg = _UVSelectDialog(self, carid, found_files)
             if dlg.exec() != QDialog.Accepted or not dlg.selected_files:
@@ -1108,7 +1101,8 @@ class CarListTab(QWidget):
                 _shutil.copy2(src_path, dest)
                 self._notify(t("car_list.uv_extracted"), "success", 3000)
             except Exception as e:
-                self._notify(t("car_list.failed_save_uv", error=e), "error", 4000)
+                print(f"[WARNING] _save_uv_files_local: {type(e).__name__}: {e}")
+                self._notify(t('car_list.failed_save_uv', error=e), 'error', 4000)
         else:
             dest_folder = QFileDialog.getExistingDirectory(
                 self, t("car_list.save_uv_folder")
@@ -1131,8 +1125,9 @@ class CarListTab(QWidget):
     def _get_uv_map(self, carid: str):
         try:
             from core.settings import get_beamng_install_path
-        except ImportError:
-            self._notify(t("car_list.import_error"), "error")
+        except ImportError as _exc:
+            print(f"[WARNING] _get_uv_map: {type(_exc).__name__}: {_exc}")
+            self._notify(t('car_list.import_error'), 'error')
             return
 
         beamng_install = get_beamng_install_path()
@@ -1157,12 +1152,15 @@ class CarListTab(QWidget):
 
         try:
             found_files = self._find_uv_files(carid, zip_file_path, beamng_path)
-        except zipfile.BadZipFile:
-            self._notify(t("car_list.invalid_zip", carid=carid), "error", 4000)
+        except zipfile.BadZipFile as _exc:
+            print(f"[WARNING] _get_uv_map: {type(_exc).__name__}: {_exc}")
+            self._notify(t('car_list.invalid_zip', carid=carid), 'error', 4000)
             return
         except Exception as e:
-            self._notify(t("car_list.failed_search_zip", error=e), "error", 4000)
-            import traceback; traceback.print_exc()
+            print(f"[WARNING] _get_uv_map: {type(e).__name__}: {e}")
+            self._notify(t('car_list.failed_search_zip', error=e), 'error', 4000)
+            import traceback
+            traceback.print_exc()
             return
 
         if not found_files:
@@ -1255,7 +1253,8 @@ class CarListTab(QWidget):
                 self._notify(t("car_list.uv_extracted"), "success", 3000)
                 print(f"[DEBUG] UV Map extracted: {file_path} → {dest}")
             except Exception as e:
-                self._notify(t("car_list.failed_save_uv", error=e), "error", 4000)
+                print(f"[WARNING] _save_uv_files: {type(e).__name__}: {e}")
+                self._notify(t('car_list.failed_save_uv', error=e), 'error', 4000)
         else:
             dest_folder = QFileDialog.getExistingDirectory(
                 self, t("car_list.save_uv_folder")
@@ -1278,4 +1277,3 @@ class CarListTab(QWidget):
                 t("car_list.uv_extracted_count", ok=ok, total=len(selected)),
                 "success", 3000,
             )
-

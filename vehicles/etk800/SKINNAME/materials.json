@@ -22,13 +22,19 @@
         "clearCoatFactor": 1,
         "clearCoatRoughnessFactor":0.02,
         "metallicFactor": 0.6,
+		"roughnessFactor": 0.5,
         "clearCoatMap": "/vehicles/etk800/etk800_main_cc.data.png",
         "normalMap": "/vehicles/etk800/etk800_n.dds",
         "opacityMap": "/vehicles/etk800/etk800_main_c.data.png",
         "baseColorMap": "vehicles/etk800/SKINNAME/etk800_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -64,9 +70,14 @@
         "normalMap": "vehicles/etk800/extra/etk800_extra_nm.normal.png",
         "opacityMap": "/vehicles/etk800/extra/etk800_extra_c.data.png",
         "baseColorMap": "vehicles/etk800/SKINNAME/etk800_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

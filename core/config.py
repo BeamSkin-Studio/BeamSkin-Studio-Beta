@@ -1,5 +1,4 @@
 
-
 VEHICLE_IDS = {
     "autobello": "Autobello Piccolina",
     "atv": "FPU Wydra",
@@ -43,7 +42,6 @@ VEHICLE_IDS = {
     "wigeon": "Ibishu Wigeon",
     "wl40": "Hirochi WL-40"
 }
-
 
 SINGLE_LAYER_VARIANTS = {
     "vivace:ardente": True,

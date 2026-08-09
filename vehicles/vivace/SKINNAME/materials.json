@@ -20,15 +20,20 @@
         "useAnisotropic": true,
         "diffuseMapUseUV": 1,
         "clearCoatFactor": 1,
-        "clearCoatRoughnessFactor":0.02,
+        "clearCoatRoughnessFactor": 0.02,
         "metallicFactor": 0.6,
         "clearCoatMap": "/vehicles/vivace/vivace_main_cc.data.png",
         "normalMap": "/vehicles/vivace/vivace_main_nm.normal.dds",
         "opacityMap": "/vehicles/vivace/vivace_main_c.data.png",
         "baseColorMap": "vehicles/vivace/SKINNAME/vivace_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+        "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.1,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -36,5 +41,5 @@
     "materialTag1": "vehicle",
     "order_simset": 0,
     "version": 1.5
-  },
+  }
 }

@@ -6,6 +6,75 @@ echo BeamSkin Studio - Dependency Installer
 echo ============================================================
 echo.
 
+:: ── [0/7] Detect running from inside an unextracted ZIP/RAR ─────────────────
+:: Archive managers (WinRAR, 7-Zip, Explorer's zip viewer) often run files
+:: directly from a temp mount when the user double-clicks inside the
+:: archive without extracting first. Catch that before anything else,
+:: since every step after this will fail in confusing ways otherwise.
+set "SCRIPT_DIR=%~dp0"
+set "CUR_PATH=%SCRIPT_DIR%"
+set "IS_ARCHIVE="
+
+echo !CUR_PATH! | findstr /i /c:"\Rar$" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !CUR_PATH! | findstr /i /c:".zip\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !CUR_PATH! | findstr /i /c:".rar\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !CUR_PATH! | findstr /i /c:".7z\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !CUR_PATH! | findstr /i /c:"\Temp\7z" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+:: Fallback heuristic: running from directly inside %TEMP% at all is a
+:: strong sign this is still an archive mount, since nobody installs the
+:: app there on purpose.
+if not defined IS_ARCHIVE (
+    echo !CUR_PATH! | findstr /i /c:"!TEMP!" >nul 2>&1
+    if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+)
+
+:: Strongest signal of all: a real extracted copy of BeamSkin Studio always
+:: has main.py and requirements.txt sitting right next to this script. Their
+:: absence means either the archive was never extracted, or the extraction
+:: was incomplete/corrupted - either way, manual extraction is the fix.
+if not exist "%SCRIPT_DIR%main.py" set "IS_ARCHIVE=1"
+if not exist "%SCRIPT_DIR%requirements.txt" set "IS_ARCHIVE=1"
+
+if defined IS_ARCHIVE (
+    echo.
+    echo ============================================================
+    echo  [ERROR] You're running this from inside a ZIP/RAR archive!
+    echo ============================================================
+    echo.
+    echo  It looks like you double-clicked a file INSIDE the archive
+    echo  without extracting it first, or the extraction is incomplete.
+    echo  This will not work correctly.
+    echo.
+    echo  Detected folder:
+    echo    !CUR_PATH!
+    echo.
+    echo  To fix this:
+    echo    1. Close this window.
+    echo    2. Right-click the downloaded ZIP/RAR file itself.
+    echo    3. Choose "Extract All..." ^(or "Extract Here" in WinRAR/7-Zip^).
+    echo    4. Open the EXTRACTED folder ^(not the archive^) and run
+    echo       Install.bat from there.
+    echo.
+    echo  Tip: avoid extracting into a path with spaces, e.g.
+    echo       C:\Tools\BeamSkin works great.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [OK] Running from a properly extracted folder.
+echo.
+
 :: ── [1/7] Find a compatible Python (3.9 – 3.13) via py launcher ─────────────
 echo [1/7] Detecting compatible Python installation...
 set "PY="
@@ -108,7 +177,7 @@ goto :after_helpers
         %PY% -m pip install %~2 --quiet
         if !errorlevel! neq 0 (
             echo [ERROR] Failed to install %~2!
-            pause
+            call :manual_fallback
             exit /b 1
         )
         echo   [OK] %~2 installed.
@@ -123,23 +192,65 @@ goto :after_helpers
 echo [6/7] Verifying installation...
 %PY% -c "import PySide6; import PIL; import requests; import win32api; import imageio; print('[OK] All core dependencies verified')"
 if %errorlevel% neq 0 (
-    echo.
-    echo [ERROR] Dependency verification failed!
-    echo         Check the error printed above, then run install.bat again.
-    pause
+    call :manual_fallback
     exit /b 1
 )
 
+goto :do_launch
+
+:: -----------------------------------------------------------
+:: :manual_fallback
+:: Shown whenever the automated install could not be verified.
+:: Mirrors the "Manual Install" tab on the BeamSkin Studio website.
+:: -----------------------------------------------------------
+:manual_fallback
+echo.
+echo ============================================================
+echo  [ERROR] Automatic installation could not be verified.
+echo ============================================================
+echo.
+echo  Please install manually instead:
+echo.
+echo    1. Install Python 3.9+ (3.12 recommended) from:
+echo       https://www.python.org/downloads/
+echo       IMPORTANT: check "Add Python to PATH" during install.
+echo.
+echo    2. Open Command Prompt or PowerShell in this folder.
+echo       (Tip: type cmd in Explorer's address bar while inside
+echo       the BeamSkin Studio folder.)
+echo.
+echo    3. Run:
+echo       pip install -r requirements.txt
+echo       (If "pip" isn't found, try: python -m pip install -r requirements.txt)
+echo.
+echo  Common issues:
+echo    - Windows Defender / SmartScreen warning: click
+echo      "More info -^> Run anyway" - this is a false positive
+echo      common with Python apps.
+echo    - ModuleNotFoundError after this: re-run install.bat, or
+echo      install the missing package manually with:
+echo      pip install ^<package-name^>
+echo    - Nothing works: delete this folder and the downloaded ZIP,
+echo      then re-download a fresh copy and try again.
+echo.
+echo  Still stuck? Open an issue on GitHub with the error above:
+echo    https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta/issues
+echo  Or email: burztworkshop@gmail.com
+echo.
+pause
+exit /b 1
+
 :: ── [7/7] Launch BeamSkin Studio ────────────────────────────────────────────
+:do_launch
 echo [7/7] Starting BeamSkin Studio...
 timeout /t 2 /nobreak >nul
 
-if exist "Beamskin_studio.bat" (
-    start "" "Beamskin_studio.bat"
+if exist "%SCRIPT_DIR%Beamskin_studio.bat" (
+    start "" "%SCRIPT_DIR%Beamskin_studio.bat"
     exit
 )
-if exist "BeamSkin Studio.bat" (
-    start "" "BeamSkin Studio.bat"
+if exist "%SCRIPT_DIR%BeamSkin Studio.bat" (
+    start "" "%SCRIPT_DIR%BeamSkin Studio.bat"
     exit
 )
 

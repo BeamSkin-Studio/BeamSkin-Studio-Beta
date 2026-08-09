@@ -1,17 +1,48 @@
+"""
+main.py — BeamSkin Studio entry point  (PySide6 edition)
+"""
 
 import os
 import sys
 import threading
 import platform
 
+if getattr(sys, "frozen", False):
+    script_dir = os.path.dirname(sys.executable)
+else:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
+# Always run with CWD = the app's own folder, whether frozen or not.
+# Without this, relative paths like "vehicles/carconfigs.txt" resolve
+# against whatever directory the user launched the exe from (shortcut's
+# "Start in" field, taskbar pin, etc.) instead of the exe's own location.
 os.chdir(script_dir)
+
+# ── seed writable data dir + ensure built-in vehicle templates exist ────────
+try:
+    from core.settings import ensure_first_run_seed
+    ensure_first_run_seed()
+except Exception as _e:
+    print(f"[WARNING] Could not seed first-run data: {_e}")
+
+# ── file logging  (must start before other prints so nothing is missed) ─────
+try:
+    from core.settings import is_file_logging_enabled, is_file_logging_append
+    from utils.file_logger import start_file_logging
+
+    if is_file_logging_enabled():
+        start_file_logging(append=is_file_logging_append())
+except Exception as _e:
+    print(f"[WARNING] Could not initialize file logging: {_e}")
+
 print(f"[DEBUG] Working directory: {os.getcwd()}")
 print(f"[DEBUG] Platform: {platform.system()}")
+print(f"[DEBUG] Frozen: {getattr(sys, 'frozen', False)}")
 
 
+# ── error popup helper  (pure PySide6, no Tkinter) ───────────────────────────
 def show_error_and_exit(title: str, message: str, detail: str = None):
+    """Show a themed error dialog then terminate."""
     full_message = message
     if detail:
         full_message += f"\n\nDetails:\n{detail}"
@@ -32,11 +63,12 @@ def show_error_and_exit(title: str, message: str, detail: str = None):
         box.setIcon(QMessageBox.Critical)
         box.exec()
     except Exception:
-        pass
+        pass  # if Qt itself is broken, the .bat crash log shows the traceback
 
     sys.exit(1)
 
 
+# ── dependency check  (PySide6-era packages) ─────────────────────────────────
 REQUIRED_PACKAGES = {
     "PySide6":        "PySide6",
     "PIL":            "Pillow",
@@ -59,6 +91,7 @@ if missing:
     )
 
 
+# ── AppUserModelID  (taskbar icon grouping on Windows) ───────────────────────
 if sys.platform == "win32":
     try:
         import ctypes
@@ -69,9 +102,10 @@ if sys.platform == "win32":
         print(f"[DEBUG] Failed to set AppUserModelID: {e}")
 
 
+# ── main entry point ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
 
-
+    # Single-instance lock
     try:
         from utils.single_instance import check_single_instance, release_global_lock
         import atexit
@@ -90,7 +124,7 @@ if __name__ == "__main__":
         print(f"[WARNING] Could not import single_instance module: {e}")
         print("[WARNING] Multiple instances may run simultaneously")
 
-
+    # Core module imports
     try:
         from core.updater import check_for_updates, CURRENT_VERSION, set_app_instance
         from gui.theme import COLORS as colors
@@ -98,7 +132,7 @@ if __name__ == "__main__":
         show_error_and_exit("Missing Core Files",
                             "A required core module could not be loaded.", str(e))
 
-
+    # PySide6 application object — must exist before any QWidget
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt, QTimer
 
@@ -107,7 +141,7 @@ if __name__ == "__main__":
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
 
-
+    # GUI import
     try:
         from gui.main_window import BeamSkinStudioApp
     except ImportError as e:
@@ -127,7 +161,7 @@ if __name__ == "__main__":
             traceback.format_exc(),
         )
 
-
+    # Create main window
     try:
         window = BeamSkinStudioApp()
     except Exception as e:
@@ -146,16 +180,20 @@ if __name__ == "__main__":
 
     set_app_instance(window, colors)
 
-
+    # Centre window on primary screen and show it immediately so Qt always
+    # has a visible window — if show_startup_sequence throws, the window
+    # is still on screen rather than leaving the app in an invisible state.
+    # Size comes from window.size() (set in BeamSkinStudioApp.__init__ via
+    # resize()) rather than a hardcoded value here, so main_window.py stays
+    # the single source of truth for the startup size.
     screen = app.primaryScreen().geometry()
-    w, h = 1600, 1000
-    window.resize(w, h)
+    w, h = window.width(), window.height()
     window.move((screen.width() - w) // 2, (screen.height() - h) // 2)
     window.show()
     window.raise_()
     window.activateWindow()
 
-
+    # Signal the splash screen that the main window is visible and ready
     try:
         import tempfile
         _signal_path = os.path.join(tempfile.gettempdir(), "BeamSkinStudio_ready.signal")
@@ -165,7 +203,7 @@ if __name__ == "__main__":
     except Exception as _e:
         print(f"[DEBUG] Could not write ready signal: {_e}")
 
-
+    # Connection helpers
     def _do_connection_check():
         from utils.connection import check_connection
         from gui.components.connection_dialog import show_connection_dialog
@@ -222,20 +260,32 @@ if __name__ == "__main__":
         try:
             threading.Thread(target=_do_connection_check_bg, daemon=True).start()
 
-            if not is_setup_complete():
-                print("[DEBUG] First-time setup not complete, showing setup wizard...")
-                QTimer.singleShot(200, window.show_setup_wizard)
-                return
+            def _after_legacy_check():
+                if not is_setup_complete():
+                    print("[DEBUG] First-time setup not complete, showing setup wizard...")
+                    QTimer.singleShot(200, window.show_setup_wizard)
+                    return
 
-            def _show_offline_dialog():
-                from gui.components.connection_dialog import show_connection_dialog
-                show_connection_dialog(
-                    window,
-                    on_retry=_do_connection_check,
-                    on_offline=_go_offline,
-                )
+                def _show_offline_dialog():
+                    from gui.components.connection_dialog import show_connection_dialog
+                    show_connection_dialog(
+                        window,
+                        on_retry=_do_connection_check,
+                        on_offline=_go_offline,
+                    )
 
-            run_startup_sequence(window, show_offline_dialog_fn=_show_offline_dialog)
+                run_startup_sequence(window, show_offline_dialog_fn=_show_offline_dialog)
+
+            # Legacy-data migration must be checked BEFORE is_setup_complete():
+            # a user upgrading from a pre-data-dir build already completed
+            # setup once under the old scheme, so they should only ever see
+            # the one-time "pick a data folder" prompt here — never the full
+            # first-run wizard (language + BeamNG paths). window.show_setup_wizard
+            # already used to handle this ordering correctly, but this local
+            # startup function bypassed it entirely by jumping straight to
+            # is_setup_complete(), so a legacy install would always fail that
+            # check (nothing in the new data dir yet) and get the full wizard.
+            window.show_legacy_migration_prompt(_after_legacy_check)
 
         except Exception:
             import traceback
@@ -259,6 +309,11 @@ if __name__ == "__main__":
         print("[DEBUG] Application closed")
         try:
             release_global_lock()
+        except Exception:
+            pass
+        try:
+            from utils.file_logger import stop_file_logging
+            stop_file_logging()
         except Exception:
             pass
 

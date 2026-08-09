@@ -1,30 +1,19 @@
 from __future__ import annotations
-from typing import Optional, Callable
+from typing import Optional
 
-from PySide6.QtCore  import (Qt, QTimer, QPropertyAnimation,
-                              QEasingCurve, QRect, QPoint, Signal,
-                              QSize, Property)
-from PySide6.QtGui   import (QColor, QPainter, QPen, QBrush,
-                              QLinearGradient, QFont, QFontMetrics,
-                              QEnterEvent, QPixmap)
-from PySide6.QtWidgets import (
-    QWidget, QFrame, QLabel, QPushButton, QLineEdit, QTextEdit,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QSizePolicy,
-    QGraphicsOpacityEffect, QGraphicsDropShadowEffect, QRadioButton,
-    QButtonGroup, QApplication, QStackedWidget,
-)
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, Signal, Property
+from PySide6.QtGui import QColor, QPainter, QBrush, QFont, QEnterEvent
+from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QLineEdit, QVBoxLayout, QHBoxLayout, QGraphicsOpacityEffect, QStackedWidget
 
 from gui.theme import COLORS, font, drop_shadow, fade_in
 
 
 class ToggleSwitch(QWidget):
-
     stateChanged = Signal(int)
 
     _W, _H = 44, 24
 
     def __init__(self, parent=None):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
         self._checked = False
         self._pos     = 0.0
@@ -47,7 +36,6 @@ class ToggleSwitch(QWidget):
         return self._checked
 
     def setChecked(self, checked: bool):
-        print(f"[DEBUG] setChecked() called")
         if self._checked == checked:
             return
         self._checked = checked
@@ -57,18 +45,20 @@ class ToggleSwitch(QWidget):
         self._anim.start()
         self.stateChanged.emit(2 if checked else 0)
 
+    def setEnabled(self, enabled: bool):
+        super().setEnabled(enabled)
+        self.setCursor(Qt.PointingHandCursor if enabled else Qt.ArrowCursor)
+        self.update()
+
     def toggle(self):
-        print(f"[DEBUG] toggle() called")
         self.setChecked(not self._checked)
 
     def mousePressEvent(self, event):
-        print(f"[DEBUG] mousePressEvent() called")
         if event.button() == Qt.LeftButton:
             self.toggle()
         super().mousePressEvent(event)
 
     def paintEvent(self, _event):
-        print(f"[DEBUG] paintEvent() called")
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -83,6 +73,12 @@ class ToggleSwitch(QWidget):
             int(off_c.green() + (on_c.green() - off_c.green()) * t),
             int(off_c.blue()  + (on_c.blue()  - off_c.blue())  * t),
         )
+        thumb_color = QColor("white")
+        if not self.isEnabled():
+            gray = (track.red() + track.green() + track.blue()) // 3
+            track = QColor(gray, gray, gray).lighter(115)
+            thumb_color = QColor(210, 210, 210)
+
         p.setPen(Qt.NoPen)
         p.setBrush(QBrush(track))
         p.drawRoundedRect(0, 0, w, h, r, r)
@@ -91,13 +87,12 @@ class ToggleSwitch(QWidget):
         thumb_d = h - margin * 2
         travel  = w - thumb_d - margin * 2
         x       = int(margin + self._pos * travel)
-        p.setBrush(QBrush(QColor("white")))
+        p.setBrush(QBrush(thumb_color))
         p.drawEllipse(QRect(x, margin, thumb_d, thumb_d))
 
         p.end()
 
 class Card(QFrame):
-
     def __init__(
         self,
         parent: Optional[QWidget] = None,
@@ -125,12 +120,10 @@ class Card(QFrame):
         """)
 
     def set_bg(self, color: str):
-        print(f"[DEBUG] set_bg() called")
         self._bg = color
         self._apply_style()
 
 class AnimButton(QPushButton):
-
     def __init__(
         self,
         text: str = "",
@@ -166,7 +159,6 @@ class AnimButton(QPushButton):
         self.setCursor(Qt.PointingHandCursor)
 
     def _apply(self, hover: bool):
-        print(f"[DEBUG] _apply() called")
         bg = self._fg_hover if hover else self._fg
         w  = "bold" if self._bold else "normal"
         self.setStyleSheet(f"""
@@ -189,19 +181,16 @@ class AnimButton(QPushButton):
         """)
 
     def enterEvent(self, event: QEnterEvent):
-        print(f"[DEBUG] enterEvent() called")
         self._hovered = True
         self._apply(hover=True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        print(f"[DEBUG] leaveEvent() called")
         self._hovered = False
         self._apply(hover=False)
         super().leaveEvent(event)
 
 class GhostButton(QPushButton):
-
     def __init__(
         self,
         text: str = "",
@@ -244,7 +233,6 @@ class GhostButton(QPushButton):
         """)
 
 class LabelledEntry(QWidget):
-
     textChanged = Signal(str)
 
     def __init__(
@@ -294,16 +282,13 @@ class LabelledEntry(QWidget):
         return self.entry.text()
 
     def set_text(self, t: str):
-        print(f"[DEBUG] set_text() called")
         self.entry.setText(t)
 
     def clear(self):
-        print(f"[DEBUG] clear() called")
         self.entry.clear()
 
 class HSeparator(QFrame):
     def __init__(self, parent=None):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.HLine)
         self.setFixedHeight(1)
@@ -321,7 +306,6 @@ _TYPE_ICONS = {
 }
 
 class Toast(QFrame):
-
     def __init__(
         self,
         parent: QWidget,
@@ -366,7 +350,6 @@ class Toast(QFrame):
         QTimer.singleShot(duration, self._dismiss)
 
     def _reposition(self):
-        print(f"[DEBUG] _reposition() called")
         p = self.parent()
         if p:
             pg = p.rect()
@@ -374,7 +357,6 @@ class Toast(QFrame):
                       pg.bottom() - self.height() - 20)
 
     def _dismiss(self):
-        print(f"[DEBUG] _dismiss() called")
         fx = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(fx)
         anim = QPropertyAnimation(fx, b"opacity", self)
@@ -386,7 +368,6 @@ class Toast(QFrame):
         anim.start(QPropertyAnimation.DeleteWhenStopped)
 
 class SectionHeader(QWidget):
-
     def __init__(
         self,
         title: str,
@@ -415,9 +396,7 @@ class SectionHeader(QWidget):
             layout.addWidget(sub_lbl)
 
 class FadeStack(QStackedWidget):
-
     def setCurrentIndex(self, index: int):
-        print(f"[DEBUG] setCurrentIndex() called")
         prev = self.currentIndex()
         super().setCurrentIndex(index)
         w = self.currentWidget()
@@ -425,7 +404,6 @@ class FadeStack(QStackedWidget):
             fade_in(w, duration=200)
 
 class VehicleCard(QFrame):
-
     add_requested = Signal(str, str)
 
     def __init__(
@@ -480,7 +458,6 @@ class VehicleCard(QFrame):
             row.addWidget(mod_badge)
 
     def mousePressEvent(self, event):
-        print(f"[DEBUG] mousePressEvent() called")
         if event.button() == Qt.LeftButton:
             self.add_requested.emit(self.carid, self.display_name)
         super().mousePressEvent(event)
@@ -509,7 +486,6 @@ class Spinner(QLabel):
     _FRAMES = ["◐", "◓", "◑", "◒"]
 
     def __init__(self, parent=None, size: int = 18):
-        print(f"[DEBUG] __init__() called")
         super().__init__(self._FRAMES[0], parent)
         self.setFont(font(size))
         self.setStyleSheet(
@@ -522,12 +498,8 @@ class Spinner(QLabel):
         self._timer.start(120)
 
     def _tick(self):
-        print(f"[DEBUG] _tick() called")
         self._idx = (self._idx + 1) % len(self._FRAMES)
         self.setText(self._FRAMES[self._idx])
 
     def stop(self):
-        print(f"[DEBUG] stop() called")
         self._timer.stop()
-
-

@@ -23,9 +23,7 @@
         "normalMap": "/vehicles/rockbouncer/rockbouncer_main_nm.normal.png",
         "opacityMap": "/vehicles/rockbouncer/rockbouncer_main_c.data.png",
         "roughnessFactor": 0
-      },
-      {},
-      {}
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

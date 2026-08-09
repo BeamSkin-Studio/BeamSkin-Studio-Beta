@@ -2,10 +2,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from PySide6.QtCore    import Qt, QTimer, QPoint, QSize
+from PySide6.QtCore    import Qt, QTimer, QPoint
 from PySide6.QtGui     import QPixmap, QCursor
 from PySide6.QtWidgets import (
-    QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout, QApplication,
+    QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
 )
 
 from gui.theme   import COLORS, font, drop_shadow, fade_in
@@ -13,37 +13,45 @@ from gui.state   import state
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return key
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
+
+try:
+    from core.settings import get_vehicle_previews_dir, get_bundle_path
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def get_vehicle_previews_dir():
+        return os.path.join('gui', 'images', 'vehicles')
+    def get_bundle_path():
+        return os.getcwd()
 
 
 class HoverPreviewManager:
-
     def __init__(self, app_widget: QWidget, preview_overlay: QFrame):
-        print(f"[DEBUG] __init__() called")
         self.app             = app_widget
         self.overlay         = preview_overlay
         self._timer: Optional[QTimer] = None
-        self._current_carid: Optional[str] = None
+        self._current_key: Optional[tuple] = None
 
 
     def show_hover_preview(self, carid: str, image_path: Optional[str] = None,
                             display_name: Optional[str] = None) -> None:
         print(f"[DEBUG] show_hover_preview: carid={carid!r} path={image_path!r} display_name={display_name!r}")
-
         if not image_path or not os.path.exists(image_path):
-            image_path = os.path.join("gui", "images", "vehicles", carid, "default.jpg")
+            image_path = os.path.join(get_vehicle_previews_dir(), carid, "default.jpg")
         if not os.path.exists(image_path):
-            fallback = os.path.join("gui", "images", "common",
+            image_path = os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid, "default.jpg")
+        if not os.path.exists(image_path):
+            fallback = os.path.join(get_bundle_path(), "gui", "images", "common",
                                     "imagepreview", "MissingTexture.jpg")
             if os.path.exists(fallback):
                 image_path = fallback
             else:
                 return
 
-
         self._clear_overlay()
-
 
         ow, oh = 300, 240
         self.overlay.setFixedSize(ow, oh)
@@ -71,7 +79,6 @@ class HoverPreviewManager:
         hdr_row.addWidget(hdr_lbl)
         inner.addWidget(hdr)
 
-
         px = QPixmap(image_path).scaled(
             280, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
@@ -83,7 +90,8 @@ class HoverPreviewManager:
 
         try:
             cursor = self.app.mapFromGlobal(QCursor.pos())
-        except Exception:
+        except Exception as _exc:
+            print(f"[WARNING] show_hover_preview: {type(_exc).__name__}: {_exc}")
             cursor = QPoint(0, 0)
 
         x = cursor.x() + 20
@@ -98,21 +106,18 @@ class HoverPreviewManager:
         self.overlay.move(x, y)
         self.overlay.raise_()
         self.overlay.show()
-
-
         fade_in(self.overlay, 150)
 
     def hide_hover_preview(self, force: bool = False) -> None:
-        print(f"[DEBUG] hide_hover_preview: hiding preview overlay")
+        print("[DEBUG] hide_hover_preview: hiding preview overlay")
         if self._timer:
             self._timer.stop()
             self._timer = None
-        self._current_carid = None
+        self._current_key = None
         self.overlay.hide()
         self._clear_overlay()
 
     def _clear_overlay(self) -> None:
-        print(f"[DEBUG] _clear_overlay() called")
         old_layout = self.overlay.layout()
         if old_layout is not None:
             while old_layout.count():
@@ -124,20 +129,20 @@ class HoverPreviewManager:
             _tmp = QWidget()
             _tmp.setLayout(old_layout)
 
-
         for child in list(self.overlay.findChildren(QWidget)):
             child.hide()
             child.setParent(None)
 
     def schedule_hover_preview(self, carid: str, widget: QWidget,
-                               get_image_path=None, get_display_name=None) -> None:
-        print(f"[DEBUG] schedule_hover_preview() called")
+                               get_image_path=None, get_display_name=None,
+                               variant_suffix: str = "") -> None:
         if self._timer:
             self._timer.stop()
-        self._current_carid = carid
+        key = (carid, variant_suffix)
+        self._current_key = key
 
         def _show():
-            if self._current_carid == carid:
+            if self._current_key == key:
                 img  = get_image_path() if callable(get_image_path) else None
                 name = get_display_name() if callable(get_display_name) else None
                 self.show_hover_preview(carid, img, display_name=name)
@@ -148,11 +153,12 @@ class HoverPreviewManager:
         self._timer.start(500)
 
     def setup_robust_hover(self, widget: QWidget, carid: str,
-                           get_image_path=None, get_display_name=None) -> None:
-        print(f"[DEBUG] setup_robust_hover() called")
-        def _enter(event, w=widget, c=carid):
+                           get_image_path=None, get_display_name=None,
+                           variant_suffix: str = "") -> None:
+        def _enter(event, w=widget, c=carid, vs=variant_suffix):
             self.schedule_hover_preview(
-                c, w, get_image_path=get_image_path, get_display_name=get_display_name
+                c, w, get_image_path=get_image_path, get_display_name=get_display_name,
+                variant_suffix=vs,
             )
 
         def _leave(event):
@@ -174,10 +180,6 @@ def create_preview_overlay(parent: QWidget) -> QFrame:
             border: 2px solid {COLORS['accent']};
         }}
     """)
-
-
     drop_shadow(overlay, 20, (0, 6))
     overlay.hide()
     return overlay
-
-

@@ -30,27 +30,14 @@
         "normalMap": "/vehicles/miramar/miramar_main_n.normal.png",
         "opacityFactor": null,
         "opacityMap": "/vehicles/miramar/miramar_main_o.data.png",
-        "pixelSpecular": null
-      },
-      {
-        "clearCoatFactor": null,
-        "clearCoatRoughnessFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "instanceDiffuse": null,
-        "metallicFactor": null,
-        "opacityFactor": null,
-        "pixelSpecular": null
-      },
-      {
-        "clearCoatFactor": null,
-        "clearCoatRoughnessFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "instanceDiffuse": null,
-        "metallicFactor": null,
-        "opacityFactor": null,
-        "pixelSpecular": null
+        "pixelSpecular": null,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,
@@ -90,27 +77,14 @@
         "normalMap": "/vehicles/miramar/miramar_main_n.normal.png",
         "opacityFactor": null,
         "opacityMap": "/vehicles/miramar/miramar_main_o.data.png",
-        "pixelSpecular": null
-      },
-      {
-        "clearCoatFactor": null,
-        "clearCoatRoughnessFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "instanceDiffuse": null,
-        "metallicFactor": null,
-        "opacityFactor": null,
-        "pixelSpecular": null
-      },
-      {
-        "clearCoatFactor": null,
-        "clearCoatRoughnessFactor": null,
-        "colorPaletteMapUseUV": null,
-        "diffuseMapUseUV": null,
-        "instanceDiffuse": null,
-        "metallicFactor": null,
-        "opacityFactor": null,
-        "pixelSpecular": null
+        "pixelSpecular": null,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,

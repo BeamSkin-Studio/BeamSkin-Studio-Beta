@@ -26,9 +26,14 @@
         "normalMap": "/vehicles/etkc/etkc_n.dds",
         "opacityMap": "/vehicles/etkc/etkc_main_c.data.png",
         "baseColorMap": "vehicles/etkc/SKINNAME/etkc_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -64,9 +69,14 @@
         "normalMap": "vehicles/etkc/sport_custom/etkc_extra_nm.normal.png",
         "opacityMap": "/vehicles/etkc/sport_custom/etkc_extra_c.data.png",
         "baseColorMap": "vehicles/etkc/SKINNAME/etkc_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

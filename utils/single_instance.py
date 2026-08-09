@@ -1,15 +1,10 @@
 import os
 import sys
 import tempfile
-import platform
-
-print(f"[DEBUG] Loading class: SingleInstanceLock")
 
 
 class SingleInstanceLock:
-
     def __init__(self, app_name: str = "BeamSkinStudio"):
-        print(f"[DEBUG] SingleInstanceLock.__init__ called")
         self.app_name       = app_name
         self.lock_file      = None
         self.lock_file_path = None
@@ -21,91 +16,68 @@ class SingleInstanceLock:
             lock_dir = os.environ.get("XDG_RUNTIME_DIR", tempfile.gettempdir())
 
         self.lock_file_path = os.path.join(lock_dir, f"{app_name}.lock")
-        print(f"[DEBUG] Lock file path: {self.lock_file_path}")
-
 
     def acquire(self) -> bool:
-        print(f"[DEBUG] acquire called")
         try:
-            if os.path.exists(self.lock_file_path):
+            if sys.platform == "win32":
+                self.file_handle = open(self.lock_file_path, "a+")
                 try:
-                    with open(self.lock_file_path, "r") as f:
-                        pid = int(f.read().strip())
-
-                    if self._is_process_running(pid):
-                        print(f"[DEBUG] Another instance is running (PID: {pid})")
-                        return False
-                    else:
-                        print(f"[DEBUG] Removing stale lock file (PID: {pid} not running)")
-                        os.remove(self.lock_file_path)
-                except (ValueError, IOError):
-                    print(f"[DEBUG] Removing invalid lock file")
-                    try:
-                        os.remove(self.lock_file_path)
-                    except Exception:
-                        pass
-
-            with open(self.lock_file_path, "w") as f:
-                f.write(str(os.getpid()))
-
-            if sys.platform != "win32":
+                    import msvcrt
+                    self.file_handle.seek(0)
+                    msvcrt.locking(self.file_handle.fileno(), msvcrt.LK_NBLCK, 1)
+                except ImportError:
+                    print("[DEBUG] SingleInstanceLock.acquire: msvcrt not available, cannot enforce single instance")
+                except OSError as _exc:
+                    print(f"[WARNING] acquire: {type(_exc).__name__}: {_exc}")
+                    self.file_handle.close()
+                    self.file_handle = None
+                    return False
+            else:
+                self.file_handle = open(self.lock_file_path, "a+")
                 try:
                     import fcntl
-                    self.file_handle = open(self.lock_file_path, "r")
                     fcntl.flock(self.file_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    print(f"[DEBUG] File lock acquired using fcntl")
                 except ImportError:
-                    print(f"[DEBUG] fcntl not available, using PID-based locking only")
-                except IOError:
-                    print(f"[DEBUG] Could not acquire file lock, another instance may be running")
-                    if self.file_handle:
-                        self.file_handle.close()
+                    print("[DEBUG] SingleInstanceLock.acquire: fcntl not available, cannot enforce single instance")
+                except OSError as _exc:
+                    print(f"[WARNING] acquire: {type(_exc).__name__}: {_exc}")
+                    self.file_handle.close()
+                    self.file_handle = None
                     return False
 
+            self.file_handle.seek(0)
+            self.file_handle.truncate()
+            self.file_handle.write(str(os.getpid()))
+            self.file_handle.flush()
+
             self.lock_file = self.lock_file_path
-            print(f"[DEBUG] Lock acquired: {self.lock_file_path}")
+            print(f"[DEBUG] SingleInstanceLock: lock acquired at {self.lock_file_path}")
             return True
 
         except Exception as e:
             print(f"[ERROR] Failed to acquire lock: {e}")
             return True
 
-
     def release(self):
-        print(f"[DEBUG] release called")
         if self.file_handle:
             try:
-                import fcntl
-                fcntl.flock(self.file_handle.fileno(), fcntl.LOCK_UN)
+                if sys.platform == "win32":
+                    import msvcrt
+                    self.file_handle.seek(0)
+                    msvcrt.locking(self.file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.file_handle.fileno(), fcntl.LOCK_UN)
                 self.file_handle.close()
-                print(f"[DEBUG] File lock released")
-            except Exception:
-                pass
+            except Exception as _exc:
+                print(f"[WARNING] release: {type(_exc).__name__}: {_exc}")
 
         if self.lock_file and os.path.exists(self.lock_file):
             try:
                 os.remove(self.lock_file)
-                print(f"[DEBUG] Lock released: {self.lock_file}")
+                print(f"[DEBUG] SingleInstanceLock: lock released at {self.lock_file}")
             except Exception as e:
                 print(f"[ERROR] Failed to release lock: {e}")
-
-
-    def _is_process_running(self, pid: int) -> bool:
-        try:
-            if sys.platform == "win32":
-                import subprocess
-                result = subprocess.run(
-                    ["tasklist", "/FI", f"PID eq {pid}"],
-                    capture_output=True, text=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-                return str(pid) in result.stdout
-            else:
-                os.kill(pid, 0)
-                return True
-        except (OSError, Exception):
-            return False
-
 
     def __enter__(self):
         return self.acquire()
@@ -116,13 +88,11 @@ class SingleInstanceLock:
 
 def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
     global _global_lock
-    print(f"[DEBUG] check_single_instance called")
 
     _global_lock = SingleInstanceLock(app_name)
 
     if not _global_lock.acquire():
-        print(f"[DEBUG] Another instance detected, attempting to bring it to front...")
-
+        print("[DEBUG] check_single_instance: another instance detected, attempting to bring it to front")
 
         try:
             if sys.platform == "win32":
@@ -138,7 +108,7 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
 
                     win32gui.EnumWindows(_cb, None)
                 except ImportError:
-                    print("[DEBUG] pywin32 not available, cannot bring window to front")
+                    print("[DEBUG] check_single_instance: pywin32 not available, cannot bring window to front")
 
             elif sys.platform in ("linux", "linux2"):
                 import subprocess
@@ -150,7 +120,6 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
                         if "BeamSkin Studio" in line or app_name in line:
                             window_id = line.split()[0]
                             subprocess.run(["wmctrl", "-i", "-a", window_id])
-                            print(f"[DEBUG] Activated existing window using wmctrl")
                             break
 
             elif sys.platform == "darwin":
@@ -163,32 +132,9 @@ def check_single_instance(app_name: str = "BeamSkinStudio") -> bool:
                     ],
                     timeout=2,
                 )
-                print(f"[DEBUG] Activated existing window using osascript")
 
         except Exception as e:
-            print(f"[DEBUG] Could not bring existing window to front: {e}")
-
-
-        try:
-            from PySide6.QtWidgets import QApplication, QMessageBox
-
-
-            q_app = QApplication.instance() or QApplication(sys.argv)
-
-            msg = QMessageBox()
-            msg.setWindowTitle("Already Running")
-            msg.setIcon(QMessageBox.Icon.Critical)
-            msg.setText(
-                f"{app_name} is already running!\n\n"
-                "Please close the existing instance before starting a new one."
-            )
-            msg.setWindowFlags(msg.windowFlags() | 0x00040000)
-            msg.exec()
-
-        except Exception as e:
-
-            print(f"[ERROR] Failed to show dialog: {e}")
-            print(f"[ERROR] {app_name} is already running!")
+            print(f"[DEBUG] check_single_instance: could not bring existing window to front: {e}")
 
         return False
 
@@ -199,14 +145,11 @@ _global_lock: SingleInstanceLock | None = None
 
 
 def acquire_global_lock(app_name: str = "BeamSkinStudio") -> bool:
-    print(f"[DEBUG] acquire_global_lock called")
     global _global_lock
     _global_lock = SingleInstanceLock(app_name)
     return _global_lock.acquire()
 
 
 def release_global_lock():
-    print(f"[DEBUG] release_global_lock called")
-    global _global_lock
     if _global_lock:
         _global_lock.release()

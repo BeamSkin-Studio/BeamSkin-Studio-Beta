@@ -1,3 +1,17 @@
+"""
+launcher.py — BeamSkin Studio splash / dependency installer  (PySide6 edition)
+===============================================================================
+Replaces the old CustomTkinter LauncherWindow.
+
+Responsibilities:
+  1. Check that required Python packages are installed; install any that are
+     missing (pip is invoked in a background thread so the UI stays responsive).
+  2. Show an animated splash screen while the main app loads.
+  3. Launch main.py and close the splash once the main window is visible.
+
+If Python itself is missing the user is directed to python.org — we cannot
+bootstrap a Python installer from inside a Python script that isn't running.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +22,8 @@ import threading
 import time
 import urllib.request
 
-
+# ── stdlib-only bootstrap: install PySide6 if it is somehow absent ───────────
+# (Normally install.bat guarantees this; this is a last-resort safety net.)
 def _ensure_pyside6() -> None:
     try:
         import PySide6  # noqa: F401
@@ -23,13 +38,13 @@ def _ensure_pyside6() -> None:
 
 _ensure_pyside6()
 
-
+# ── allow importing gui.theme from the project root ───────────────────────────
 script_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(script_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-
+# ── now safe to import Qt and theme colors ───────────────────────────────────
 from PySide6.QtCore import (Qt, QThread, Signal, QObject,
                              QTimer, QPropertyAnimation, QEasingCurve)
 from PySide6.QtGui  import QColor, QFont, QPixmap, QPainter, QPen, QBrush
@@ -46,9 +61,13 @@ _REQUIRED = [
 ]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKER  — package install in background thread
+# ─────────────────────────────────────────────────────────────────────────────
+
 class _InstallSignals(QObject):
-    progress = Signal(str, float)
-    finished = Signal(bool, str)
+    progress = Signal(str, float)   # (message, 0-1)
+    finished = Signal(bool, str)    # (success, error_msg)
 
 
 class _InstallWorker(QThread):
@@ -70,10 +89,10 @@ class _InstallWorker(QThread):
                 self.signals.finished.emit(True, "")
                 return
 
-            total = len(missing) + 1
+            total = len(missing) + 1  # +1 for pip upgrade
             step  = 0
 
-
+            # Upgrade pip first
             self.signals.progress.emit("Updating pip…", step / total)
             subprocess.run(
                 [sys.executable, "-m", "pip", "install", "--upgrade",
@@ -108,7 +127,13 @@ class _InstallWorker(QThread):
             self.signals.finished.emit(False, str(exc))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPLASH WINDOW
+# ─────────────────────────────────────────────────────────────────────────────
+
 class SplashWindow(QWidget):
+    """Frameless splash screen shown while packages are verified and the
+    main application window is initialising."""
 
     def __init__(self):
         super().__init__()
@@ -120,9 +145,10 @@ class SplashWindow(QWidget):
         self._center()
         self._build_ui()
 
+    # ── layout ────────────────────────────────────────────────────────────── #
 
     def _build_ui(self):
-
+        # outer card
         card = QFrame(self)
         card.setGeometry(0, 0, 640, 420)
         card.setStyleSheet(f"""
@@ -138,7 +164,7 @@ class SplashWindow(QWidget):
         col.setSpacing(0)
         col.setAlignment(Qt.AlignCenter)
 
-
+        # logo
         self._logo_lbl = QLabel()
         self._logo_lbl.setAlignment(Qt.AlignCenter)
         self._logo_lbl.setStyleSheet("background:transparent;border:none;")
@@ -146,7 +172,7 @@ class SplashWindow(QWidget):
         col.addWidget(self._logo_lbl)
         col.addSpacing(20)
 
-
+        # title
         title = QLabel("BeamSkin Studio")
         title.setFont(self._font(26, bold=True))
         title.setAlignment(Qt.AlignCenter)
@@ -156,7 +182,7 @@ class SplashWindow(QWidget):
         col.addWidget(title)
         col.addSpacing(6)
 
-
+        # subtitle
         sub = QLabel("Professional Skin Modding Tool for BeamNG.drive")
         sub.setFont(self._font(12))
         sub.setAlignment(Qt.AlignCenter)
@@ -166,7 +192,7 @@ class SplashWindow(QWidget):
         col.addWidget(sub)
         col.addSpacing(32)
 
-
+        # status label
         self._status = QLabel("Initialising…")
         self._status.setFont(self._font(13))
         self._status.setAlignment(Qt.AlignCenter)
@@ -176,7 +202,7 @@ class SplashWindow(QWidget):
         col.addWidget(self._status)
         col.addSpacing(14)
 
-
+        # progress bar
         self._bar = QProgressBar()
         self._bar.setRange(0, 1000)
         self._bar.setValue(0)
@@ -196,7 +222,7 @@ class SplashWindow(QWidget):
         col.addWidget(self._bar)
         col.addSpacing(28)
 
-
+        # error/action button (hidden by default)
         self._action_btn = QPushButton("")
         self._action_btn.setFixedHeight(42)
         self._action_btn.setVisible(False)
@@ -204,7 +230,7 @@ class SplashWindow(QWidget):
         self._action_btn.setCursor(Qt.PointingHandCursor)
         col.addWidget(self._action_btn)
 
-
+        # version / footer
         ver_lbl = QLabel("Loading…")
         ver_lbl.setFont(self._font(10))
         ver_lbl.setAlignment(Qt.AlignCenter)
@@ -215,6 +241,7 @@ class SplashWindow(QWidget):
         col.addWidget(ver_lbl)
         self._ver_lbl = ver_lbl
 
+    # ── helpers ───────────────────────────────────────────────────────────── #
 
     @staticmethod
     def _font(size: int, bold: bool = False) -> QFont:
@@ -224,14 +251,15 @@ class SplashWindow(QWidget):
         return f
 
     def _try_load_logo(self):
+        """Load the white logo PNG if available; fall back to text emoji."""
         script_dir = os.path.dirname(os.path.abspath(__file__))
-
+        # launcher.py lives inside launchers-scripts/ (one level down from root)
         parent_dir = os.path.dirname(script_dir)
         logo_path = os.path.join(
             parent_dir, "gui", "Icons", "BeamSkin_Studio_White.png"
         )
         if not os.path.exists(logo_path):
-
+            # try root-level (if launcher.py is in project root)
             logo_path = os.path.join(
                 script_dir, "gui", "Icons", "BeamSkin_Studio_White.png"
             )
@@ -255,8 +283,10 @@ class SplashWindow(QWidget):
             (screen.height() - self.height()) // 2,
         )
 
+    # ── public API ────────────────────────────────────────────────────────── #
 
     def set_status(self, message: str, progress: float = None):
+        """Update status label and optional progress bar (0.0–1.0)."""
         self._status.setText(message)
         if progress is not None:
             self._bar.setValue(int(progress * 1000))
@@ -296,13 +326,14 @@ class SplashWindow(QWidget):
     def show_choice(self, message: str,
                     yes_text: str, no_text: str,
                     on_yes=None, on_no=None):
+        """Show two buttons side by side (e.g. Download / Cancel)."""
         self._status.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
         self._status.setText(message)
         self._bar.setValue(0)
 
-
+        # reuse action_btn as YES; add a NO button dynamically
         self._action_btn.setText(yes_text)
         self._action_btn.setStyleSheet(f"""
             QPushButton {{
@@ -341,7 +372,7 @@ class SplashWindow(QWidget):
                     color: {COLORS['text']};
                 }}
             """)
-
+            # insert the no button right after action_btn
             layout = self._action_btn.parent().layout()
             idx = layout.indexOf(self._action_btn)
             layout.insertWidget(idx + 1, self._no_btn)
@@ -364,13 +395,18 @@ class SplashWindow(QWidget):
             self._no_btn.setVisible(False)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN SEQUENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _launch_main_app(splash: SplashWindow):
+    """Launch main.py in the same process (or as subprocess if preferred)."""
     script_dir  = os.path.dirname(os.path.abspath(__file__))
     parent_dir  = os.path.dirname(script_dir)
     main_py     = os.path.join(parent_dir, "main.py")
 
     if not os.path.exists(main_py):
-
+        # if launcher.py lives at the root level alongside main.py
         main_py = os.path.join(script_dir, "main.py")
 
     if not os.path.exists(main_py):
@@ -406,7 +442,7 @@ def main():
     splash.show()
     QApplication.processEvents()
 
-
+    # Try to read version for footer
     script_dir = os.path.dirname(os.path.abspath(__file__))
     for candidate in [
         os.path.join(script_dir, "version.txt"),
@@ -446,7 +482,7 @@ def main():
 
 def _launch_and_close(splash: SplashWindow):
     _launch_main_app(splash)
-
+    # Give main.py a moment to appear, then close splash
     QTimer.singleShot(200, QApplication.quit)
 
 

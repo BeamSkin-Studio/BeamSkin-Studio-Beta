@@ -25,17 +25,14 @@
         "diffuseMapUseUV": 1,
         "metallicFactor": 0.5,
         "normalMap": "vehicles/md_series/md_series_main_nm.normal.png",
-        "opacityMap": "/vehicles/md_series/md_series_main_c.data.png"
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null
+        "opacityMap": "/vehicles/md_series/md_series_main_c.data.png",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,
@@ -67,10 +64,15 @@
         "diffuseMapUseUV": 1,
         "metallicFactor": 0.5,
         "normalMap": "/vehicles/md_series/md_series_main_nm.normal.png",
-        "opacityMap": "/vehicles/md_series/md_series_main_alt_c.data.png"
-      },
-      {},
-      {}
+        "opacityMap": "/vehicles/md_series/md_series_main_alt_c.data.png",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -102,10 +104,15 @@
         "diffuseMapUseUV": 1,
         "metallicFactor": 0.5,
         "normalMap": "/vehicles/md_series/armored/md_series_armored_main_nm.normal.png",
-        "opacityMap": "/vehicles/md_series/armored/md_series_armored_main_c.data.png"
-      },
-      {},
-      {}
+        "opacityMap": "/vehicles/md_series/armored/md_series_armored_main_c.data.png",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

@@ -25,19 +25,14 @@
         "metallicFactor": null,
         "normalMap": "/vehicles/scintilla/scintilla_main_nm.normal.png",
         "opacityMap": "/vehicles/scintilla/scintilla_main_c.data.png",
-        "roughnessFactor": 0
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
-      },
-      {
-        "clearCoatFactor": null,
-        "diffuseMapUseUV": null,
-        "metallicFactor": null,
-        "roughnessFactor": null
+        "roughnessFactor": 0,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.05,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
       }
     ],
     "activeLayers": 2,

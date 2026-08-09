@@ -26,9 +26,14 @@
         "normalMap": "/vehicles/covet/covet_main_nm.normal.png",
         "opacityMap": "/vehicles/covet/covet_main_alt_c.data.png",
         "baseColorMap": "vehicles/covet/SKINNAME/covet_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.15,
+        "detailScale": [
+          64,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PySide6.QtCore    import Qt, QPropertyAnimation, QEasingCurve, QRect
-from PySide6.QtGui     import QFont, QColor
+from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QWidget, QApplication,
@@ -10,26 +10,25 @@ from PySide6.QtWidgets import (
 )
 
 from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import AnimButton, GhostButton, Card, HSeparator
+from gui.widgets import AnimButton, GhostButton
 from gui.icon_helper import set_window_icon
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return key
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
 
 
 class _BaseDialog(QDialog):
-
     def __init__(self, parent: QWidget, title: str, width: int = 520, height: int = 320):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
         set_window_icon(self)
         self.setModal(True)
         self.setFixedSize(width, height)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
-
 
         if parent:
             pg = parent.frameGeometry()
@@ -43,7 +42,6 @@ class _BaseDialog(QDialog):
                 (screen.width()  - width)  // 2,
                 (screen.height() - height) // 2,
             )
-
 
         self._card = QFrame(self)
         self._card.setGeometry(0, 0, width, height)
@@ -63,17 +61,14 @@ class _BaseDialog(QDialog):
         self._build_content(title)
 
     def _build_content(self, title: str):
-        print(f"[DEBUG] _build_content() called")
         raise NotImplementedError
 
     def showEvent(self, event):
-        print(f"[DEBUG] showEvent() called")
         fade_in(self._card, 220)
         super().showEvent(event)
 
 
 class DangerConfirmationDialog(QDialog):
-
     def __init__(
         self,
         parent:       QWidget,
@@ -100,7 +95,6 @@ class DangerConfirmationDialog(QDialog):
         self.setStyleSheet("background: transparent;")
         self.result = False
 
-
         if parent:
             pg = parent.frameGeometry()
             self.move(
@@ -115,7 +109,6 @@ class DangerConfirmationDialog(QDialog):
         err_h   = COLORS["error_hover"]
         err_dim = "#7a1c1c"
 
-
         self._card = QFrame(self)
         self._card.setGeometry(0, 0, W, H)
         self._card.setStyleSheet(f"""
@@ -126,7 +119,6 @@ class DangerConfirmationDialog(QDialog):
             }}
         """)
 
-
         glow = QGraphicsDropShadowEffect(self._card)
         glow.setBlurRadius(40)
         glow.setOffset(0, 0)
@@ -136,7 +128,6 @@ class DangerConfirmationDialog(QDialog):
         root = QVBoxLayout(self._card)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-
 
         accent_strip = QFrame()
         accent_strip.setFixedHeight(4)
@@ -152,11 +143,9 @@ class DangerConfirmationDialog(QDialog):
         """)
         root.addWidget(accent_strip)
 
-
         content = QVBoxLayout()
         content.setContentsMargins(28, 18, 28, 24)
         content.setSpacing(10)
-
 
         icon_lbl = QLabel(icon)
         icon_lbl.setFont(font(38))
@@ -164,13 +153,11 @@ class DangerConfirmationDialog(QDialog):
         icon_lbl.setStyleSheet("background:transparent;border:none;")
         content.addWidget(icon_lbl)
 
-
         title_lbl = QLabel(title)
         title_lbl.setFont(font(18, "bold"))
         title_lbl.setAlignment(Qt.AlignCenter)
         title_lbl.setStyleSheet(f"color:{err};background:transparent;border:none;")
         content.addWidget(title_lbl)
-
 
         if irreversible:
             irrev_lbl = QLabel(t("dialog.irreversible", default="This action cannot be undone"))
@@ -182,7 +169,6 @@ class DangerConfirmationDialog(QDialog):
             content.addWidget(irrev_lbl)
 
         content.addSpacing(4)
-
 
         msg_card = QFrame()
         msg_card.setStyleSheet(f"""
@@ -207,14 +193,12 @@ class DangerConfirmationDialog(QDialog):
 
         content.addSpacing(2)
 
-
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
         cancel_btn = GhostButton(cancel_text, font_size=14)
         cancel_btn.setMinimumHeight(42)
         cancel_btn.clicked.connect(self._on_cancel)
-
 
         confirm_btn = QPushButton(confirm_text)
         confirm_btn.setFont(font(14, "bold"))
@@ -249,30 +233,23 @@ class DangerConfirmationDialog(QDialog):
 
         root.addLayout(content)
 
-
         cancel_btn.setFocus()
 
 
     def _on_confirm(self):
-        print(f"[DEBUG] _on_confirm() called")
         self.result = True
         self.accept()
 
     def _on_cancel(self):
-        print(f"[DEBUG] _on_cancel() called")
         self.result = False
         self.reject()
 
     def keyPressEvent(self, event):
-        print(f"[DEBUG] keyPressEvent() called")
         if event.key() == Qt.Key_Escape:
             self._on_cancel()
         super().keyPressEvent(event)
 
     def showEvent(self, event):
-        print(f"[DEBUG] showEvent() called")
-
-
         self.setWindowOpacity(0.0)
         anim = QPropertyAnimation(self, b"windowOpacity", self)
         anim.setDuration(220)
@@ -283,13 +260,11 @@ class DangerConfirmationDialog(QDialog):
         super().showEvent(event)
 
     def show_and_get(self) -> bool:
-        print(f"[DEBUG] show_and_get() called")
         self.exec()
         return self.result
 
 
 class ConfirmationDialog(_BaseDialog):
-
     def __init__(
         self,
         parent: QWidget,
@@ -301,12 +276,12 @@ class ConfirmationDialog(_BaseDialog):
         icon: str = "❓",
         danger: bool = False,
     ):
-
-
         if confirm_text is None:
             confirm_text = t("dialog.yes", default="Yes")
         if cancel_text is None:
             cancel_text = t("dialog.no", default="No")
+
+        self._delegate = None
 
         if danger:
             self._delegate = DangerConfirmationDialog(
@@ -315,11 +290,15 @@ class ConfirmationDialog(_BaseDialog):
                 cancel_text=cancel_text,
                 icon=icon,
             )
-
             self.result = False
+            self._message      = message
+            self._confirm_text = confirm_text
+            self._cancel_text  = cancel_text
+            self._icon         = icon
+            self._danger       = True
+            super().__init__(parent, title, 1, 1)
             return
 
-        self._delegate    = None
         self._message      = message
         self._confirm_text = confirm_text
         self._cancel_text  = cancel_text
@@ -329,14 +308,14 @@ class ConfirmationDialog(_BaseDialog):
         super().__init__(parent, title, 520, 320)
 
     def _build_content(self, title: str):
-        print(f"[DEBUG] _build_content() called")
+        if self._delegate is not None:
+            return
 
         icon_lbl = QLabel(self._icon)
         icon_lbl.setFont(font(44))
         icon_lbl.setAlignment(Qt.AlignCenter)
         icon_lbl.setStyleSheet("background:transparent;border:none;")
         self._root.addWidget(icon_lbl)
-
 
         title_lbl = QLabel(title)
         title_lbl.setFont(font(20, "bold"))
@@ -345,7 +324,6 @@ class ConfirmationDialog(_BaseDialog):
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
         self._root.addWidget(title_lbl)
-
 
         msg_card = QFrame()
         msg_card.setStyleSheet(f"""
@@ -364,7 +342,6 @@ class ConfirmationDialog(_BaseDialog):
         msg_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
         msg_inner.addWidget(msg_lbl)
         self._root.addWidget(msg_card)
-
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
@@ -388,24 +365,19 @@ class ConfirmationDialog(_BaseDialog):
         confirm_btn.setFocus()
 
     def _on_confirm(self):
-        print(f"[DEBUG] _on_confirm() called")
         self.result = True
         self.accept()
 
     def _on_cancel(self):
-        print(f"[DEBUG] _on_cancel() called")
         self.result = False
         self.reject()
 
     def keyPressEvent(self, event):
-        print(f"[DEBUG] keyPressEvent() called")
         if event.key() == Qt.Key_Escape:
             self._on_cancel()
         super().keyPressEvent(event)
 
     def show_and_get(self) -> bool:
-        print(f"[DEBUG] show_and_get() called")
-
         if self._delegate is not None:
             return self._delegate.show_and_get()
         self.exec()
@@ -413,7 +385,6 @@ class ConfirmationDialog(_BaseDialog):
 
 
 class InfoDialog(_BaseDialog):
-
     def __init__(
         self,
         parent: QWidget,
@@ -431,7 +402,6 @@ class InfoDialog(_BaseDialog):
         super().__init__(parent, title, 520, 300)
 
     def _build_content(self, title: str):
-        print(f"[DEBUG] _build_content() called")
         type_color_map = {
             "error":   COLORS["error"],
             "warning": COLORS["warning"],
@@ -481,7 +451,6 @@ class InfoDialog(_BaseDialog):
         ok_btn.setFocus()
 
     def keyPressEvent(self, event):
-        print(f"[DEBUG] keyPressEvent() called")
         if event.key() in (Qt.Key_Escape, Qt.Key_Return):
             self.accept()
         super().keyPressEvent(event)
@@ -531,5 +500,3 @@ def showerror(parent, title: str, message: str, colors: dict, icon: str = "❌")
 
 def showsuccess(parent, title: str, message: str, colors: dict, icon: str = "✅"):
     InfoDialog(parent, title, message, colors, icon=icon, type="success").exec()
-
-

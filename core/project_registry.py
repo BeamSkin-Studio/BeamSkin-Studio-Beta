@@ -7,10 +7,15 @@ from typing import Dict, List, Optional, Tuple
 
 print("[DEBUG] project_registry: module loading")
 
-
-_HERE     = os.path.dirname(os.path.abspath(__file__))
-_DATA_DIR = os.path.join(os.path.dirname(_HERE), "data")
-_REGISTRY = os.path.join(_DATA_DIR, "project_registry.json")
+try:
+    from core.settings import get_data_dir, get_project_registry_path
+    _DATA_DIR = get_data_dir()
+    _REGISTRY = get_project_registry_path()
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _DATA_DIR = os.path.join(os.path.dirname(_HERE), 'data')
+    _REGISTRY = os.path.join(_DATA_DIR, 'project_registry.json')
 
 print(f"[DEBUG] project_registry: _DATA_DIR={_DATA_DIR}")
 print(f"[DEBUG] project_registry: _REGISTRY={_REGISTRY}")
@@ -38,7 +43,7 @@ def _file_meta(path: str) -> Dict:
 
 
 def _count_skins(project_data: Dict) -> int:
-    print(f"[DEBUG] _count_skins: counting skins in project_data")
+    print("[DEBUG] _count_skins: counting skins in project_data")
     total = 0
     for car_key, car in project_data.get("cars", {}).items():
         n = len(car.get("skins", []))
@@ -48,42 +53,92 @@ def _count_skins(project_data: Dict) -> int:
     return total
 
 
+def _registry_path() -> str:
+    try:
+        path = get_project_registry_path()
+    except NameError as _exc:
+        print(f"[WARNING] _registry_path: {type(_exc).__name__}: {_exc}")
+        path = _REGISTRY
+    print(f"[DEBUG] _registry_path: {path!r}")
+    return path
+
+
+def _data_dir() -> str:
+    try:
+        path = get_data_dir()
+    except NameError as _exc:
+        print(f"[WARNING] _data_dir: {type(_exc).__name__}: {_exc}")
+        path = _DATA_DIR
+    print(f"[DEBUG] _data_dir: {path!r}")
+    return path
+
+
+def _backup_corrupted_registry(path: str, reason: str) -> None:
+    if not os.path.exists(path):
+        return
+    backup_path = path + ".corrupted"
+    if os.path.exists(backup_path):
+        return
+    try:
+        import shutil as _shutil
+        _shutil.copy2(path, backup_path)
+        print(f"[WARNING] _read: registry {reason} — backed up original to {backup_path!r} "
+              f"before it gets overwritten")
+    except Exception as exc:
+        print(f"[WARNING] _read: could not back up corrupted registry {path!r}: {exc}")
+
+
+def _clear_corrupted_marker(path: str) -> None:
+    backup_path = path + ".corrupted"
+    if os.path.exists(backup_path):
+        try:
+            os.remove(backup_path)
+        except Exception as _exc:
+            print(f"[WARNING] _clear_corrupted_marker: {type(_exc).__name__}: {_exc}")
+
+
 def _read() -> List[Dict]:
-    print(f"[DEBUG] _read: reading registry from {_REGISTRY!r}")
-    if not os.path.exists(_REGISTRY):
-        print(f"[DEBUG] _read: registry file does not exist — returning []")
+    path = _registry_path()
+    print(f"[DEBUG] _read: reading registry from {path!r}")
+    if not os.path.exists(path):
+        print("[DEBUG] _read: registry file does not exist — returning []")
         return []
     try:
-        with open(_REGISTRY, "r", encoding="utf-8") as fh:
+        with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
         if not isinstance(data, list):
             print(f"[DEBUG] _read: registry root is not a list (type={type(data)}) — returning []")
+            _backup_corrupted_registry(path, f"root is not a list (type={type(data)})")
             return []
         print(f"[DEBUG] _read: loaded {len(data)} entries")
+        _clear_corrupted_marker(path)
         return data
     except Exception as exc:
         print(f"[DEBUG] _read: ERROR reading registry: {exc}")
+        _backup_corrupted_registry(path, f"failed to parse ({exc})")
         return []
 
 
 def _write(entries: List[Dict]) -> None:
-    print(f"[DEBUG] _write: writing {len(entries)} entries to {_REGISTRY!r}")
-    os.makedirs(_DATA_DIR, exist_ok=True)
+    path = _registry_path()
+    print(f"[DEBUG] _write: writing {len(entries)} entries to {path!r}")
+    os.makedirs(_data_dir(), exist_ok=True)
     try:
-        with open(_REGISTRY, "w", encoding="utf-8") as fh:
+        with open(path, "w", encoding="utf-8") as fh:
             json.dump(entries, fh, indent=2, ensure_ascii=False)
-        print(f"[DEBUG] _write: write successful")
+        print("[DEBUG] _write: write successful")
     except Exception as exc:
         print(f"[DEBUG] _write: ERROR writing registry: {exc}")
 
 
 def _normalise_path(path: str) -> str:
     result = os.path.normcase(os.path.abspath(path))
+    print(f"[DEBUG] _normalise_path: {path!r} -> {result!r}")
     return result
 
 
 def load_registry() -> List[Dict]:
-    print(f"[DEBUG] load_registry: called")
+    print("[DEBUG] load_registry: called")
     entries = _read()
     entries.sort(key=lambda e: e.get("last_saved", ""), reverse=True)
     print(f"[DEBUG] load_registry: returning {len(entries)} entries sorted newest-first")
@@ -124,6 +179,7 @@ def add_or_update_entry(path: str, project_data: Dict) -> None:
         "last_saved":   meta["last_saved"],
         "file_size_kb": meta["file_size_kb"],
         "added_at":     existing.get("added_at", _now_iso()) if existing else _now_iso(),
+        "last_opened":  existing.get("last_opened") if existing else None,
     }
     print(f"[DEBUG] add_or_update_entry: built entry={entry}")
 
@@ -137,6 +193,25 @@ def add_or_update_entry(path: str, project_data: Dict) -> None:
 
     _write(entries)
     print(f"[project_registry] registered: {abs_path}")
+
+
+def touch_last_opened(path: str) -> None:
+    print(f"[DEBUG] touch_last_opened: called with path={path!r}")
+    abs_path = os.path.abspath(path)
+    norm     = _normalise_path(abs_path)
+    entries  = _read()
+
+    existing = next(
+        (e for e in entries if _normalise_path(e.get("path", "")) == norm),
+        None,
+    )
+    if existing is None:
+        print(f"[DEBUG] touch_last_opened: {abs_path!r} not in registry — nothing to update")
+        return
+
+    existing["last_opened"] = _now_iso()
+    _write(entries)
+    print(f"[project_registry] last_opened updated: {abs_path}")
 
 
 def register_existing(path: str) -> Optional[Dict]:
@@ -156,15 +231,14 @@ def register_existing(path: str) -> Optional[Dict]:
     )
 
     if existing:
-        print(f"[DEBUG] register_existing: already registered — refreshing fs metadata")
+        print("[DEBUG] register_existing: already registered — refreshing fs metadata")
         meta = _file_meta(abs_path)
         existing.update(meta)
         print(f"[DEBUG] register_existing: updated meta={meta}")
         _write(entries)
         return existing
 
-
-    print(f"[DEBUG] register_existing: new entry — reading project file for metadata")
+    print("[DEBUG] register_existing: new entry — reading project file for metadata")
     try:
         with open(abs_path, "r", encoding="utf-8") as fh:
             project_data = json.load(fh)
@@ -202,12 +276,12 @@ def remove_entry(path: str) -> bool:
         print(f"[project_registry] removed: {abs_path}")
         return True
 
-    print(f"[DEBUG] remove_entry: path was not in registry — nothing removed")
+    print("[DEBUG] remove_entry: path was not in registry — nothing removed")
     return False
 
 
 def validate_entries() -> Tuple[List[Dict], List[Dict]]:
-    print(f"[DEBUG] validate_entries: called")
+    print("[DEBUG] validate_entries: called")
     entries = _read()
     print(f"[DEBUG] validate_entries: checking {len(entries)} entries")
 
@@ -234,5 +308,6 @@ def validate_entries() -> Tuple[List[Dict], List[Dict]]:
 
 
 def get_registry_path() -> str:
-    print(f"[DEBUG] get_registry_path: returning {_REGISTRY!r}")
-    return _REGISTRY
+    path = _registry_path()
+    print(f"[DEBUG] get_registry_path: returning {path!r}")
+    return path

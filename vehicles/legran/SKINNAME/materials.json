@@ -23,10 +23,15 @@
         "metallicFactor": 0,
         "normalMap": "/vehicles/legran/legran_n.normal.png",
         "opacityMap": "/vehicles/legran/legran_main_c.data.png",
-        "useAnisotropic": true
-      },
-      {},
-      {}
+        "useAnisotropic": true,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

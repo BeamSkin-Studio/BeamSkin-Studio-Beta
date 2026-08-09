@@ -39,9 +39,7 @@
         "normalMap": "/vehicles/dumptruck/dumptruck_body_mat_nm.normal.png",
         "opacityMap": "/vehicles/dumptruck/dumptruck_body_mat_c.data.png",
         "roughnessFactor": null
-      },
-      {},
-      {}
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -67,9 +65,7 @@
         "metallicFactor": 1,
         "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
         "opacityMap": "/vehicles/dumptruck/dumptruck_cab_c.data.png"
-      },
-      {},
-      {}
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

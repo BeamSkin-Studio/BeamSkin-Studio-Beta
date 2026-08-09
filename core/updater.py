@@ -21,62 +21,72 @@ from PySide6.QtWidgets import (
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return kw.get("default", key)
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return kw.get('default', key)
 
 log = logging.getLogger(__name__)
 
 try:
     from gui.theme import COLORS, font, fade_in
-except ImportError:
-    COLORS = {
-        "card_bg": "#1e1e2e", "frame_bg": "#181825",
-        "accent": "#7c3aed", "accent_hover": "#6d28d9", "accent_dim": "#5b21b6",
-        "accent_text": "#ffffff", "text": "#cdd6f4", "text_secondary": "#a6adc8",
-        "border": "#313244", "card_hover": "#27273a",
-        "success": "#a6e3a1", "error": "#f38ba8", "warning": "#f9e2af",
-    }
-    def font(size=13, weight="normal"):
-        f = QFont("Segoe UI", size); f.setBold(weight == "bold"); return f
-    def fade_in(w, duration=200): pass
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    COLORS = {'card_bg': '#1e1e2e', 'frame_bg': '#181825', 'accent': '#7c3aed', 'accent_hover': '#6d28d9', 'accent_dim': '#5b21b6', 'accent_text': '#ffffff', 'text': '#cdd6f4', 'text_secondary': '#a6adc8', 'border': '#313244', 'card_hover': '#27273a', 'success': '#a6e3a1', 'error': '#f38ba8', 'warning': '#f9e2af'}
+    def font(size=13, weight='normal'):
+        f = QFont('Segoe UI', size)
+        f.setBold(weight == 'bold')
+        return f
+    def fade_in(w, duration=200):
+        pass
 
 
 def get_github_repo():
-    if sys.platform == "win32":
-        return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta"
-    return "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta"
+    result = ("https://github.com/BeamSkin-Studio/BeamSkin-Studio-Beta"
+              if sys.platform == "win32"
+              else "https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta")
+    log.debug("get_github_repo: platform=%s -> %s", sys.platform, result)
+    return result
 
 def get_releases_api_url():
     repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
-    return f"https://api.github.com/repos/BeamSkin-Studio/{repo}/releases/latest"
-
+    url = f"https://api.github.com/repos/BeamSkin-Studio/{repo}/releases/latest"
+    log.debug("get_releases_api_url: repo=%s -> %s", repo, url)
+    return url
 
 _latest_release_zip_url: str = ""
 
 def get_zip_url():
     if _latest_release_zip_url:
+        log.debug("get_zip_url: returning cached %s", _latest_release_zip_url)
         return _latest_release_zip_url
     repo = "BeamSkin-Studio-Beta" if sys.platform == "win32" else "BeamSkin-Studio-Linux-Beta"
-    return f"https://github.com/BeamSkin-Studio/{repo}/releases/latest/download/BeamSkin-Studio.zip"
+    url = f"https://github.com/BeamSkin-Studio/{repo}/releases/latest/download/BeamSkin-Studio.zip"
+    log.debug("get_zip_url: no cached URL, falling back to %s", url)
+    return url
 
 def fetch_latest_release():
     global _latest_release_zip_url
+    log.debug("fetch_latest_release: GET %s", get_releases_api_url())
     resp = requests.get(
         get_releases_api_url(),
         timeout=10,
         headers={"Accept": "application/vnd.github+json"},
     )
+    log.debug("fetch_latest_release: status_code=%s", resp.status_code)
     resp.raise_for_status()
     data = resp.json()
+    log.debug("fetch_latest_release: tag_name=%r asset_count=%s",
+              data.get("tag_name"), len(data.get("assets", [])))
 
     tag = re.sub(r"^[Vv]\.?", "", data["tag_name"])
     version = _format_version_string(tag)
-
 
     zip_url = data.get("zipball_url", "")
     for asset in data.get("assets", []):
         if asset.get("name", "").endswith(".zip"):
             zip_url = asset["browser_download_url"]
+            log.debug("fetch_latest_release: matched .zip asset %r", asset.get("name"))
             break
 
     _latest_release_zip_url = zip_url
@@ -84,15 +94,22 @@ def fetch_latest_release():
     return version, zip_url
 
 def get_base_path():
-    if getattr(sys, "frozen", False):
-        return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.dirname(os.path.abspath(__file__))
+    frozen = getattr(sys, "frozen", False)
+    if frozen:
+        result = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    else:
+        result = os.path.dirname(os.path.abspath(__file__))
+    log.debug("get_base_path: frozen=%s -> %s", frozen, result)
+    return result
 
 def get_app_dir():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    frozen = getattr(sys, "frozen", False)
+    if frozen:
+        result = os.path.dirname(sys.executable)
+    else:
+        result = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log.debug("get_app_dir: frozen=%s -> %s", frozen, result)
+    return result
 
 def get_downloads_folder():
     if sys.platform == "win32":
@@ -102,10 +119,14 @@ def get_downloads_folder():
                 winreg.HKEY_CURRENT_USER,
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
             ) as key:
-                return winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")[0]
-        except Exception:
-            pass
-    return os.path.join(os.path.expanduser("~"), "Downloads")
+                result = winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")[0]
+                log.debug("get_downloads_folder: from registry -> %s", result)
+                return result
+        except Exception as e:
+            log.debug("get_downloads_folder: registry lookup failed: %s", e)
+    result = os.path.join(os.path.expanduser("~"), "Downloads")
+    log.debug("get_downloads_folder: falling back to %s", result)
+    return result
 
 
 def _format_version_string(raw: str) -> str:
@@ -117,11 +138,15 @@ def _format_version_string(raw: str) -> str:
             try:
                 build  = int(parts[3])
                 status = "Beta" if build == 0 else f"Build {build}"
-            except ValueError:
+            except ValueError as _exc:
+                print(f"[WARNING] _format_version_string: {type(_exc).__name__}: {_exc}")
                 status = parts[3].capitalize()
         else:
             status = "Stable"
-        return f"{major}.{minor}.{patch}.{status}"
+        result = f"{major}.{minor}.{patch}.{status}"
+        log.debug("_format_version_string: raw=%r -> %s", raw, result)
+        return result
+    log.debug("_format_version_string: raw=%r has <3 parts, returning content=%r", raw, content)
     return content
 
 
@@ -129,23 +154,32 @@ def read_version():
     log.debug("read_version called")
     for p in [os.path.join(get_base_path(), "version.txt"),
               os.path.join(os.getcwd(), "version.txt"), "version.txt"]:
+        log.debug("read_version: checking %s", p)
         if not os.path.exists(p):
+            log.debug("read_version: %s does not exist", p)
             continue
         try:
             with open(p, "r") as f:
-                return _format_version_string(f.read())
+                result = _format_version_string(f.read())
+            log.debug("read_version: read %s -> %s", p, result)
+            return result
         except Exception as e:
             log.debug("Failed to read %s: %s", p, e)
+    log.debug("read_version: no version.txt found, returning 0.0.0.Unknown")
     return "0.0.0.Unknown"
 
 def parse_version(s: str):
+    original = s
     s = s.lower().strip().replace("version:", "").replace("v", "").strip()
     m = re.match(r"(\d+)\.(\d+)\.(\d+)\.?(.*)", s)
     if m:
         major, minor, patch, suffix = m.groups()
         prio = {"stable": 0, "": 0, "rc": 1, "beta": 2, "alpha": 3}.get(
             (suffix or "stable").lower().strip(), 2)
-        return (int(major), int(minor), int(patch), prio)
+        result = (int(major), int(minor), int(patch), prio)
+        log.debug("parse_version: %r -> %s", original, result)
+        return result
+    log.debug("parse_version: %r did not match pattern, returning (0,0,0,999)", original)
     return (0, 0, 0, 999)
 
 def is_newer_version(remote: str, current: str) -> bool:
@@ -153,7 +187,9 @@ def is_newer_version(remote: str, current: str) -> bool:
         r, c = parse_version(remote), parse_version(current)
         log.debug("Parsed current: %s -> %s", current, c)
         log.debug("Parsed remote:  %s -> %s", remote, r)
-        return r[:3] > c[:3] if r[:3] != c[:3] else r[3] < c[3]
+        result = r[:3] > c[:3] if r[:3] != c[:3] else r[3] < c[3]
+        log.debug("is_newer_version: remote=%s current=%s -> %s", remote, current, result)
+        return result
     except Exception as e:
         log.debug("Version comparison error: %s", e)
         return remote != current
@@ -174,8 +210,11 @@ def set_app_instance(app, colors):
 def get_skipped_version() -> str:
     try:
         import core.settings as _s
-        return _s.app_settings.get("skipped_update_version", "")
-    except Exception:
+        result = _s.app_settings.get("skipped_update_version", "")
+        log.debug("get_skipped_version: %r", result)
+        return result
+    except Exception as e:
+        log.debug("get_skipped_version: could not read setting: %s", e)
         return ""
 
 
@@ -200,20 +239,25 @@ class _DownloadWorker(QThread):
         self._dest = dest
 
     def run(self):
+        log.debug("_DownloadWorker.run: url=%s dest=%s", self._url, self._dest)
         try:
             r = requests.get(self._url, stream=True, timeout=30)
             r.raise_for_status()
             total = int(r.headers.get("content-length", 0))
+            log.debug("_DownloadWorker.run: content-length=%s", total)
             done  = 0
             with open(self._dest, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if self.isInterruptionRequested():
+                        log.debug("_DownloadWorker.run: interruption requested at done=%s", done)
                         return
                     f.write(chunk)
                     done += len(chunk)
                     self.progress.emit(done, total)
+            log.debug("_DownloadWorker.run: complete, %s bytes written to %s", done, self._dest)
             self.finished.emit(self._dest)
         except Exception as e:
+            log.debug("_DownloadWorker.run: failed: %s", e)
             self.failed.emit(str(e))
 
 
@@ -222,17 +266,14 @@ class _ExtractWorker(QThread):
     finished = Signal(int)
     failed   = Signal(str)
 
-
     PRESERVE: set = {
         os.path.join("data",     "app_settings.json"),
         os.path.join("vehicles", "added_vehicles.json"),
     }
 
-
     NEVER_OVERWRITE_PREFIXES: frozenset = frozenset({
         "data",
     })
-
 
     NEVER_DELETE_PREFIXES: frozenset = frozenset({
         "data",
@@ -246,6 +287,20 @@ class _ExtractWorker(QThread):
         self._version = new_version
 
 
+    @staticmethod
+    def _live_preserve_paths() -> set:
+        try:
+            from core.settings import get_settings_path, get_added_vehicles_path
+            result = {
+                os.path.abspath(get_settings_path()),
+                os.path.abspath(get_added_vehicles_path()),
+            }
+            log.debug("_ExtractWorker._live_preserve_paths: %s", result)
+            return result
+        except ImportError as e:
+            log.debug("_ExtractWorker._live_preserve_paths: core.settings unavailable: %s", e)
+            return set()
+
     @classmethod
     def _is_overwrite_protected(cls, rel_norm: str) -> bool:
         parts = rel_norm.split(os.sep)
@@ -258,10 +313,8 @@ class _ExtractWorker(QThread):
     @classmethod
     def _is_deletion_protected(cls, rel_norm: str) -> bool:
         parts = rel_norm.split(os.sep)
-
         if "__pycache__" in parts or rel_norm.endswith(".pyc"):
             return True
-
         for prefix in cls.NEVER_DELETE_PREFIXES:
             prefix_parts = prefix.split(os.sep)
             if parts[: len(prefix_parts)] == prefix_parts:
@@ -270,29 +323,31 @@ class _ExtractWorker(QThread):
 
 
     def run(self):
+        log.debug("_ExtractWorker.run: zip=%s version=%s", self._zip, self._version)
         try:
             app_dir   = get_app_dir()
             dl_folder = os.path.dirname(self._zip)
             temp_dir  = os.path.join(dl_folder, f"BeamSkin-Studio-temp-{self._version}")
-
+            log.debug("_ExtractWorker.run: app_dir=%s temp_dir=%s", app_dir, temp_dir)
 
             self.status.emit("Extracting archive\u2026")
             with zipfile.ZipFile(self._zip, "r") as z:
                 z.extractall(temp_dir)
+            log.debug("_ExtractWorker.run: extracted %s -> %s", self._zip, temp_dir)
 
             contents = os.listdir(temp_dir)
             source   = (os.path.join(temp_dir, contents[0])
                         if len(contents) == 1 and
                            os.path.isdir(os.path.join(temp_dir, contents[0]))
                         else temp_dir)
-
+            log.debug("_ExtractWorker.run: temp_dir contents=%s, source=%s", contents, source)
 
             incoming: set = set()
             for root, _, files in os.walk(source):
                 for fname in files:
                     rel = os.path.relpath(os.path.join(root, fname), source)
                     incoming.add(rel.replace("/", os.sep).replace("\\", os.sep))
-
+            log.debug("_ExtractWorker.run: incoming file count=%s", len(incoming))
 
             backups: dict = {}
             for rel in self.PRESERVE:
@@ -301,16 +356,33 @@ class _ExtractWorker(QThread):
                     try:
                         with open(full, "r", encoding="utf-8") as f:
                             backups[rel] = f.read()
-                    except Exception:
-                        pass
+                        log.debug("_ExtractWorker.run: backed up Tier-1 file %s", rel)
+                    except Exception as e:
+                        log.debug("_ExtractWorker.run: could not back up Tier-1 file %s: %s", rel, e)
 
+            live_backups: dict = {}
+            for full in self._live_preserve_paths():
+                if os.path.exists(full):
+                    try:
+                        with open(full, "r", encoding="utf-8") as f:
+                            live_backups[full] = f.read()
+                        log.debug("_ExtractWorker.run: backed up live data file %s", full)
+                    except Exception as e:
+                        log.warning("Could not back up live data file %s: %s", full, e)
+
+            log.debug("_ExtractWorker.run: backups=%s live_backups=%s",
+                       len(backups), len(live_backups))
 
             self.status.emit("Copying files\u2026")
             updated = 0
+            skipped_preserved = 0
+            skipped_protected = 0
+            copy_errors = 0
             preserve_norm = {p.replace("/", os.sep).replace("\\", os.sep)
                              for p in self.PRESERVE}
             for root, _, files in os.walk(source):
                 if self.isInterruptionRequested():
+                    log.debug("_ExtractWorker.run: interruption requested during copy step")
                     return
                 rel_dir    = os.path.relpath(root, source)
                 target_dir = app_dir if rel_dir == "." else os.path.join(app_dir, rel_dir)
@@ -319,20 +391,29 @@ class _ExtractWorker(QThread):
                     rel_file = fname if rel_dir == "." else os.path.join(rel_dir, fname)
                     rel_norm = rel_file.replace("/", os.sep).replace("\\", os.sep)
                     if rel_norm in preserve_norm:
+                        skipped_preserved += 1
                         continue
                     if self._is_overwrite_protected(rel_norm):
+                        skipped_protected += 1
                         continue
                     try:
                         shutil.copy2(os.path.join(root, fname),
                                      os.path.join(target_dir, fname))
                         updated += 1
-                    except Exception:
-                        pass
-
+                    except Exception as e:
+                        copy_errors += 1
+                        log.debug("_ExtractWorker.run: could not copy %s: %s", rel_norm, e)
+            log.debug("_ExtractWorker.run: copy step done — updated=%s skipped_preserved=%s "
+                       "skipped_protected=%s copy_errors=%s",
+                       updated, skipped_preserved, skipped_protected, copy_errors)
 
             self.status.emit("Removing obsolete files\u2026")
+            live_preserve_abs = {os.path.abspath(p) for p in live_backups.keys()}
+            live_preserve_abs |= {os.path.abspath(p) for p in self._live_preserve_paths()}
+            removed_count = 0
             for root, dirs, files in os.walk(app_dir, topdown=False):
                 if self.isInterruptionRequested():
+                    log.debug("_ExtractWorker.run: interruption requested during delete step")
                     return
                 for fname in files:
                     full     = os.path.join(root, fname)
@@ -341,44 +422,64 @@ class _ExtractWorker(QThread):
                         continue
                     if rel_norm in preserve_norm:
                         continue
+                    if os.path.abspath(full) in live_preserve_abs:
+                        continue
                     if self._is_deletion_protected(rel_norm):
                         continue
                     try:
                         os.remove(full)
+                        removed_count += 1
                         log.debug("Removed obsolete file: %s", rel_norm)
                     except Exception as e:
                         log.warning("Could not remove %s: %s", rel_norm, e)
-
-
                 for dname in dirs:
                     dpath    = os.path.join(root, dname)
                     rel_norm = os.path.relpath(dpath, app_dir)
-
-
                     if self._is_deletion_protected(os.path.join(rel_norm, ".keep")):
                         continue
                     try:
                         if not os.listdir(dpath):
                             os.rmdir(dpath)
-                    except Exception:
-                        pass
+                            log.debug("_ExtractWorker.run: removed empty dir %s", rel_norm)
+                    except Exception as e:
+                        log.debug("_ExtractWorker.run: could not rmdir %s: %s", rel_norm, e)
 
+            log.debug("_ExtractWorker.run: delete step done — removed_count=%s", removed_count)
 
+            restored_tier1 = 0
             for rel, content in backups.items():
                 full = os.path.join(app_dir, rel)
                 os.makedirs(os.path.dirname(full), exist_ok=True)
                 try:
                     with open(full, "w", encoding="utf-8") as f:
                         f.write(content)
-                except Exception:
-                    pass
+                    restored_tier1 += 1
+                except Exception as e:
+                    log.debug("_ExtractWorker.run: could not restore Tier-1 file %s: %s", rel, e)
+            log.debug("_ExtractWorker.run: restored_tier1=%s", restored_tier1)
 
+            for full, content in live_backups.items():
+                if not os.path.exists(full):
+                    os.makedirs(os.path.dirname(full), exist_ok=True)
+                    try:
+                        with open(full, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        log.debug("Restored live data file: %s", full)
+                    except Exception as e:
+                        log.warning("Could not restore live data file %s: %s", full, e)
 
-            try:   shutil.rmtree(temp_dir)
-            except Exception: pass
-            try:   os.remove(self._zip)
-            except Exception: pass
+            try:
+                shutil.rmtree(temp_dir)
+                log.debug("_ExtractWorker.run: removed temp_dir %s", temp_dir)
+            except Exception as e:
+                log.debug("_ExtractWorker.run: could not remove temp_dir %s: %s", temp_dir, e)
+            try:
+                os.remove(self._zip)
+                log.debug("_ExtractWorker.run: removed downloaded zip %s", self._zip)
+            except Exception as e:
+                log.debug("_ExtractWorker.run: could not remove zip %s: %s", self._zip, e)
 
+            log.debug("_ExtractWorker.run: complete, emitting finished(updated=%s)", updated)
             self.finished.emit(updated)
 
         except Exception as e:
@@ -396,7 +497,6 @@ _PAGE_DL_ERROR    = 5
 
 
 class _UpdateDialog(QDialog):
-
     def __init__(self, parent: QWidget, new_version: str, on_done=None):
         super().__init__(parent)
         self._new_version = new_version
@@ -407,9 +507,15 @@ class _UpdateDialog(QDialog):
         self._ex_worker   = None
 
         self.setWindowTitle(t("update.title", default="Update Available"))
-        self.setWindowFlags(
-            Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
-        )
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet(f"""
+            QDialog {{
+                background: {COLORS['frame_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 16px;
+            }}
+        """)
         self.setModal(True)
         self.setFixedWidth(500)
         self._build()
@@ -417,12 +523,16 @@ class _UpdateDialog(QDialog):
 
 
     def _fire_done(self):
+        log.debug("_fire_done: done_fired=%s", self._done_fired)
         if not self._done_fired:
             self._done_fired = True
             if self._on_done:
                 QTimer.singleShot(0, self._on_done)
 
     def closeEvent(self, event):
+        log.debug("closeEvent: dl_worker_running=%s ex_worker_running=%s",
+                   bool(self._dl_worker and self._dl_worker.isRunning()),
+                   bool(self._ex_worker and self._ex_worker.isRunning()))
         for worker in (self._dl_worker, self._ex_worker):
             if worker and worker.isRunning():
                 worker.requestInterruption()
@@ -430,6 +540,7 @@ class _UpdateDialog(QDialog):
         super().closeEvent(event)
 
     def reject(self):
+        log.debug("reject: called")
         self._fire_done()
         super().reject()
 
@@ -439,16 +550,16 @@ class _UpdateDialog(QDialog):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-
         header = QFrame(self)
         header.setFixedHeight(120)
         header.setStyleSheet(f"""
             QFrame {{
                 background: {COLORS['frame_bg']};
                 border-bottom: 1px solid {COLORS['border']};
+                border-top-left-radius: 16px;
+                border-top-right-radius: 16px;
             }}
         """)
-
 
         header_vlay = QVBoxLayout(header)
         header_vlay.setContentsMargins(0, 0, 0, 0)
@@ -472,7 +583,6 @@ class _UpdateDialog(QDialog):
         hrow.setSpacing(18)
         header_vlay.addLayout(hrow, 1)
 
-
         badge = QFrame()
         badge.setFixedSize(52, 52)
         badge.setStyleSheet(f"""
@@ -493,7 +603,6 @@ class _UpdateDialog(QDialog):
         badge_lay.addWidget(icon_lbl)
         hrow.addWidget(badge)
 
-
         tcol = QVBoxLayout()
         tcol.setSpacing(4)
         t1 = QLabel(t("update.title", default="Update Available"))
@@ -508,9 +617,14 @@ class _UpdateDialog(QDialog):
 
         root.addWidget(header)
 
-
         self._stack = QStackedWidget(self)
-        self._stack.setStyleSheet(f"background:{COLORS['card_bg']};")
+        self._stack.setStyleSheet(f"""
+            QStackedWidget {{
+                background: {COLORS['card_bg']};
+                border-bottom-left-radius: 16px;
+                border-bottom-right-radius: 16px;
+            }}
+        """)
         self._stack.addWidget(self._page_main())
         self._stack.addWidget(self._page_downloading())
         self._stack.addWidget(self._page_downloaded())
@@ -711,7 +825,6 @@ class _UpdateDialog(QDialog):
     def _page_main(self):
         f, lay = self._body()
 
-
         row = QHBoxLayout()
         row.setSpacing(12)
         current_pill = self._ver_pill(
@@ -738,7 +851,6 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-
         highlights = [
             ("⚡", t("update.feat1", default="Latest features & improvements")),
             ("🛡", t("update.feat2", default="Bug fixes & stability updates")),
@@ -762,7 +874,6 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-
         changelog_btn = self._btn(
             t("update.view_changelog", default="📋  What's New in this version"),
             primary=False,
@@ -771,7 +882,6 @@ class _UpdateDialog(QDialog):
         lay.addWidget(changelog_btn)
 
         lay.addWidget(self._sep())
-
 
         brow = QHBoxLayout()
         brow.setSpacing(10)
@@ -782,7 +892,6 @@ class _UpdateDialog(QDialog):
         brow.addWidget(later_btn)
         brow.addWidget(download_btn, 1)
         lay.addLayout(brow)
-
 
         skip_btn = QPushButton(
             t("update.skip_version", default="Skip this version")
@@ -816,7 +925,6 @@ class _UpdateDialog(QDialog):
         self._dl_file_lbl = self._center_lbl("", 10)
         lay.addWidget(self._dl_file_lbl)
 
-
         prog_row = QHBoxLayout()
         prog_row.setSpacing(10)
         self._dl_bar = self._progress_bar()
@@ -837,7 +945,6 @@ class _UpdateDialog(QDialog):
 
     def _page_downloaded(self):
         f, lay = self._body()
-
 
         badge_row = QHBoxLayout()
         badge_row.addStretch()
@@ -909,7 +1016,6 @@ class _UpdateDialog(QDialog):
     def _page_complete(self):
         f, lay = self._body()
 
-
         badge_row = QHBoxLayout()
         badge_row.addStretch()
         badge_row.addWidget(self._success_badge())
@@ -952,6 +1058,7 @@ class _UpdateDialog(QDialog):
     def _start_download(self):
         filename       = f"BeamSkin-Studio-{self._new_version}.zip"
         self._zip_path = os.path.join(get_downloads_folder(), filename)
+        log.debug("_start_download: filename=%s zip_path=%s", filename, self._zip_path)
 
         self._dl_file_lbl.setText(filename)
         self._dl_bar.setValue(0)
@@ -977,6 +1084,7 @@ class _UpdateDialog(QDialog):
             self._dl_size_lbl.setText(f"{done/1_048_576:.1f} MB")
 
     def _on_dl_finished(self, filepath: str):
+        log.debug("_on_dl_finished: filepath=%s", filepath)
         self._zip_path = filepath
         self._dl_path_lbl.setText(f"Saved to:\n{filepath}")
         self._stack.setCurrentIndex(_PAGE_DOWNLOADED)
@@ -991,6 +1099,7 @@ class _UpdateDialog(QDialog):
         self.adjustSize()
 
     def _start_extract(self):
+        log.debug("_start_extract: zip_path=%s version=%s", self._zip_path, self._new_version)
         self._stack.setCurrentIndex(_PAGE_EXTRACTING)
         self.adjustSize()
         self._ex_worker = _ExtractWorker(self._zip_path, self._new_version)
@@ -1000,6 +1109,7 @@ class _UpdateDialog(QDialog):
         self._ex_worker.start()
 
     def _on_ex_finished(self, files_updated: int):
+        log.debug("_on_ex_finished: files_updated=%s", files_updated)
         self._complete_lbl.setText(
             f"Updated {files_updated} files to version {self._new_version}.\n\n"
             "Your settings and custom vehicles have been preserved.\n\n"
@@ -1009,6 +1119,7 @@ class _UpdateDialog(QDialog):
         self.adjustSize()
 
     def _on_ex_failed(self, error: str):
+        log.debug("_on_ex_failed: error=%s", error)
         self._dl_path_lbl.setText(
             f"Extract failed: {error}\nYou can extract manually from the downloads folder."
         )
@@ -1017,6 +1128,7 @@ class _UpdateDialog(QDialog):
 
     def _open_downloads(self):
         folder = os.path.dirname(self._zip_path) if self._zip_path else get_downloads_folder()
+        log.debug("_open_downloads: folder=%s platform=%s", folder, sys.platform)
         if sys.platform == "win32":
             os.startfile(folder)
         elif sys.platform == "darwin":
@@ -1025,6 +1137,7 @@ class _UpdateDialog(QDialog):
             subprocess.Popen(["xdg-open", folder])
 
     def _restart_app(self):
+        log.debug("_restart_app: called")
         self._fire_done()
         app_dir        = get_app_dir()
         batch_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.bat")
@@ -1033,15 +1146,19 @@ class _UpdateDialog(QDialog):
         self.accept()
 
         if getattr(sys, "frozen", False):
+            log.debug("_restart_app: frozen build, relaunching %s", sys.executable)
             subprocess.Popen([sys.executable])
         elif sys.platform == "win32" and os.path.exists(batch_launcher):
+            log.debug("_restart_app: using batch_launcher %s", batch_launcher)
             subprocess.Popen([batch_launcher], cwd=app_dir, shell=True)
         elif os.path.exists(py_launcher):
+            log.debug("_restart_app: using py_launcher %s", py_launcher)
             subprocess.Popen(
                 ["pythonw" if sys.platform == "win32" else sys.executable, py_launcher],
                 cwd=app_dir,
             )
         else:
+            log.debug("_restart_app: falling back to main_script %s", main_script)
             subprocess.Popen([sys.executable, main_script], cwd=app_dir)
 
         QApplication.instance().quit()
@@ -1100,7 +1217,6 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
         log.debug("_on_no_update — main thread")
         _pending_signaller = None
         if ignore_skip:
-
             _show_up_to_date_toast()
         if on_done:
             on_done()
@@ -1129,9 +1245,11 @@ def _check_for_updates_impl(on_done=None, ignore_skip: bool = False):
 
 
 def _show_up_to_date_toast() -> None:
+    log.debug("_show_up_to_date_toast: called, version=%s", CURRENT_VERSION)
     try:
         for top in QApplication.topLevelWidgets():
             if hasattr(top, "show_notification"):
+                log.debug("_show_up_to_date_toast: showing on widget %r", top)
                 top.show_notification(
                     t("update.up_to_date",
                       version=CURRENT_VERSION,
@@ -1140,5 +1258,6 @@ def _show_up_to_date_toast() -> None:
                     duration=3500,
                 )
                 return
+        log.debug("_show_up_to_date_toast: no widget with show_notification found")
     except Exception as e:
         log.debug("_show_up_to_date_toast: %s", e)

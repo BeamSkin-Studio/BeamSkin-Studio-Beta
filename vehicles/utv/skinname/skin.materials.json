@@ -27,10 +27,15 @@
         "metallicFactor": 1,
         "normalMap": "/vehicles/utv/utv_main_nm.normal.png",
         "opacityMap": "/vehicles/utv/utv_main_c.data.png",
-        "useAnisotropic": true
-      },
-      {},
-      {}
+        "useAnisotropic": true,
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.20,
+        "detailScale": [
+          64,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

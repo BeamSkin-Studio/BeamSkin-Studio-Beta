@@ -5,7 +5,7 @@
        "name":"YOUR SKIN NAME",			//change YOUR SKIN NAME to your skin name (spaces allowed)
        "value":200,
    }
-   "slotType" : "paint_design",
+   "slotType" : "skin_vivace",
    "globalSkin" : "SKINNAME",			//change SKINNAME to your skin name (one word)
    },
    }

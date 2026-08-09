@@ -2,33 +2,49 @@ from __future__ import annotations
 import os
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PySide6.QtCore   import Qt, Signal, QSize, QTimer, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui    import QFont, QIcon, QPixmap
+from PySide6.QtCore   import Qt, Signal
+from PySide6.QtGui    import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QScrollArea, QLineEdit, QSizePolicy, QButtonGroup,
-    QRadioButton, QFileDialog, QApplication,
+    QScrollArea, QLineEdit, QButtonGroup, QRadioButton,
+    QFileDialog, QGraphicsOpacityEffect,
 )
 
-from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import (AnimButton, GhostButton, VehicleCard,
-                          HSeparator, LabelledEntry, Badge, Spinner,
-                          ToggleSwitch)
+from gui.theme   import COLORS, font, fade_in
+from gui.widgets import (AnimButton, VehicleCard, HSeparator,
+                          LabelledEntry, ToggleSwitch)
 from gui.state   import state
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return key
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
+
+try:
+    from core.settings import get_vehicles_dir, get_vehicle_previews_dir, get_bundle_path
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def get_vehicles_dir():
+        return 'vehicles'
+    def get_vehicle_previews_dir():
+        return os.path.join('gui', 'images', 'vehicles')
+    def get_bundle_path():
+        return os.getcwd()
 
 
 def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
     try:
         from core.config import is_rebadge_suffix
-    except ImportError:
-        def is_rebadge_suffix(_c, _s): return False
+    except ImportError as _exc:
+        print(f"[WARNING] _get_vehicle_variants: {type(_exc).__name__}: {_exc}")
+        def is_rebadge_suffix(_c, _s):
+            return False
 
-    vehicles_dir = os.path.join("vehicles", carid)
+    bundled_dir = os.path.join(get_bundle_path(), "vehicles", carid)
+    local_dir   = os.path.join(get_vehicles_dir(), carid)
+    vehicles_dir = bundled_dir if os.path.isdir(bundled_dir) else local_dir
     if not os.path.isdir(vehicles_dir):
         return [("", "Normal")]
 
@@ -54,7 +70,6 @@ def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
 
 
 class VehicleVariantExpander(QFrame):
-
     variant_add_requested = Signal(str, str, str)
 
     def __init__(
@@ -177,7 +192,6 @@ class VehicleVariantExpander(QFrame):
         """)
 
     def _pill_style(self) -> str:
-        print(f"[DEBUG] _pill_style() called")
         return f"""
             QPushButton {{
                 background:{COLORS['card_bg']};
@@ -201,26 +215,19 @@ class VehicleVariantExpander(QFrame):
         self._panel.setVisible(self._expanded)
 
     def _on_pill(self, suffix: str, label: str):
-        print(f"[DEBUG] _on_pill() called")
-
-
         vname = (f"{self.display_name} ({label})"
                  if suffix else self.display_name)
         self.variant_add_requested.emit(self.carid, vname, suffix)
 
     def mark_variant_added(self, suffix: str):
-        print(f"[DEBUG] mark_variant_added() called")
         self._added.add(suffix)
-
         if suffix in self._buttons:
             self._buttons[suffix].setVisible(False)
-
         if {s for s, _ in self.variants}.issubset(self._added):
             self.setVisible(False)
 
 
 class NavPill(QPushButton):
-
     def __init__(
         self,
         text: str,
@@ -237,7 +244,6 @@ class NavPill(QPushButton):
         self._apply(False)
 
     def _apply(self, active: bool):
-        print(f"[DEBUG] _apply() called")
         self._active = active
         if active:
             self.setStyleSheet(f"""
@@ -271,13 +277,11 @@ class NavPill(QPushButton):
             """)
 
     def set_active(self, active: bool):
-        print(f"[DEBUG] set_active() called")
         if self._active != active:
             self._apply(active)
 
 
 class Topbar(QFrame):
-
     view_changed     = Signal(str)
     generate_clicked = Signal()
 
@@ -302,11 +306,9 @@ class Topbar(QFrame):
         self._build()
 
     def _build(self):
-        print(f"[DEBUG] _build() called")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 0, 20, 0)
         layout.setSpacing(0)
-
 
         logo_px = self.logo_pixmap or self._load_logo_pixmap()
         if logo_px:
@@ -327,7 +329,6 @@ class Topbar(QFrame):
             layout.addWidget(brand)
             layout.addSpacing(8)
 
-
         items = [
             (t("menu.generator"),    "generator"),
             (t("menu.HowToTab"),     "howto"),
@@ -346,7 +347,6 @@ class Topbar(QFrame):
 
         layout.addStretch()
 
-
         self.generate_button = AnimButton(
             t("project.generate_mod", default="Generate Mod"),
             icon_text="✨",
@@ -363,7 +363,7 @@ class Topbar(QFrame):
         self.set_active("generator")
 
     def _load_logo_pixmap(self) -> Optional[QPixmap]:
-        icon_dir = os.path.join("gui", "Icons")
+        icon_dir = os.path.join(get_bundle_path(), "gui", "Icons")
         suffix   = "White" if state.theme_mode == "dark" else "Black"
         path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
         if os.path.exists(path):
@@ -377,7 +377,6 @@ class Topbar(QFrame):
         self.generate_button.setVisible(view_name == "generator")
 
     def refresh_ui(self, logo_pixmap: Optional[QPixmap] = None):
-        print(f"[DEBUG] _load_logo_pixmap() called")
         if logo_pixmap:
             self.logo_pixmap = logo_pixmap
         else:
@@ -397,7 +396,9 @@ class Topbar(QFrame):
                     w.setParent(None)
                     w.deleteLater()
             _tmp = QWidget()
+            _tmp.setAttribute(Qt.WA_DontShowOnScreen, True)
             _tmp.setLayout(old)
+            _tmp.deleteLater()
 
         self.menu_buttons.clear()
         self._build()
@@ -405,16 +406,14 @@ class Topbar(QFrame):
 
 
 class Sidebar(QFrame):
-
-
     add_vehicle_requested = Signal(str, str, str)
 
     def __init__(self, parent: QWidget):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
-        self.setFixedWidth(320)
+        self.setFixedWidth(300)
+        self.setObjectName("SidebarFrame")
         self.setStyleSheet(f"""
-            QFrame {{
+            #SidebarFrame {{
                 background-color: {COLORS['sidebar_bg']};
                 border-right: 1px solid {COLORS['border']};
             }}
@@ -422,7 +421,6 @@ class Sidebar(QFrame):
 
         self._populate_callback: Optional[Callable] = None
         self._vehicle_cards: List[VehicleCard] = []
-
         self._variant_expanders: Dict[str, VehicleVariantExpander] = {}
 
         self._mod_name_text = ""
@@ -431,11 +429,12 @@ class Sidebar(QFrame):
         self.custom_output  = ""
         self.unpacked       = False
 
+        self._locked = False
+
         self._build()
 
 
     def _build(self):
-        print(f"[DEBUG] _build() called")
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
@@ -474,6 +473,8 @@ class Sidebar(QFrame):
         )
         self._author_entry.set_text(self._author_text)
         inner_layout.addWidget(self._author_entry)
+
+        inner_layout.addWidget(HSeparator())
 
         out_lbl = QLabel(t("project.output_mode", default="Output Mode"))
         out_lbl.setFont(font(11, "bold"))
@@ -595,7 +596,6 @@ class Sidebar(QFrame):
         veh_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
         inner_layout.addWidget(veh_lbl)
 
-
         self._add_all_btn = QPushButton("⚡  Add All Vehicles & Variants")
         self._add_all_btn.setFont(font(12, "bold"))
         self._add_all_btn.setFixedHeight(36)
@@ -646,6 +646,9 @@ class Sidebar(QFrame):
         scroll.setWidget(inner)
         root.addWidget(scroll)
 
+        self._inner = inner
+        self.set_locked(self._locked)
+
 
     def populate_vehicles(self, add_callback: Callable[[str, str, str], None]):
         self._populate_callback = add_callback
@@ -654,8 +657,10 @@ class Sidebar(QFrame):
 
         try:
             from core.config import get_rebadges_for
-        except ImportError:
-            def get_rebadges_for(_c): return {}
+        except ImportError as _exc:
+            print(f"[WARNING] populate_vehicles: {type(_exc).__name__}: {_exc}")
+            def get_rebadges_for(_c):
+                return {}
 
         gen = self._get_generator()
         project_keys = set(gen.project_data["cars"].keys()) if gen else set()
@@ -670,7 +675,6 @@ class Sidebar(QFrame):
             else:
                 self._add_vehicle_card(cid, name, add_callback)
 
-
             for suffix, rebadge_name in get_rebadges_for(cid).items():
                 from gui.tabs.generator import _make_project_key
                 if _make_project_key(cid, suffix) in project_keys:
@@ -679,14 +683,13 @@ class Sidebar(QFrame):
                                        variant_suffix=suffix)
 
     def _get_generator(self):
-        print(f"[DEBUG] populate_vehicles: rebuilding sidebar vehicle list")
+        print("[DEBUG] populate_vehicles: rebuilding sidebar vehicle list")
         mw = self.window()
         if mw and hasattr(mw, "tabs"):
             return mw.tabs.get("generator")
         return None
 
     def _is_fully_in_project(self, carid: str, project_keys: set) -> bool:
-        print(f"[DEBUG] _is_fully_in_project() called")
         variants = _get_vehicle_variants(carid)
         for suffix, _ in variants:
             from gui.tabs.generator import _make_project_key
@@ -695,22 +698,20 @@ class Sidebar(QFrame):
         return True
 
     def restore_vehicle(self, carid: str, variant_suffix: str = ""):
-        print(f"[DEBUG] restore_vehicle() called")
         if self._populate_callback is None:
             return
 
         try:
-            from core.config import is_rebadge_suffix
-        except ImportError:
-            def is_rebadge_suffix(_c, _s): return False
-
+            from core.config import is_rebadge_suffix, get_rebadges_for
+        except ImportError as _exc:
+            print(f"[WARNING] restore_vehicle: {type(_exc).__name__}: {_exc}")
+            def is_rebadge_suffix(_c, _s):
+                return False
+            def get_rebadges_for(_c):
+                return {}
 
         if variant_suffix and is_rebadge_suffix(carid, variant_suffix):
-            try:
-                from core.config import get_rebadges_for
-                rebadge_name = get_rebadges_for(carid).get(variant_suffix, carid)
-            except ImportError:
-                rebadge_name = carid
+            rebadge_name = get_rebadges_for(carid).get(variant_suffix, carid)
             already_present = any(
                 cid == carid and vs == variant_suffix
                 for _card, cid, _name, vs in state.sidebar_vehicle_buttons
@@ -724,12 +725,9 @@ class Sidebar(QFrame):
         variants = _get_vehicle_variants(carid)
 
         if len(variants) > 1:
-
-
             if carid in self._variant_expanders:
                 exp = self._variant_expanders[carid]
                 exp.setVisible(True)
-
                 if variant_suffix in exp._buttons:
                     btn = exp._buttons[variant_suffix]
                     btn.setEnabled(True)
@@ -739,8 +737,11 @@ class Sidebar(QFrame):
             else:
                 self._add_variant_expander(carid, name, variants, self._populate_callback)
         else:
-
-            if not any(c.carid == carid for c in self._vehicle_cards):
+            already_present = any(
+                cid == carid and vs == variant_suffix
+                for _card, cid, _name, vs in state.sidebar_vehicle_buttons
+            )
+            if not already_present:
                 self._add_vehicle_card(carid, name, self._populate_callback)
 
     def _insert_sorted(self, widget: QWidget, display_name: str):
@@ -754,7 +755,6 @@ class Sidebar(QFrame):
             w = item.widget()
             if w is None:
                 continue
-
             if hasattr(w, "display_name"):
                 existing = w.display_name.lower()
             elif isinstance(w, VehicleVariantExpander):
@@ -773,7 +773,6 @@ class Sidebar(QFrame):
         variants: List[Tuple[str, str]],
         callback: Callable,
     ):
-        print(f"[DEBUG] _insert_sorted() called")
         is_custom = carid in state.added_vehicles
         expander = VehicleVariantExpander(carid, name, variants, parent=self,
                                           is_custom=is_custom)
@@ -783,9 +782,7 @@ class Sidebar(QFrame):
         self._variant_expanders[carid] = expander
         self._insert_sorted(expander, name)
         fade_in(expander, 180)
-
         self._attach_hover_preview(expander._header, carid, "")
-
         for suffix, label in variants:
             if suffix in expander._buttons:
                 self._attach_hover_preview(
@@ -814,26 +811,32 @@ class Sidebar(QFrame):
         if mw is None or not hasattr(mw, "preview_manager"):
             return
         img_name = f"{variant_suffix}.jpg" if variant_suffix else "default.jpg"
-        img_path = os.path.join("gui", "images", "vehicles", carid, img_name)
 
-        if not os.path.exists(img_path):
-            img_path = os.path.join("gui", "images", "vehicles", carid, "default.jpg")
+        candidates = [
+            os.path.join(get_vehicle_previews_dir(), carid, img_name),
+            os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid, img_name),
+        ]
+        if variant_suffix:
+            candidates += [
+                os.path.join(get_vehicle_previews_dir(), carid, "default.jpg"),
+                os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid, "default.jpg"),
+            ]
+
+        img_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
+
         mw.preview_manager.setup_robust_hover(
             widget, carid,
             get_image_path=lambda p=img_path: p,
             get_display_name=(lambda n=display_name: n) if display_name else None,
+            variant_suffix=variant_suffix,
         )
 
     def _on_add_vehicle(self, carid: str, name: str, variant: str, callback: Callable):
         callback(carid, name, variant)
 
         if carid in self._variant_expanders:
-
-
             self._variant_expanders[carid].mark_variant_added(variant)
         else:
-
-
             target_cards = [
                 card for card, cid, _name, vs in state.sidebar_vehicle_buttons
                 if cid == carid and vs == variant
@@ -850,7 +853,6 @@ class Sidebar(QFrame):
         ]
 
     def _clear_vehicle_list(self):
-        print(f"[DEBUG] _clear_vehicle_list() called")
         for card in list(self._vehicle_cards):
             card.deleteLater()
         self._vehicle_cards.clear()
@@ -876,7 +878,7 @@ class Sidebar(QFrame):
 
 
     def _add_all_vehicles(self):
-        print(f"[DEBUG] _add_all_vehicles: testing mode bulk-add triggered")
+        print("[DEBUG] _add_all_vehicles: testing mode bulk-add triggered")
         if self._populate_callback is None:
             return
 
@@ -897,20 +899,17 @@ class Sidebar(QFrame):
             )
 
     def _on_output_mode_changed(self):
-        print(f"[DEBUG] _on_output_mode_changed() called")
         self.output_mode = "steam" if self._steam_radio.isChecked() else "custom"
         self._update_custom_path_visibility()
 
     def _on_unpacked_changed(self, state_val: int):
-        print(f"[DEBUG] _on_unpacked_changed() called")
         self.unpacked = (state_val == 2)
 
     def _update_custom_path_visibility(self):
-        print(f"[DEBUG] _update_custom_path_visibility() called")
         self._custom_path_frame.setVisible(self.output_mode == "custom")
 
     def _browse_custom_output(self):
-        print(f"[DEBUG] _browse_custom_output: opening output folder dialog")
+        print("[DEBUG] _browse_custom_output: opening output folder dialog")
         path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
         if path:
             self.custom_output = path
@@ -932,20 +931,32 @@ class Sidebar(QFrame):
     def get_unpacked(self) -> bool:
         return self.unpacked
 
+    def set_locked(self, locked: bool) -> None:
+        self._locked = locked
+        if not hasattr(self, "_inner"):
+            return
+
+        self._inner.setEnabled(not locked)
+        if locked:
+            effect = QGraphicsOpacityEffect(self._inner)
+            effect.setOpacity(0.5)
+            self._inner.setGraphicsEffect(effect)
+        else:
+            self._inner.setGraphicsEffect(None)
+
 
     def refresh_ui(self, populate_callback: Optional[Callable] = None):
-        print(f"[DEBUG] refresh_ui() called")
         if populate_callback:
             self._populate_callback = populate_callback
         try:
             self._mod_name_text = self.get_mod_name()
             self._author_text   = self.get_author()
-        except Exception:
-            pass
+        except Exception as _exc:
+            print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
         try:
             self.unpacked = self._unpacked_toggle.isChecked()
-        except Exception:
-            pass
+        except Exception as _exc:
+            print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
 
         old = self.layout()
         if old is not None:
@@ -957,7 +968,9 @@ class Sidebar(QFrame):
                     w.setParent(None)
                     w.deleteLater()
             _tmp = QWidget()
+            _tmp.setAttribute(Qt.WA_DontShowOnScreen, True)
             _tmp.setLayout(old)
+            _tmp.deleteLater()
 
         self._vehicle_cards       = []
         self._variant_expanders   = {}
@@ -986,5 +999,3 @@ def _radio_qss() -> str:
             background: {COLORS['accent']};
         }}
     """
-
-

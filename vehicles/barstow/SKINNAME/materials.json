@@ -26,9 +26,14 @@
         "normalMap": "vehicles/barstow/barstow_main_n.normal.png",
         "opacityMap": "/vehicles/barstow/barstow_main_c.data.png",
         "baseColorMap": "vehicles/barstow/SKINNAME/barstow_skin_SKINNAME.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.4,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

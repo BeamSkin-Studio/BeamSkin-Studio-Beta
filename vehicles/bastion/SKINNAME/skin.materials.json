@@ -26,10 +26,15 @@
         "roughnessFactor": 0.4,
         "metallicMap": "vehicles/bastion/bastion_main_m.data.png",
         "normalMap": "/vehicles/bastion/bastion_main_nm.normal.png",
-        "opacityMap": "/vehicles/bastion/bastion_main_c.data.png"
-      },
-      {},
-      {}
+        "opacityMap": "/vehicles/bastion/bastion_main_c.data.png",
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

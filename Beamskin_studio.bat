@@ -6,9 +6,43 @@ setlocal enabledelayedexpansion
 :: ============================================================
 
 set "LOG_FILE=%TEMP%\BeamSkinStudio_launch.log"
+set "SCRIPT_DIR=%~dp0"
 
 :: Clear old log
 if exist "%LOG_FILE%" del /f /q "%LOG_FILE%"
+
+:: -----------------------------------------------------------
+:: Step 0: Make sure we're not still inside a ZIP/RAR archive
+:: Archive managers (WinRAR, 7-Zip, Explorer's zip viewer) often
+:: run files directly from a temp mount when a user double-clicks
+:: inside the archive without extracting first. A real extracted
+:: copy always has main.py and requirements.txt next to this
+:: script, so their absence is the most reliable tell.
+:: -----------------------------------------------------------
+set "IS_ARCHIVE="
+
+echo !SCRIPT_DIR! | findstr /i /c:"\Rar$" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !SCRIPT_DIR! | findstr /i /c:".zip\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !SCRIPT_DIR! | findstr /i /c:".rar\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !SCRIPT_DIR! | findstr /i /c:".7z\" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+echo !SCRIPT_DIR! | findstr /i /c:"\Temp\7z" >nul 2>&1
+if !errorlevel! equ 0 set "IS_ARCHIVE=1"
+
+if not exist "%SCRIPT_DIR%main.py" set "IS_ARCHIVE=1"
+if not exist "%SCRIPT_DIR%requirements.txt" set "IS_ARCHIVE=1"
+
+if defined IS_ARCHIVE (
+    call :show_error "Still Inside a ZIP/RAR Archive" "It looks like BeamSkin Studio hasn't been extracted yet - or the extraction is incomplete.^^Please close this window, right-click the downloaded ZIP/RAR and choose Extract All, then open the EXTRACTED folder and run BeamSkin Studio.bat from there.^^Detected folder: %SCRIPT_DIR%"
+    exit /b 1
+)
 
 :: -----------------------------------------------------------
 :: Step 1: Find a Python version that has all dependencies
@@ -44,32 +78,32 @@ if not defined PYEXE (
 )
 
 if not defined PYEXE (
-    call :show_error "No Compatible Python Found" "No Python installation with all required dependencies was found.^^Please run install.bat to install dependencies."
+    call :show_error "Dependencies Not Installed" "BeamSkin Studio could not find a Python installation with all required packages ^(PySide6, Pillow, requests, pywin32, imageio^).^^This usually means the app hasn't been set up yet.^^Please run install.bat first - it's in this same folder - then launch BeamSkin Studio.bat again."
     exit /b 1
 )
 
 :: -----------------------------------------------------------
 :: Step 2: Locate the entry point
 :: -----------------------------------------------------------
-if exist "launchers-scripts\launcher.py" (
+if exist "%SCRIPT_DIR%launchers-scripts\launcher.py" (
     set "LAUNCH_FILE=launchers-scripts\launcher.py"
     goto :launch
 )
 
-if exist "main.py" (
+if exist "%SCRIPT_DIR%main.py" (
     set "LAUNCH_FILE=main.py"
     goto :launch
 )
 
-call :show_error "Files Not Found" "Neither launcher.py nor main.py could be found.^^Make sure you are running this from the BeamSkin Studio root folder.^^Expected location: %CD%"
+call :show_error "Files Not Found" "Neither launcher.py nor main.py could be found.^^Make sure you are running this from the BeamSkin Studio root folder.^^Expected location: %SCRIPT_DIR%"
 exit /b 1
 
 :: -----------------------------------------------------------
 :: Step 3: Launch via VBScript — no console, full crash guard
 :: -----------------------------------------------------------
 :launch
-set "ABS_LAUNCH=%CD%\%LAUNCH_FILE%"
-set "ABS_WORKDIR=%CD%"
+set "ABS_LAUNCH=%SCRIPT_DIR%%LAUNCH_FILE%"
+set "ABS_WORKDIR=%SCRIPT_DIR%"
 
 :: Resolve actual python.exe path from whichever command was selected
 for /f "delims=" %%P in ('%PYEXE% -c "import sys; print(sys.executable)"') do set "RESOLVED_PYEXE=%%P"

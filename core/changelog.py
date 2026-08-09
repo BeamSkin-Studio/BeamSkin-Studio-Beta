@@ -28,6 +28,42 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.0.Beta",
+        "date": "09-08-2026",
+        "entries": [
+            title("🚀 New Features"),
+            subtitle("Retroreflectivity:"),
+            item("You can now add real retroreflectivity to your skins!"),
+            subtitle("Layers:"),
+            item("To make decals look like actual decals, I've made it so everything is done in layers, separating the car paint and decals. This was done because of the new orange peel effect, and because I noticed the cars have a paint-like roughness."),
+            subtitle("Edit Vehicle Info:"),
+            item("You can now edit the info_skinname.json within BeamSkin Studio, available when adding a config."),
+            subtitle("Presets:"),
+            item("You can now save material values as a preset that you can easily load and reuse."),
+            subtitle("Data Folder:"),
+            item("Now everything you add or save is saved at a specific location that you pick, you will need to migrate if you are already using BeamSkin Studio before this update."),
+            separator(),
+            title("⚙️ Improvements"),
+            subtitle("Exporting:"),
+            item("Now, during an export, the entire project tab will lock its interactivity until it is finished."),
+            subtitle("Export Progress:"),
+            item("The export progress bar is no longer at the bottom. It will now appear at the bottom right as a little notification."),
+            subtitle("Project Browser:"),
+            item("The Remove button now deletes the actual project file."),
+            subtitle("How To Use Tab:"),
+            item("The guide tab now include images for better understanding."),
+            separator(),
+            title("🐛 Bug Fixes"),
+            subtitle("Mod Scanner:"),
+            item("• Fixed an issue causing \"mod scanner unavailble\"\n• Fixed an issue causing the user to be unable to add the mod after the scan."),
+            separator(),
+            title("📝 Notes"),
+            note("If you are experiencing any issues, then please make a bug report in the discord server!"),
+        ]
+    },
+
+
+    {
         "version": "0.8.4.Beta",
         "date": "03-08-2026",
         "entries": [
@@ -72,7 +108,7 @@ CHANGELOGS = [
 
     {
         "version": "0.8.0.Beta",
-        "date": "08-15-2026",
+        "date": "15-05-2026",
         "entries": [
             title("🚀 New Features"),
             subtitle("Body variant support"),
@@ -136,3 +172,11 @@ def get_changelog_for_version(version: str) -> dict | None:
         if entry.get("version", "").strip() == version:
             return entry
     return None
+
+
+def get_latest_changelog() -> dict | None:
+    return CHANGELOGS[0] if CHANGELOGS else None
+
+
+def get_all_versions() -> list[str]:
+    return [entry["version"] for entry in CHANGELOGS]

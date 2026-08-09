@@ -1,36 +1,47 @@
 from __future__ import annotations
 import os
 import platform
-from typing import Callable, Optional
+from typing import Callable
 
 from PySide6.QtCore    import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QWidget, QLineEdit, QFileDialog, QApplication,
-    QStackedWidget, QSizePolicy,
+    QStackedWidget,
 )
 from PySide6.QtGui import QPixmap
 
 from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import AnimButton, GhostButton, HSeparator, Badge
+from gui.widgets import AnimButton, GhostButton, HSeparator
 from gui.icon_helper import set_window_icon
 
 try:
     from core.localization import t, set_language, get_available_languages
-except ImportError:
-    def t(key, **kw): return key
-    def set_language(lang): return True
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
+    def set_language(lang):
+        return True
     def get_available_languages():
-        return {"en": {"name": "English", "native": "English", "flag": "🇬🇧"}}
+        return {'en': {'name': 'English', 'native': 'English', 'flag': '🇬🇧'}}
 
-print("[DEBUG] setup_wizard.py loaded (PySide6)")
+try:
+    from core.settings import get_bundle_path, get_data_dir, set_data_dir
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def get_bundle_path():
+        return os.getcwd()
+    def get_data_dir():
+        return os.path.join(os.path.expanduser('~'), 'BeamSkinStudio')
+    def set_data_dir(new_dir, migrate=True):
+        return True
 
 
 class _LangRow(QFrame):
     selected = Signal(str)
 
     def __init__(self, code: str, info: dict, is_selected: bool, parent=None):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
         self.code = code
         self.setCursor(Qt.PointingHandCursor)
@@ -72,7 +83,6 @@ class _LangRow(QFrame):
             row.addWidget(chk)
 
     def _apply(self, active: bool):
-        print(f"[DEBUG] _apply() called")
         if active:
             self.setStyleSheet(f"""
                 QFrame {{
@@ -95,12 +105,10 @@ class _LangRow(QFrame):
             """)
 
     def mousePressEvent(self, _event):
-        print(f"[DEBUG] mousePressEvent() called")
         self.selected.emit(self.code)
 
 
 class SetupWizard(QDialog):
-
     def __init__(self, parent: QWidget, colors: dict,
                  on_complete: Callable[[dict], None]):
         super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
@@ -112,9 +120,12 @@ class SetupWizard(QDialog):
 
         self.colors      = colors
         self.on_complete = on_complete
-        self.paths       = {"beamng_install": "", "mods_folder": ""}
+        self.paths       = {
+            "beamng_install": "",
+            "mods_folder":    "",
+            "data_folder":    get_data_dir(),
+        }
         self._selected_lang = "en"
-
 
         if parent:
             pg = parent.frameGeometry()
@@ -129,7 +140,6 @@ class SetupWizard(QDialog):
 
 
     def _build(self):
-        print(f"[DEBUG] _build() called")
         self._card = QFrame(self)
         self._card.setObjectName("wizardCard")
         self._card.setGeometry(0, 0, 860, 760)
@@ -146,7 +156,6 @@ class SetupWizard(QDialog):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
 
@@ -158,18 +167,16 @@ class SetupWizard(QDialog):
 
 
     def _build_language_page(self) -> QWidget:
-        print(f"[DEBUG] _build_language_page() called")
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         col = QVBoxLayout(page)
         col.setContentsMargins(36, 28, 36, 28)
         col.setSpacing(16)
 
-
         hdr = QVBoxLayout()
         hdr.setSpacing(6)
 
-        logo_path = os.path.join("gui", "Icons", "BeamSkin_Studio_White.png")
+        logo_path = os.path.join(get_bundle_path(), "gui", "Icons", "BeamSkin_Studio_White.png")
         if os.path.exists(logo_path):
             logo_lbl = QLabel()
             px = QPixmap(logo_path).scaled(
@@ -203,7 +210,6 @@ class SetupWizard(QDialog):
         self._welcome_sub = sub
         col.addLayout(hdr)
 
-
         self._lang_search = QLineEdit()
         self._lang_search.setPlaceholderText(
             "🔍  " + t("language_selection.search")
@@ -224,7 +230,6 @@ class SetupWizard(QDialog):
         self._lang_search.textChanged.connect(self._filter_languages)
         col.addWidget(self._lang_search)
 
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -242,7 +247,6 @@ class SetupWizard(QDialog):
 
         self._populate_languages("")
 
-
         col.addWidget(HSeparator())
         next_btn = AnimButton(
             t("language_selection.continue"),
@@ -257,8 +261,6 @@ class SetupWizard(QDialog):
         return page
 
     def _populate_languages(self, query: str):
-        print(f"[DEBUG] _populate_languages() called")
-
         while self._lang_list_layout.count():
             item = self._lang_list_layout.takeAt(0)
             if item.widget():
@@ -280,7 +282,6 @@ class SetupWizard(QDialog):
         self._lang_list_layout.addStretch()
 
     def _filter_languages(self, text: str):
-        print(f"[DEBUG] _filter_languages() called")
         self._populate_languages(text)
 
     def _on_lang_selected(self, code: str):
@@ -323,8 +324,8 @@ class SetupWizard(QDialog):
             from core.settings import app_settings, save_settings
             app_settings["language"] = self._selected_lang
             save_settings()
-        except Exception:
-            pass
+        except Exception as _exc:
+            print(f"[WARNING] _go_to_paths: {type(_exc).__name__}: {_exc}")
         self._stack.setCurrentIndex(1)
         self._refresh_texts()
 
@@ -335,7 +336,6 @@ class SetupWizard(QDialog):
         col = QVBoxLayout(page)
         col.setContentsMargins(36, 28, 36, 28)
         col.setSpacing(16)
-
 
         hdr_lbl = QLabel(t("setup_wizard.paths_title"))
         hdr_lbl.setFont(font(20, "bold"))
@@ -357,7 +357,6 @@ class SetupWizard(QDialog):
         self._paths_sub_lbl = sub_lbl
         col.addWidget(HSeparator())
 
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -371,7 +370,6 @@ class SetupWizard(QDialog):
         inner_col.setContentsMargins(0, 0, 0, 0)
         inner_col.setSpacing(14)
 
-
         inner_col.addWidget(self._path_section(
             number="1",
             title=t("setup_wizard.beamng_install"),
@@ -379,7 +377,6 @@ class SetupWizard(QDialog):
             attr="beamng",
             browse_cb=self._browse_beamng,
         ))
-
 
         inner_col.addWidget(self._path_section(
             number="2",
@@ -389,10 +386,25 @@ class SetupWizard(QDialog):
             browse_cb=self._browse_mods,
         ))
 
+        data_section = self._path_section(
+            number="3",
+            title=t("setup_wizard.data_folder", default="BeamSkin Studio Data Folder"),
+            desc=t(
+                "setup_wizard.data_folder_desc",
+                default="Where your added vehicles, projects, and settings are stored. "
+                        "The default location works for most people — only change this "
+                        "if you want your data on a different drive.",
+            ),
+            attr="data",
+            browse_cb=self._browse_data,
+        )
+        self._data_entry.setReadOnly(False)
+        self._data_entry.setText(self.paths["data_folder"])
+        inner_col.addWidget(data_section)
+
         inner_col.addStretch()
         scroll.setWidget(inner)
         col.addWidget(scroll, 1)
-
 
         col.addWidget(HSeparator())
         btn_row = QHBoxLayout()
@@ -500,7 +512,6 @@ class SetupWizard(QDialog):
 
 
     def _browse_beamng(self):
-        print(f"[DEBUG] _browse_beamng: opening BeamNG install folder dialog")
         init = self.paths.get("beamng_install") or ""
         if not init or not os.path.exists(init):
             if platform.system() == "Windows":
@@ -530,7 +541,6 @@ class SetupWizard(QDialog):
         self._check_finish_ready()
 
     def _browse_mods(self):
-        print(f"[DEBUG] _browse_mods: opening mods folder dialog")
         init = self.paths.get("mods_folder") or ""
         if not init or not os.path.exists(init):
             if platform.system() == "Windows":
@@ -562,8 +572,39 @@ class SetupWizard(QDialog):
         self._check_finish_ready()
 
 
+    def _browse_data(self):
+        init = self.paths.get("data_folder") or get_data_dir()
+        if not os.path.exists(init):
+            init = os.path.expanduser("~")
+
+        path = QFileDialog.getExistingDirectory(
+            self, t("setup_wizard.browse_data_title", default="Choose Data Folder"), init
+        )
+        if not path:
+            return
+
+        self._data_entry.setText(path)
+        if os.path.isdir(path) and os.access(path, os.W_OK):
+            self.paths["data_folder"] = path
+            self._data_status.setText(
+                t("setup_wizard.data_valid", default="✓ Folder is writable")
+            )
+            self._data_status.setStyleSheet(
+                f"color:{COLORS['success']};background:transparent;border:none;"
+            )
+        else:
+            self.paths["data_folder"] = get_data_dir()
+            self._data_entry.setText(self.paths["data_folder"])
+            self._data_status.setText(
+                t("setup_wizard.data_invalid", default="✗ Folder is not writable — reverted to default")
+            )
+            self._data_status.setStyleSheet(
+                f"color:{COLORS['error']};background:transparent;border:none;"
+            )
+        self._check_finish_ready()
+
+
     def _validate_beamng(self, path: str) -> bool:
-        print(f"[DEBUG] _validate_beamng() called")
         if not os.path.exists(path):
             return False
         sys = platform.system()
@@ -584,18 +625,22 @@ class SetupWizard(QDialog):
 
     def _on_finish(self):
         print(f"[DEBUG] _on_finish: wizard complete, paths={self.paths}")
+
+        chosen_data_dir = self.paths.get("data_folder") or get_data_dir()
+        try:
+            set_data_dir(chosen_data_dir, migrate=True)
+        except Exception as e:
+            print(f"[WARNING] setup_wizard: could not apply data folder: {e}")
+
         self.on_complete(self.paths)
         self.accept()
 
     def keyPressEvent(self, event):
-        print(f"[DEBUG] keyPressEvent() called")
-
         if event.key() == Qt.Key_Escape:
             return
         super().keyPressEvent(event)
 
     def show(self):
-        print(f"[DEBUG] show() called")
         self.exec()
 
 
@@ -606,5 +651,3 @@ def show_setup_wizard(
 ):
     wizard = SetupWizard(parent, colors, on_complete)
     wizard.show()
-
-

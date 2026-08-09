@@ -24,9 +24,14 @@
         "normalMap": "/vehicles/common/cargobox_n.dds",
         "opacityMap": "/vehicles/common/cargobox_c.data.png",
         "baseColorMap": "vehicles/pickup/SKINNAMEBOX/pickup_cargobox_skin_SKINNAMEBOX.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.1,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,
@@ -62,9 +67,14 @@
         "normalMap": "/vehicles/common/pickup/pickup_n.dds",
         "opacityMap": "/vehicles/pickup/pickup_skin_o.data.png",
         "baseColorMap": "vehicles/pickup/SKINNAMEBOX/pickup_skin_SKINNAMEBOX.dds",
-      },
-      {},
-      {}
+		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.1,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1
+      }
     ],
     "activeLayers": 2,
     "dynamicCubemap": true,

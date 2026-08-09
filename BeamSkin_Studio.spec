@@ -28,7 +28,7 @@ datas = []
 datas += [
     ('version.txt',                         '.'),
     ('gui/Icons',                           'gui/Icons'),
-    ('imagesforgui',                        'imagesforgui'),
+    ('gui/images',                          'gui/images'),
     ('vehicles',                            'vehicles'),
     ('data',                                'data'),
     # Language files — critical for the localisation system
@@ -246,7 +246,9 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='gui/Icons/BeamSkin_Studio.ico',
-    # version= intentionally omitted — version.txt is bundled via datas[].
-    # To add Windows file-property metadata use PyInstaller's pyi-grab-version
-    # tool to create a proper VERSIONINFO file, then: version='version_info.txt'
+    # Embeds Windows file-property metadata (version, product name, etc.)
+    # directly into the exe — visible via right-click -> Properties -> Details.
+    # Keep version_info.txt's filevers/prodvers/FileVersion/ProductVersion
+    # in sync with version.txt whenever you bump the version.
+    version='version_info.txt',
 )

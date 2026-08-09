@@ -1,28 +1,35 @@
 from __future__ import annotations
 import json
 import os
-import threading
-import time
 import webbrowser
 from typing import Optional
 
-from PySide6.QtCore    import Qt, Signal, QTimer
+from PySide6.QtCore    import Qt
 from PySide6.QtGui     import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton,
-    QVBoxLayout, QHBoxLayout, QScrollArea, QSizePolicy,
+    QVBoxLayout, QScrollArea,
 )
 
-from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.theme   import COLORS, font
 from gui.state   import state
 
 try:
     from core.localization import t
-except ImportError:
-    def t(key, **kw): return key
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def t(key, **kw):
+        return key
+
+try:
+    from core.settings import get_bundle_path
+except ImportError as _exc:
+    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    def get_bundle_path():
+        return os.getcwd()
 
 
-_LOCALES_DIR = os.path.join("core", "localization", "languages")
+_LOCALES_DIR = os.path.join(get_bundle_path(), "core", "localization", "languages")
 
 
 def _scan_translators() -> str:
@@ -34,8 +41,8 @@ def _scan_translators() -> str:
         if lp and os.path.isfile(lp):
             with open(lp, "r", encoding="utf-8") as f:
                 current_lang_names = json.load(f).get("language_names", {})
-    except Exception:
-        pass
+    except Exception as _exc:
+        print(f"[WARNING] _scan_translators: {type(_exc).__name__}: {_exc}")
 
     entries: list = []
     seen: set = set()
@@ -45,7 +52,8 @@ def _scan_translators() -> str:
         try:
             with open(os.path.join(_LOCALES_DIR, filename), "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception:
+        except Exception as _exc:
+            print(f"[WARNING] _scan_translators: {type(_exc).__name__}: {_exc}")
             continue
         meta         = data.get("_meta", {})
         contributors = meta.get("contributors", [])
@@ -88,11 +96,8 @@ def _get_current_locale_path() -> Optional[str]:
 
 
 class AboutTab(QWidget):
-
     def __init__(self, parent: QWidget):
-        print(f"[DEBUG] __init__() called")
         super().__init__(parent)
-        print("[DEBUG] AboutTab __init__ called")
         self.setStyleSheet(f"background:{COLORS['app_bg']};")
 
         self._payment_overlay: Optional[QWidget] = None
@@ -109,7 +114,6 @@ class AboutTab(QWidget):
 
 
     def _setup_ui(self):
-        print(f"[DEBUG] _setup_ui() called")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
@@ -206,7 +210,6 @@ class AboutTab(QWidget):
             }
             QPushButton:hover { background: #4752C4; }
         """)
-
         discord_icon = QLabel("", self._discord_btn)
         discord_icon.setPixmap(self._load_discord_icon())
         discord_icon.setFixedSize(24, 24)
@@ -229,19 +232,15 @@ class AboutTab(QWidget):
 
 
     def _load_logo_pixmap(self) -> Optional[QPixmap]:
-        print(f"[DEBUG] _load_logo_pixmap() called")
-        icon_dir = os.path.join("gui", "Icons")
+        icon_dir = os.path.join(get_bundle_path(), "gui", "Icons")
         suffix   = "White" if state.theme_mode == "dark" else "Black"
         path     = os.path.join(icon_dir, f"BeamSkin_Studio_{suffix}.png")
         if os.path.exists(path):
-
-
             return QPixmap(path).scaled(400, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         return None
 
 
     def _accent_button(self, text: str, width: int = 120) -> QPushButton:
-        print(f"[DEBUG] _accent_button() called")
         btn = QPushButton(text)
         btn.setFont(font(15))
         btn.setFixedHeight(40)
@@ -259,7 +258,6 @@ class AboutTab(QWidget):
         return btn
 
     def _card_button(self, text: str, width: int = 140, font_size: int = 13) -> QPushButton:
-        print(f"[DEBUG] _card_button() called")
         btn = QPushButton(text)
         btn.setFont(font(font_size, "bold"))
         btn.setFixedHeight(40)
@@ -278,20 +276,19 @@ class AboutTab(QWidget):
 
 
     def _show_payment_options(self):
-        print(f"[DEBUG] _show_payment_options: showing donation overlay")
+        print("[DEBUG] _show_payment_options: showing donation overlay")
         if self._payment_overlay is not None:
             return
 
         overlay = QWidget(self)
         overlay.setStyleSheet(
-            f"background:rgba(13,15,20,0.85);"
+            "background:rgba(13,15,20,0.85);"
         )
         overlay.setAttribute(Qt.WA_StyledBackground, True)
         overlay.setGeometry(self.rect())
         overlay.raise_()
         overlay.show()
         self._payment_overlay = overlay
-
 
         dialog = QFrame(overlay)
         dialog.setStyleSheet(f"""
@@ -345,26 +342,24 @@ class AboutTab(QWidget):
             (overlay.height() - dialog.height()) // 2,
         )
 
-
         def _maybe_close(event):
             if not dialog.geometry().contains(event.pos()):
                 self._close_payment_options()
         overlay.mousePressEvent = _maybe_close
 
     def _close_payment_options(self):
-        print(f"[DEBUG] _close_payment_options: closing donation overlay")
+        print("[DEBUG] _close_payment_options: closing donation overlay")
         if self._payment_overlay:
             self._payment_overlay.deleteLater()
             self._payment_overlay = None
 
     def resizeEvent(self, event):
-        print(f"[DEBUG] resizeEvent() called")
         super().resizeEvent(event)
         if self._payment_overlay:
             self._payment_overlay.setGeometry(self.rect())
 
     def _load_discord_icon(self) -> QPixmap:
-        path = os.path.join("gui", "Icons", "discord_logo_white.png")
+        path = os.path.join(get_bundle_path(), "gui", "Icons", "discord_logo_white.png")
         if os.path.exists(path):
             return QPixmap(path).scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         return QPixmap()
@@ -386,7 +381,6 @@ class AboutTab(QWidget):
 
 
     def refresh_ui(self):
-        print(f"[DEBUG] _load_discord_icon() called")
         if self._logo_lbl is not None:
             new_px = self._load_logo_pixmap()
             if new_px:
@@ -406,5 +400,3 @@ class AboutTab(QWidget):
             self._version_lbl.setText(
                 t("about.version", version=version_str, default=f"Version {version_str}")
             )
-
-
