@@ -38,15 +38,16 @@ try:
     )
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
-    _APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _APP_DIR  = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _DATA_DIR = os.path.join(os.path.expanduser('~'), 'BeamSkinStudio')
     def get_bundle_path():
         return _APP_DIR
     def get_vehicles_dir():
-        return os.path.join(_APP_DIR, 'vehicles')
+        return os.path.join(_DATA_DIR, 'vehicles')
     def get_vehicle_previews_dir():
         return os.path.join(_APP_DIR, 'gui', 'images', 'vehicles')
     def get_settings_path():
-        return os.path.join(_APP_DIR, 'data', 'app_settings.json')
+        return os.path.join(_DATA_DIR, 'data', 'app_settings.json')
 
 _IMAGES_DIR = get_vehicle_previews_dir()
 _BUNDLED_IMAGES_DIR = os.path.join(get_bundle_path(), "gui", "images", "vehicles")

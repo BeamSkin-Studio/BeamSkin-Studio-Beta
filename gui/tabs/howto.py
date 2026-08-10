@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QDialog, QGraphicsView, QGraphicsScene,
 )
 
-import gui  # noqa: F401  (imported for gui.__file__, used to locate images/guide)
+import gui
 from gui.theme   import COLORS, font
 
 try:

@@ -9,7 +9,7 @@ try:
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     app_settings = {}
-    _settings_module = None  # type: ignore
+    _settings_module = None
 
 try:
     from core.config import VEHICLE_IDS
@@ -194,7 +194,7 @@ class StateManager:
     @property
     def added_vehicles(self) -> Dict[str, str]:
         if self._settings_module is not None:
-            return self._settings_module.added_vehicles  # type: ignore[attr-defined]
+            return self._settings_module.added_vehicles
         return self._local_added_vehicles
 
 

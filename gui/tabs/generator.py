@@ -2132,16 +2132,10 @@ class GeneratorTab(QWidget):
         self._toggle_info_data()
         self._update_variant_ui()
 
-        while self._mat_props_layout.count():
-            item = self._mat_props_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        self._clear_layout(self._mat_props_layout)
         self.material_properties_entries.clear()
 
-        while self._info_data_layout.count():
-            item = self._info_data_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        self._clear_layout(self._info_data_layout)
         self.info_data_entries.clear()
         self._info_field_originals.clear()
 
@@ -2329,6 +2323,8 @@ class GeneratorTab(QWidget):
             item = layout.takeAt(0)
             w = item.widget()
             if w is not None:
+                w.hide()
+                w.setParent(None)
                 w.deleteLater()
                 continue
             child_layout = item.layout()

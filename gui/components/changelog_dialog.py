@@ -125,7 +125,7 @@ def _exec_remote_changelog(source: str) -> list | None:
         "__builtins__": _builtins,
     }
     try:
-        exec(compile(source, "<remote_changelog>", "exec"), namespace)  # noqa: S102
+        exec(compile(source, "<remote_changelog>", "exec"), namespace)
         return namespace.get("CHANGELOGS")
     except Exception as e:
         print(f"[changelog] exec failed: {e}")

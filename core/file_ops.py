@@ -21,7 +21,7 @@ try:
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     def get_vehicles_dir():
-        return os.path.join(os.getcwd(), 'vehicles')
+        return os.path.join(os.path.expanduser('~'), 'BeamSkinStudio', 'vehicles')
 
 
 _copied_file_cache: dict[str, dict[str, str]] = {}

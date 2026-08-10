@@ -28,6 +28,17 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.1.Beta",
+        "date": "10-08-2026",
+        "entries": [
+            title("🐛 Bug Fixes"),
+            subtitle("Generator Tab"),
+            item("• Fixed an issue causing the \"edit vehicle info\" to duplicate it's self if you have more then 1 vehicle in the project."),
+        ]
+    },
+
+
+    {
         "version": "0.9.0.Beta",
         "date": "09-08-2026",
         "entries": [

@@ -27,7 +27,7 @@ try:
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     def get_vehicles_dir():
-        return 'vehicles'
+        return os.path.join(os.path.expanduser('~'), 'BeamSkinStudio', 'vehicles')
     def get_vehicle_previews_dir():
         return os.path.join('gui', 'images', 'vehicles')
     def get_bundle_path():
