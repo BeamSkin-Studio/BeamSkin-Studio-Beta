@@ -55,6 +55,7 @@ def get_releases_api_url():
     return url
 
 _latest_release_zip_url: str = ""
+_latest_release_exe_url: str = ""
 
 def get_zip_url():
     if _latest_release_zip_url:
@@ -65,8 +66,12 @@ def get_zip_url():
     log.debug("get_zip_url: no cached URL, falling back to %s", url)
     return url
 
+def get_exe_url():
+    log.debug("get_exe_url: returning cached %r", _latest_release_exe_url)
+    return _latest_release_exe_url
+
 def fetch_latest_release():
-    global _latest_release_zip_url
+    global _latest_release_zip_url, _latest_release_exe_url
     log.debug("fetch_latest_release: GET %s", get_releases_api_url())
     resp = requests.get(
         get_releases_api_url(),
@@ -83,15 +88,25 @@ def fetch_latest_release():
     version = _format_version_string(tag)
 
     zip_url = data.get("zipball_url", "")
+    exe_url = ""
     for asset in data.get("assets", []):
-        if asset.get("name", "").endswith(".zip"):
+        name = asset.get("name", "")
+        if name.endswith(".zip") and not zip_url_is_asset(zip_url):
             zip_url = asset["browser_download_url"]
-            log.debug("fetch_latest_release: matched .zip asset %r", asset.get("name"))
-            break
+            log.debug("fetch_latest_release: matched .zip asset %r", name)
+        elif name.endswith(".exe"):
+            exe_url = asset["browser_download_url"]
+            log.debug("fetch_latest_release: matched .exe asset %r", name)
 
     _latest_release_zip_url = zip_url
-    log.debug("fetch_latest_release: version=%s  zip_url=%s", version, zip_url)
+    _latest_release_exe_url = exe_url
+    log.debug("fetch_latest_release: version=%s  zip_url=%s  exe_url=%s",
+              version, zip_url, exe_url)
     return version, zip_url
+
+def zip_url_is_asset(url: str) -> bool:
+    return "/releases/download/" in url or "/releases/latest/download/" in url
+
 
 def get_base_path():
     frozen = getattr(sys, "frozen", False)
@@ -127,6 +142,10 @@ def get_downloads_folder():
     result = os.path.join(os.path.expanduser("~"), "Downloads")
     log.debug("get_downloads_folder: falling back to %s", result)
     return result
+
+
+def is_frozen_build() -> bool:
+    return bool(getattr(sys, "frozen", False))
 
 
 def _format_version_string(raw: str) -> str:
@@ -258,6 +277,72 @@ class _DownloadWorker(QThread):
             self.finished.emit(self._dest)
         except Exception as e:
             log.debug("_DownloadWorker.run: failed: %s", e)
+            self.failed.emit(str(e))
+
+
+class _ExeSwapWorker(QThread):
+    status   = Signal(str)
+    finished = Signal(str)
+    failed   = Signal(str)
+
+    def __init__(self, new_exe_path: str):
+        super().__init__()
+        self._new_exe_path = new_exe_path
+
+    def run(self):
+        try:
+            current_exe = sys.executable
+            app_dir     = os.path.dirname(current_exe)
+            log.debug("_ExeSwapWorker.run: current_exe=%s new_exe=%s",
+                      current_exe, self._new_exe_path)
+
+            self.status.emit("Preparing update\u2026")
+
+            if not os.path.exists(self._new_exe_path):
+                self.failed.emit(f"Downloaded file not found: {self._new_exe_path}")
+                return
+
+            staged_path = os.path.join(app_dir, os.path.basename(current_exe) + ".new")
+            log.debug("_ExeSwapWorker.run: staging new exe at %s", staged_path)
+            shutil.copy2(self._new_exe_path, staged_path)
+
+            if sys.platform == "win32":
+                script_path = os.path.join(app_dir, "_update_swap.bat")
+                script = (
+                    "@echo off\r\n"
+                    "setlocal\r\n"
+                    ":wait\r\n"
+                    f'tasklist /FI "IMAGENAME eq {os.path.basename(current_exe)}" '
+                    f'2>NUL | find /I "{os.path.basename(current_exe)}" >NUL\r\n'
+                    "if not errorlevel 1 (\r\n"
+                    "  timeout /t 1 /nobreak >NUL\r\n"
+                    "  goto wait\r\n"
+                    ")\r\n"
+                    f'del "{current_exe}"\r\n'
+                    f'move /Y "{staged_path}" "{current_exe}"\r\n'
+                    f'start "" "{current_exe}"\r\n'
+                    "del \"%~f0\"\r\n"
+                )
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(script)
+            else:
+                script_path = os.path.join(app_dir, "_update_swap.sh")
+                script = (
+                    "#!/bin/sh\n"
+                    f'while pgrep -f "{os.path.basename(current_exe)}" >/dev/null; do sleep 1; done\n'
+                    f'mv -f "{staged_path}" "{current_exe}"\n'
+                    f'chmod +x "{current_exe}"\n'
+                    f'"{current_exe}" &\n'
+                    f'rm -- "$0"\n'
+                )
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(script)
+                os.chmod(script_path, 0o755)
+
+            log.debug("_ExeSwapWorker.run: wrote swap script %s", script_path)
+            self.finished.emit(script_path)
+        except Exception as e:
+            log.debug("_ExeSwapWorker.run: failed: %s", e)
             self.failed.emit(str(e))
 
 
@@ -505,6 +590,8 @@ class _UpdateDialog(QDialog):
         self._zip_path    = None
         self._dl_worker   = None
         self._ex_worker   = None
+        self._swap_worker      = None
+        self._swap_script_path = None
 
         self.setWindowTitle(t("update.title", default="Update Available"))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
@@ -1056,9 +1143,25 @@ class _UpdateDialog(QDialog):
         self.reject()
 
     def _start_download(self):
-        filename       = f"BeamSkin-Studio-{self._new_version}.zip"
-        self._zip_path = os.path.join(get_downloads_folder(), filename)
-        log.debug("_start_download: filename=%s zip_path=%s", filename, self._zip_path)
+        if is_frozen_build():
+            exe_url = get_exe_url()
+            if not exe_url:
+                log.debug("_start_download: frozen build but no .exe asset on release")
+                self._on_dl_failed(
+                    "This release has no downloadable .exe update. "
+                    "Please update manually from GitHub."
+                )
+                return
+            filename       = f"BeamSkin-Studio-{self._new_version}.exe"
+            self._zip_path = os.path.join(get_downloads_folder(), filename)
+            download_url   = exe_url
+        else:
+            filename       = f"BeamSkin-Studio-{self._new_version}.zip"
+            self._zip_path = os.path.join(get_downloads_folder(), filename)
+            download_url   = get_zip_url()
+
+        log.debug("_start_download: filename=%s dest=%s url=%s",
+                  filename, self._zip_path, download_url)
 
         self._dl_file_lbl.setText(filename)
         self._dl_bar.setValue(0)
@@ -1066,7 +1169,7 @@ class _UpdateDialog(QDialog):
         self._stack.setCurrentIndex(_PAGE_DOWNLOADING)
         self.adjustSize()
 
-        self._dl_worker = _DownloadWorker(get_zip_url(), self._zip_path)
+        self._dl_worker = _DownloadWorker(download_url, self._zip_path)
         self._dl_worker.progress.connect(self._on_dl_progress)
         self._dl_worker.finished.connect(self._on_dl_finished)
         self._dl_worker.failed.connect(self._on_dl_failed)
@@ -1099,6 +1202,17 @@ class _UpdateDialog(QDialog):
         self.adjustSize()
 
     def _start_extract(self):
+        if is_frozen_build():
+            log.debug("_start_extract: frozen build, staging exe swap. new_exe=%s", self._zip_path)
+            self._stack.setCurrentIndex(_PAGE_EXTRACTING)
+            self.adjustSize()
+            self._swap_worker = _ExeSwapWorker(self._zip_path)
+            self._swap_worker.status.connect(self._ex_status_lbl.setText)
+            self._swap_worker.finished.connect(self._on_swap_finished)
+            self._swap_worker.failed.connect(self._on_ex_failed)
+            self._swap_worker.start()
+            return
+
         log.debug("_start_extract: zip_path=%s version=%s", self._zip_path, self._new_version)
         self._stack.setCurrentIndex(_PAGE_EXTRACTING)
         self.adjustSize()
@@ -1107,6 +1221,17 @@ class _UpdateDialog(QDialog):
         self._ex_worker.finished.connect(self._on_ex_finished)
         self._ex_worker.failed.connect(self._on_ex_failed)
         self._ex_worker.start()
+
+    def _on_swap_finished(self, script_path: str):
+        log.debug("_on_swap_finished: script_path=%s", script_path)
+        self._swap_script_path = script_path
+        self._complete_lbl.setText(
+            f"Downloaded version {self._new_version}.\n\n"
+            "Your settings and custom vehicles have been preserved.\n\n"
+            "Click Restart Now to finish installing the update."
+        )
+        self._stack.setCurrentIndex(_PAGE_COMPLETE)
+        self.adjustSize()
 
     def _on_ex_finished(self, files_updated: int):
         log.debug("_on_ex_finished: files_updated=%s", files_updated)
@@ -1139,14 +1264,30 @@ class _UpdateDialog(QDialog):
     def _restart_app(self):
         log.debug("_restart_app: called")
         self._fire_done()
+
+        if is_frozen_build() and self._swap_script_path and os.path.exists(self._swap_script_path):
+            log.debug("_restart_app: frozen build, launching swap script %s",
+                      self._swap_script_path)
+            self.accept()
+            if sys.platform == "win32":
+                subprocess.Popen(
+                    ["cmd", "/c", self._swap_script_path],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            else:
+                subprocess.Popen(["/bin/sh", self._swap_script_path])
+            QApplication.instance().quit()
+            return
+
         app_dir        = get_app_dir()
         batch_launcher = os.path.join(app_dir, "launchers-scripts", "quick_launcher.bat")
         py_launcher    = os.path.join(app_dir, "launchers-scripts", "quick_launcher.py")
         main_script    = os.path.join(app_dir, "main.py")
         self.accept()
 
-        if getattr(sys, "frozen", False):
-            log.debug("_restart_app: frozen build, relaunching %s", sys.executable)
+        if is_frozen_build():
+            log.debug("_restart_app: frozen build, no swap staged, relaunching %s",
+                      sys.executable)
             subprocess.Popen([sys.executable])
         elif sys.platform == "win32" and os.path.exists(batch_launcher):
             log.debug("_restart_app: using batch_launcher %s", batch_launcher)

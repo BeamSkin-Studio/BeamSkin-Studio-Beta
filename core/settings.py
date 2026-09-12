@@ -14,27 +14,39 @@ _LEGACY_MODE_FILENAME = "legacy_mode.json"
 
 _cached_data_dir: Optional[str] = None
 _cached_legacy_mode: Optional[bool] = None
+_cached_bundle_path: Optional[str] = None
+_cached_install_dir: Optional[str] = None
+_cached_vehicles_dir: Optional[str] = None
+_cached_vehicle_previews_dir: Optional[str] = None
 
 
 def get_bundle_path() -> str:
+    global _cached_bundle_path
+    if _cached_bundle_path is not None:
+        return _cached_bundle_path
     frozen = getattr(sys, "frozen", False)
     if frozen:
         result = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
         print(f"[DEBUG] get_bundle_path: frozen=True -> {result!r}")
-        return result
-    result = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(f"[DEBUG] get_bundle_path: frozen=False -> {result!r}")
+    else:
+        result = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        print(f"[DEBUG] get_bundle_path: frozen=False -> {result!r}")
+    _cached_bundle_path = result
     return result
 
 
 def get_install_dir() -> str:
+    global _cached_install_dir
+    if _cached_install_dir is not None:
+        return _cached_install_dir
     frozen = getattr(sys, "frozen", False)
     if frozen:
         result = os.path.dirname(sys.executable)
         print(f"[DEBUG] get_install_dir: frozen=True -> {result!r}")
-        return result
-    result = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(f"[DEBUG] get_install_dir: frozen=False -> {result!r}")
+    else:
+        result = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        print(f"[DEBUG] get_install_dir: frozen=False -> {result!r}")
+    _cached_install_dir = result
     return result
 
 
@@ -129,19 +141,19 @@ def is_legacy_mode() -> bool:
     if _cached_legacy_mode is None:
         print("[DEBUG] is_legacy_mode: cache empty, reading from disk")
         _cached_legacy_mode = _read_legacy_mode()
-    else:
-        print(f"[DEBUG] is_legacy_mode: returning cached value {_cached_legacy_mode}")
     return _cached_legacy_mode
 
 
 def set_legacy_mode(enabled: bool) -> None:
     print(f"[DEBUG] set_legacy_mode: called with enabled={enabled}")
-    global _cached_legacy_mode, _cached_data_dir
+    global _cached_legacy_mode, _cached_data_dir, _cached_vehicles_dir, _cached_vehicle_previews_dir
     _write_legacy_mode(enabled)
     _cached_legacy_mode = enabled
     print(f"[DEBUG] set_legacy_mode: cache updated to {enabled}, clearing _cached_data_dir "
           f"(was {_cached_data_dir!r})")
     _cached_data_dir = None
+    _cached_vehicles_dir = None
+    _cached_vehicle_previews_dir = None
     _reload_app_settings()
     _reload_added_vehicles()
     print("[DEBUG] set_legacy_mode: app_settings and added_vehicles reloaded")
@@ -168,7 +180,6 @@ def _legacy_root_vehicle_previews_dir() -> str:
 def get_data_dir() -> str:
     global _cached_data_dir
     if _cached_data_dir and os.path.isdir(_cached_data_dir):
-        print(f"[DEBUG] get_data_dir: returning cached value {_cached_data_dir!r}")
         return _cached_data_dir
 
     print("[DEBUG] get_data_dir: cache empty or stale, resolving")
@@ -243,6 +254,9 @@ def set_data_dir(new_dir: str, migrate: bool = True) -> bool:
 
     _write_bootstrap(new_dir)
     _cached_data_dir = new_dir
+    global _cached_vehicles_dir, _cached_vehicle_previews_dir
+    _cached_vehicles_dir = None
+    _cached_vehicle_previews_dir = None
     print(f"[DEBUG] set_data_dir: _cached_data_dir set to {new_dir!r}")
     _reload_app_settings()
     _reload_added_vehicles()
@@ -251,22 +265,30 @@ def set_data_dir(new_dir: str, migrate: bool = True) -> bool:
 
 
 def get_vehicles_dir() -> str:
+    global _cached_vehicles_dir
+    if _cached_vehicles_dir is not None:
+        return _cached_vehicles_dir
     if is_legacy_mode():
         path = _legacy_root_vehicles_dir()
     else:
         path = os.path.join(get_data_dir(), "vehicles")
     print(f"[DEBUG] get_vehicles_dir: {path!r}")
     os.makedirs(path, exist_ok=True)
+    _cached_vehicles_dir = path
     return path
 
 
 def get_vehicle_previews_dir() -> str:
+    global _cached_vehicle_previews_dir
+    if _cached_vehicle_previews_dir is not None:
+        return _cached_vehicle_previews_dir
     if is_legacy_mode():
         path = _legacy_root_vehicle_previews_dir()
     else:
         path = os.path.join(get_data_dir(), "vehicle_previews")
     print(f"[DEBUG] get_vehicle_previews_dir: {path!r}")
     os.makedirs(path, exist_ok=True)
+    _cached_vehicle_previews_dir = path
     return path
 
 

@@ -367,7 +367,8 @@ class PathConfigurationSection(QFrame):
         self._mods_row_desc.setText(t("settings.beamng_modpath_desc"))
         self._mods_browse_btn.setText(t("common.browse"))
 
-        self._rebuild_data_section()
+        if is_legacy_mode() != self._data_section_is_legacy:
+            self._rebuild_data_section()
 
         self._load_current_paths()
 

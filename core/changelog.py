@@ -28,6 +28,26 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.2.Beta",
+        "date": "12-08-2026",
+        "entries": [
+            title("⚙️ Improvements"),
+            subtitle("Adding modded vehicles"),
+            item("the editing logic for the skin material file have been improved, should be better now with less chance of failure"),
+            separator(),
+            title("🐛 Bug Fixes"),
+            subtitle("Vivac skins not showing - Fixed"),
+            item("Vivac skins not showing has been fixed, u will have to redo the exports of the mods that has vivac skins.\n\nThe cause was that the .jbeam template file had some icorrect writting."),
+            subtitle("Linux file paths being invaled - Fixed"),
+            item("the issue that didn't make linux file paths valid should be fixed"),
+            separator(),
+            title("An EXE Version is now Availble!"),
+            separator(),
+        ]
+    },
+
+
+    {
         "version": "0.9.1.Beta",
         "date": "10-08-2026",
         "entries": [

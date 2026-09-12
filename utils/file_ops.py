@@ -201,26 +201,181 @@ def remove_variant_from_json(carid: str, suffix_lower: str) -> bool:
         print(f"[WARNING] Variant {key} not found in JSON")
         return False
 
-def fix_stage_two_material_properties(stage2, carid, prefix):
-    properties_to_remove = [
-        "instanceDiffuse",
-        "baseColorFactor",
-        "colorPaletteMap",
-        "colorPaletteMapUseUV",
-        "metallicMap",
-        "metallicMapUseUV",
-        "roughnessFactor",
-    ]
+import copy as _copy
 
-    removed_count = 0
-    for prop in properties_to_remove:
-        if prop in stage2:
-            del stage2[prop]
-            removed_count += 1
+_GENERAL_SKIN_PATTERN = re.compile(r"^(.+?)\.([A-Za-z0-9]*skin[A-Za-z0-9_]*)\.([^.]+)$", re.IGNORECASE)
 
-    stage2["baseColorMap"] = "vehicles/carid/skinname/carid_skin_skinname.dds"
+_EXCLUDE_KEYWORDS = (
+    "sign", "display", "interior", "seat", "gauge", "glass", "light",
+    "badge", "dash", "mirror", "wheel", "cabin", "chassis",
+)
 
-    return stage2
+_STRIP_FROM_SKIN_LAYER = {
+    "instanceDiffuse", "baseColorFactor", "colorPaletteMap",
+    "colorPaletteMapUseUV", "metallicMap", "metallicMapUseUV", "roughnessFactor",
+}
+
+
+def _match_skin_key(key):
+    match = _GENERAL_SKIN_PATTERN.match(key)
+    if not match:
+        return None
+    prefix, token, variant = match.groups()
+    haystack = f"{prefix} {token}".lower()
+    if any(kw in haystack for kw in _EXCLUDE_KEYWORDS):
+        return None
+    if not variant:
+        return None
+    return prefix, token, variant
+
+
+_REQUIRED_STAGE_FACTORS = (
+    "clearCoatFactor",
+    "clearCoatRoughnessFactor",
+    "metallicFactor",
+    "roughnessFactor",
+)
+
+
+def _backfill_stage_factors(stages):
+    if not isinstance(stages, list):
+        return stages
+
+    carry = {}
+    for stage in stages:
+        if not _is_stage_active(stage):
+            continue
+        for field in _REQUIRED_STAGE_FACTORS:
+            if field in stage and stage[field] is not None:
+                carry[field] = stage[field]
+            elif field in carry:
+                print(f"[DEBUG] _backfill_stage_factors: stage missing "
+                      f"{field!r}, copying {carry[field]!r} from prior stage")
+                stage[field] = carry[field]
+    return stages
+
+
+def _is_stage_active(stage):
+    return isinstance(stage, dict) and len(stage) > 0 and any(v is not None for v in stage.values())
+
+
+def _real_active_layers(material_value):
+    stages = material_value.get("Stages")
+    if not isinstance(stages, list):
+        return 0
+    return sum(1 for s in stages if _is_stage_active(s))
+
+
+def _find_identifying_fields(stage, variant_norm):
+    return {k for k, v in stage.items() if isinstance(v, str) and variant_norm in v.lower()}
+
+
+def _genericize(stage, real_variant):
+    if isinstance(stage, dict) and real_variant:
+        for k, v in stage.items():
+            if isinstance(v, str) and real_variant in v:
+                stage[k] = v.replace(real_variant, "skinname")
+    return stage
+
+
+def _collapse_stages_to_two(stages, variant, prefix, template_by_prefix, template_global):
+    variant_norm = variant.lower()
+
+    stage0 = _copy.deepcopy(stages[0]) if stages and isinstance(stages[0], dict) else {}
+
+    active = [(i, s) for i, s in enumerate(stages) if _is_stage_active(s)]
+    skin_candidates = [s for i, s in active if i != 0]
+
+    matched = [s for s in skin_candidates if _find_identifying_fields(s, variant_norm)]
+    if matched:
+        chosen = matched
+    elif skin_candidates:
+        chosen = [skin_candidates[-1]]
+    else:
+        chosen = []
+
+    merged = {}
+    identifying_fields = set()
+    for s in chosen:
+        identifying_fields |= _find_identifying_fields(s, variant_norm)
+        for k, v in s.items():
+            if v is not None:
+                merged[k] = v
+
+    ref = template_by_prefix.get(prefix) or template_global
+    if ref is not None:
+        template_stage1 = _copy.deepcopy(ref)
+    elif len(stages) > 1 and isinstance(stages[1], dict) and stages[1]:
+        template_stage1 = _copy.deepcopy(stages[1])
+    else:
+        template_stage1 = {}
+
+    final = {}
+    for k in template_stage1.keys():
+        final[k] = merged[k] if k in merged else template_stage1[k]
+    for k, v in merged.items():
+        if k not in final:
+            final[k] = v
+
+    return stage0, final, identifying_fields
+
+
+def _finalize_skin_layer(stage1, identifying_fields, carid):
+    for field in _STRIP_FROM_SKIN_LAYER:
+        stage1.pop(field, None)
+    for field in identifying_fields:
+        if field != "baseColorMap":
+            stage1.pop(field, None)
+    stage1["baseColorMap"] = f"vehicles/{carid}/SKINNAME/{carid}_skin_SKINNAME.dds"
+    return stage1
+
+
+def _build_skin_groups(data):
+    groups = {}
+    for key, value in data.items():
+        if not isinstance(value, dict):
+            continue
+        matched = _match_skin_key(key)
+        if not matched:
+            continue
+        prefix, token, variant = matched
+        groups.setdefault(variant, {})[key] = (key, value, prefix, token)
+    return groups
+
+
+def _select_best_variant(skin_groups):
+    def score(variant):
+        entries = skin_groups[variant]
+        total = len(entries)
+        clean = sum(1 for (_, v, _, _) in entries.values() if _real_active_layers(v) == 2)
+        return (total, clean)
+
+    best = max(score(v) for v in skin_groups)
+    tied = [v for v in skin_groups if score(v) == best]
+    return min(tied, key=str.lower)
+
+
+def _build_reference_templates(data):
+    template_by_prefix = {}
+    template_global = None
+    for key, value in data.items():
+        if not isinstance(value, dict):
+            continue
+        matched = _match_skin_key(key)
+        if not matched:
+            continue
+        prefix, token, variant = matched
+        if _real_active_layers(value) != 2:
+            continue
+        stages = value.get("Stages")
+        if not isinstance(stages, list) or len(stages) < 2 or not isinstance(stages[1], dict):
+            continue
+        if prefix not in template_by_prefix:
+            template_by_prefix[prefix] = _copy.deepcopy(stages[1])
+        if template_global is None:
+            template_global = _copy.deepcopy(stages[1])
+    return template_by_prefix, template_global
+
 
 def edit_material_json(source_json_path, target_folder, carid):
     try:
@@ -256,23 +411,7 @@ def edit_material_json(source_json_path, target_folder, carid):
                       f"issues) and re-run this step.")
                 return False
 
-        general_skin_pattern = r"^(.+?)\.skin(?:_lbe)?\.(.+)$"
-
-        _EXCLUDE_PREFIX_KEYWORDS = ("sign", "display")
-
-        skin_groups = {}
-
-        for key, value in data.items():
-            match = re.match(general_skin_pattern, key)
-            if match:
-                prefix   = match.group(1)
-                skinname = match.group(2)
-                if any(kw in prefix.lower() for kw in _EXCLUDE_PREFIX_KEYWORDS):
-                    continue
-                if skinname:
-                    if skinname not in skin_groups:
-                        skin_groups[skinname] = {}
-                    skin_groups[skinname][key] = (key, value, prefix)
+        skin_groups = _build_skin_groups(data)
 
         if not skin_groups:
             print(f"[WARNING] No skin entries found matching carid: {carid}")
@@ -280,36 +419,39 @@ def edit_material_json(source_json_path, target_folder, carid):
                 json.dump(data, f, indent=2)
             return True
 
-        selected_skinname = max(skin_groups.keys(), key=lambda k: len(skin_groups[k]))
-        selected_entries = skin_groups[selected_skinname]
+        selected_variant = _select_best_variant(skin_groups)
+        selected_entries = skin_groups[selected_variant]
+        template_by_prefix, template_global = _build_reference_templates(data)
 
         filtered_data = {}
 
-        for key, (original_key, value, prefix) in selected_entries.items():
+        for key, (original_key, value, prefix, token) in selected_entries.items():
             normalized_key = f"{prefix}.skin.skinname"
 
-            import copy
-            new_value = copy.deepcopy(value)
+            new_value = _copy.deepcopy(value)
 
-            if "name" in new_value and isinstance(new_value["name"], str):
-                new_value["name"] = new_value["name"].replace(".skin_lbe.", ".skin.")
-                new_value["name"] = new_value["name"].replace(selected_skinname, "skinname")
+            stages = new_value.get("Stages")
+            if not isinstance(stages, list) or not stages:
+                print(f"[WARNING] edit_material_json: {original_key!r} has no usable "
+                      f"Stages array, skipping")
+                continue
 
-            if "mapTo" in new_value and isinstance(new_value["mapTo"], str):
-                new_value["mapTo"] = new_value["mapTo"].replace(".skin_lbe.", ".skin.")
-                new_value["mapTo"] = new_value["mapTo"].replace(selected_skinname, "skinname")
+            stages = _backfill_stage_factors(stages)
 
-            if "Stages" in new_value and isinstance(new_value["Stages"], list):
-                for stage in new_value["Stages"]:
-                    if isinstance(stage, dict) and "baseColorMap" in stage:
-                        if isinstance(stage["baseColorMap"], str):
-                            stage["baseColorMap"] = stage["baseColorMap"].replace(selected_skinname, "skinname")
+            stage0, stage1, identifying_fields = _collapse_stages_to_two(
+                stages, selected_variant, prefix, template_by_prefix, template_global
+            )
 
-            if "Stages" in new_value and isinstance(new_value["Stages"], list):
-                if len(new_value["Stages"]) >= 2:
-                    stage2 = new_value["Stages"][1]
-                    if isinstance(stage2, dict):
-                        new_value["Stages"][1] = fix_stage_two_material_properties(stage2, carid, prefix)
+            _genericize(stage0, selected_variant)
+            _genericize(stage1, selected_variant)
+            stage1 = _finalize_skin_layer(stage1, identifying_fields, carid)
+
+            new_value["Stages"] = [stage0, stage1]
+            new_value["activeLayers"] = 2
+
+            for field in ("name", "mapTo"):
+                if field in new_value:
+                    new_value[field] = normalized_key
 
             fields_to_remove = [
                 "colorPaletteMap",
@@ -319,28 +461,16 @@ def edit_material_json(source_json_path, target_folder, carid):
                 "instanceDiffuse",
                 "metallicFactor"
             ]
-
             for field in fields_to_remove:
-                if field in new_value:
-                    del new_value[field]
-
-            if "Stages" in new_value and isinstance(new_value["Stages"], list):
-                stage_fields_to_remove = ["colorPaletteMap", "colorPaletteMapUseUV"]
-                for stage_idx, stage in enumerate(new_value["Stages"]):
-                    if isinstance(stage, dict):
-                        for field in stage_fields_to_remove:
-                            if field in stage:
-                                del stage[field]
-
-                while new_value["Stages"] and not new_value["Stages"][-1]:
-                    new_value["Stages"].pop()
+                new_value.pop(field, None)
 
             filtered_data[normalized_key] = new_value
 
         with open(target_path, 'w', encoding='utf-8') as f:
             json.dump(filtered_data, f, indent=2)
 
-        print(f"[DEBUG] edit_material_json: wrote {len(filtered_data)} skin entries to {target_path} "
+        print(f"[DEBUG] edit_material_json: selected variant {selected_variant!r}, "
+              f"wrote {len(filtered_data)} skin entries to {target_path} "
               f"({len(data) - len(filtered_data)} non-matching entries dropped)")
         return True
 

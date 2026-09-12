@@ -125,10 +125,7 @@ def get_beamng_default_install_paths():
 
     existing_paths = [p for p in paths if os.path.exists(p)]
 
-    if not existing_paths and paths:
-        return [paths[0]]
-
-    return existing_paths if existing_paths else [os.path.expanduser("~")]
+    return existing_paths
 
 def get_beamng_mods_default_paths():
     system = platform.system()
@@ -167,7 +164,4 @@ def get_beamng_mods_default_paths():
 
     existing_paths = [p for p in paths if os.path.exists(p)]
 
-    if not existing_paths and paths:
-        return [paths[0]]
-
-    return existing_paths if existing_paths else [os.path.join(home, "Documents")]
+    return existing_paths

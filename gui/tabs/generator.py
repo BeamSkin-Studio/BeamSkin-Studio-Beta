@@ -28,13 +28,7 @@ except ImportError:
     print("[DEBUG] generator: core.file_ops.generate_multi_skin_mod not available — generation disabled")
     generate_multi_skin_mod = None
 
-try:
-    from utils.config_helper import load_config_types
-    _CONFIG_TYPES = load_config_types()
-    print(f"[DEBUG] generator: loaded {len(_CONFIG_TYPES)} config types")
-except ImportError:
-    print("[DEBUG] generator: utils.config_helper not available — using fallback config types")
-    _CONFIG_TYPES = ["Factory", "Custom", "Police"]
+_CONFIG_TYPES = ["Factory", "Custom", "Police"]
 
 try:
     from core.settings import get_mods_folder_path as _get_mods_folder_path

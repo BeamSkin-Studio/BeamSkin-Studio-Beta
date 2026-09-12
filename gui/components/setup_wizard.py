@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import sys
 import platform
 from typing import Callable
 
@@ -126,6 +127,7 @@ class SetupWizard(QDialog):
             "data_folder":    get_data_dir(),
         }
         self._selected_lang = "en"
+        self._setup_finished = False
 
         if parent:
             pg = parent.frameGeometry()
@@ -613,8 +615,13 @@ class SetupWizard(QDialog):
                 os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.x64.exe"))
                 or os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.exe"))
             )
+        elif sys == "Darwin":
+            has_exe = path.endswith(".app") or os.path.exists(os.path.join(path, "BeamNG.drive"))
         else:
-            has_exe = os.path.exists(os.path.join(path, "Bin64", "BeamNG.drive.x64"))
+            has_exe = any(
+                os.path.exists(os.path.join(path, p))
+                for p in ["BeamNG.drive.x64", "Bin64/BeamNG.drive.x64", "BeamNG"]
+            )
         has_content = os.path.isdir(os.path.join(path, "content"))
         return has_exe and has_content
 
@@ -632,6 +639,7 @@ class SetupWizard(QDialog):
         except Exception as e:
             print(f"[WARNING] setup_wizard: could not apply data folder: {e}")
 
+        self._setup_finished = True
         self.on_complete(self.paths)
         self.accept()
 
@@ -639,6 +647,19 @@ class SetupWizard(QDialog):
         if event.key() == Qt.Key_Escape:
             return
         super().keyPressEvent(event)
+
+    def closeEvent(self, event):
+        if self._setup_finished:
+            event.accept()
+            return
+
+        print("[DEBUG] closeEvent: setup wizard closed before completion — quitting application")
+        event.accept()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+        else:
+            sys.exit(1)
 
     def show(self):
         self.exec()
@@ -648,6 +669,7 @@ def show_setup_wizard(
     parent: QWidget,
     colors: dict,
     on_complete: Callable[[dict], None],
-):
+) -> bool:
     wizard = SetupWizard(parent, colors, on_complete)
     wizard.show()
+    return wizard._setup_finished
