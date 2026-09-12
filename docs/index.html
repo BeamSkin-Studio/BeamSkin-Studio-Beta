@@ -124,13 +124,13 @@ body::after {
 .hero-title .ac { color:var(--accent); }
 .hero-title .dim { color:var(--text-2); }
 .hero-sub { font-size:.98rem;color:var(--text-2);line-height:1.7;margin-bottom:30px;max-width:420px; }
-.hero-actions { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px; }
+.hero-actions { display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-bottom:30px; }
+.dl-heading { font-family:var(--font-head);font-weight:700;font-size:.7rem;letter-spacing:.13em;text-transform:uppercase;color:var(--text-2);margin-bottom:10px; }
 .dl-btn { display:flex;flex-direction:column;align-items:center;padding:13px 22px;border-radius:10px;border:none;cursor:pointer;font-family:var(--font-head);font-weight:800;letter-spacing:.07em;text-transform:uppercase;transition:transform .2s,filter .2s;min-width:175px; }
 .dl-btn:hover { transform:translateY(-2px);filter:brightness(1.12); }
 .dl-btn:active { transform:none; }
 .dl-btn-win { background:var(--accent);color:#000;box-shadow:0 0 28px rgba(255,102,0,.32),0 4px 18px rgba(255,102,0,.22); }
 .dl-btn-linux { background:var(--amber);color:#000;box-shadow:0 0 28px rgba(245,158,11,.28),0 4px 18px rgba(245,158,11,.18); }
-.win-group { display:flex;flex-direction:column;gap:6px; }
 .dl-btn-exe { background:var(--bg-3);color:var(--accent);border:1px solid var(--accent-md);box-shadow:0 0 16px rgba(255,102,0,.1);padding:9px 22px;min-width:175px; }
 .dl-btn-exe .btn-label { color:var(--accent); }
 .dl-btn-exe .btn-ver { color:var(--text-2); }
@@ -425,20 +425,19 @@ body::after {
         <div class="hero-badge"><span class="dot"></span> Skin modding tool for BeamNG.drive</div>
         <h1 class="hero-title">CRAFT<br><span class="ac">YOUR</span><br>BEAMNG<br><span class="dim">SKINS</span></h1>
         <p class="hero-sub">A desktop application that makes creating, managing, and packaging custom vehicle skins for BeamNG.drive simple — no manual file editing required.</p>
+        <div class="dl-heading">Download:</div>
         <div class="hero-actions">
-          <div class="win-group">
-            <button class="dl-btn dl-btn-win" id="winBtn">
-              <span class="btn-label"><i class="fab fa-windows"></i> Windows Download <span style="font-size:.62rem;font-weight:600;opacity:.75;">.zip</span></span>
-              <span id="winVer" class="btn-ver">Checking…</span>
-              <span id="winCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
-            </button>
-            <button class="dl-btn dl-btn-exe hidden" id="exeBtn">
-              <span class="btn-label"><i class="fas fa-cube"></i> EXE Download <span style="font-size:.62rem;font-weight:600;opacity:.75;">.exe</span></span>
-              <span id="exeVer" class="btn-ver"></span>
-            </button>
-          </div>
+          <button class="dl-btn dl-btn-win" id="winBtn">
+            <span class="btn-label"><i class="fab fa-windows"></i> Windows <span style="font-size:.62rem;font-weight:600;opacity:.75;">.zip</span></span>
+            <span id="winVer" class="btn-ver">Checking…</span>
+            <span id="winCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
+          </button>
+          <button class="dl-btn dl-btn-exe hidden" id="exeBtn">
+            <span class="btn-label"><i class="fas fa-cube"></i> EXE <span style="font-size:.62rem;font-weight:600;opacity:.75;">.exe</span></span>
+            <span id="exeVer" class="btn-ver"></span>
+          </button>
           <button class="dl-btn dl-btn-linux" id="linBtn">
-            <span class="btn-label"><i class="fab fa-linux"></i> Linux Download</span>
+            <span class="btn-label"><i class="fab fa-linux"></i> Linux</span>
             <span id="linVer" class="btn-ver">Checking…</span>
             <span id="linCount" class="btn-count"><i class="fas fa-download" style="font-size:.6rem;"></i> Loading…</span>
           </button>
