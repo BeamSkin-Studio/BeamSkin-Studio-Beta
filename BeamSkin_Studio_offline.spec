@@ -18,7 +18,7 @@ datas = [
     (os.path.join("gui", "Icons"),                         os.path.join("gui", "Icons")),
     (os.path.join("gui", "images"),                        os.path.join("gui", "images")),
     (os.path.join("core", "localization", "languages"),    os.path.join("core", "localization", "languages")),
-    (os.path.join("vehicles_templates"),                    "vehicles_templates"),
+    (os.path.join("vehicles"),                              "vehicles"),
     ("version.txt",                                         "."),
     ("LICENSE",                                              "."),
 ]

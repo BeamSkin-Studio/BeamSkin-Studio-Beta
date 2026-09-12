@@ -335,9 +335,15 @@ def ensure_first_run_seed() -> None:
         except Exception as e:
             print(f"[WARNING] settings: could not seed vehicle templates: {e}")
     else:
+        bundle_exists = os.path.isdir(bundled_vehicles)
         print(f"[DEBUG] ensure_first_run_seed: skipping seed "
-              f"(bundle_exists={os.path.isdir(bundled_vehicles)}, "
+              f"(bundle_exists={bundle_exists}, "
               f"target_empty={not os.listdir(target) if os.path.isdir(target) else 'N/A'})")
+        if not bundle_exists:
+            print(f"[ERROR] ensure_first_run_seed: bundled vehicles folder not found at "
+                  f"{bundled_vehicles!r} — this build is missing its packaged vehicle "
+                  f"templates (packaging bug: check the 'datas' entry in the .spec file "
+                  f"matches the folder name 'vehicles').")
 
     get_projects_dir()
 

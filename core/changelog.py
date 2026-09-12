@@ -28,6 +28,17 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.21.Beta",
+        "date": "12-09-2026",
+        "entries": [
+            title("🐛 Bug Fixes"),
+            subtitle("EXE Version - Vehicle template missing - Fixed"),
+            item("The EXE issue causing the \"no template for vehicle\" issue has been fixed"),
+        ]
+    },
+
+
+    {
         "version": "0.9.2.Beta",
         "date": "12-08-2026",
         "entries": [
