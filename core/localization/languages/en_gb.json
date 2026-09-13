@@ -730,6 +730,8 @@
     "download_update": "Download Update",
     "maybe_later": "Maybe Later",
     "update_button": "Extract & Install",
+    "install_button": "Install",
+    "close_and_install": "Close && Install",
     "open_download_folder": "Open Downloads Folder",
     "subtitle": "A new version of BeamSkin Studio is ready to install",
     "current": "Current",

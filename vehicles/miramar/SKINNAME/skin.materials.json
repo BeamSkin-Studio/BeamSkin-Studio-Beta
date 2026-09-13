@@ -29,9 +29,9 @@
         "metallicFactor": 1,
         "normalMap": "/vehicles/miramar/miramar_main_n.normal.png",
         "opacityFactor": null,
-        "opacityMap": "/vehicles/miramar/miramar_main_o.data.png",
+        "opacityMap": "/vehicles/miramar/miramar_skin_bumpers_o.data.png",
         "pixelSpecular": null,
-		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
         "detailNormalMapStrength": 0.15,
         "detailScale": [
           128,
@@ -45,7 +45,7 @@
     "materialTag0": "beamng",
     "materialTag1": "vehicle",
     "version": 1.5
- },
+  },
   "miramar_ute.skin.skinname": {
     "name": "miramar_ute.skin.skinname",
     "mapTo": "miramar_ute.skin.skinname",
@@ -76,9 +76,9 @@
         "metallicFactor": 1,
         "normalMap": "/vehicles/miramar/miramar_main_n.normal.png",
         "opacityFactor": null,
-        "opacityMap": "/vehicles/miramar/miramar_main_o.data.png",
+        "opacityMap": "/vehicles/miramar/miramar_skin_bumpers_o.data.png",
         "pixelSpecular": null,
-		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
         "detailNormalMapStrength": 0.3,
         "detailScale": [
           128,
@@ -92,5 +92,5 @@
     "materialTag0": "beamng",
     "materialTag1": "vehicle",
     "version": 1.5
-},
+  }
 }

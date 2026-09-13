@@ -21,7 +21,6 @@
         "clearCoatMap": "/vehicles/utv/utv_main_c.data.png",
         "clearCoatRoughnessFactor": 0.1,
         "diffuseMapUseUV": 1,
-        "instanceDiffuse": true,
         "metallicMap": "/vehicles/utv/utv_main_m.data.png",
         "metallicMapUseUV": 1,
         "metallicFactor": 1,

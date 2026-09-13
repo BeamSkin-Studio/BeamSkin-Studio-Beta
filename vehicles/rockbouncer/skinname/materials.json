@@ -18,7 +18,6 @@
         "baseColorMap": "/vehicles/rockbouncer/skinname/rockbouncer_skin_skinname.dds",
         "clearCoatFactor": 0.180000007,
         "clearCoatMap": "/vehicles/rockbouncer/rockbouncer_main_cc.data.png",
-        "colorPaletteMap": "/vehicles/rockbouncer/rockbouncer_main_mask.color.png",
         "diffuseMapUseUV": 1,
         "normalMap": "/vehicles/rockbouncer/rockbouncer_main_nm.normal.png",
         "opacityMap": "/vehicles/rockbouncer/rockbouncer_main_c.data.png",
@@ -30,5 +29,5 @@
     "materialTag0": "beamng",
     "materialTag1": "vehicle",
     "version": 1.5
-  },
+  }
 }

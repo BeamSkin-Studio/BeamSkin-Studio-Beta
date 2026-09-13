@@ -302,26 +302,87 @@ class _ExeSwapWorker(QThread):
                 self.failed.emit(f"Downloaded file not found: {self._new_exe_path}")
                 return
 
+            try:
+                new_size = os.path.getsize(self._new_exe_path)
+            except OSError as e:
+                self.failed.emit(f"Could not read downloaded file: {e}")
+                return
+            if new_size < 1_000_000:
+                log.debug("_ExeSwapWorker.run: downloaded exe suspiciously small (%s bytes)",
+                          new_size)
+                self.failed.emit(
+                    f"Downloaded update looks incomplete ({new_size} bytes). "
+                    "Please try downloading again."
+                )
+                return
+            if sys.platform == "win32":
+                try:
+                    with open(self._new_exe_path, "rb") as f:
+                        header = f.read(2)
+                    if header != b"MZ":
+                        log.debug("_ExeSwapWorker.run: downloaded file missing MZ header")
+                        self.failed.emit(
+                            "Downloaded update does not look like a valid executable. "
+                            "Please try downloading again."
+                        )
+                        return
+                except OSError as e:
+                    self.failed.emit(f"Could not read downloaded file: {e}")
+                    return
+
             staged_path = os.path.join(app_dir, os.path.basename(current_exe) + ".new")
             log.debug("_ExeSwapWorker.run: staging new exe at %s", staged_path)
             shutil.copy2(self._new_exe_path, staged_path)
 
+            try:
+                os.remove(self._new_exe_path)
+                log.debug("_ExeSwapWorker.run: removed downloaded exe %s", self._new_exe_path)
+            except Exception as e:
+                log.debug("_ExeSwapWorker.run: could not remove downloaded exe %s: %s",
+                          self._new_exe_path, e)
+
             if sys.platform == "win32":
                 script_path = os.path.join(app_dir, "_update_swap.bat")
+                log_path    = os.path.join(app_dir, "_update_swap.log")
                 script = (
                     "@echo off\r\n"
                     "setlocal\r\n"
+                    f'echo [%date% %time%] swap started > "{log_path}"\r\n'
+                    f'echo current_exe={current_exe} >> "{log_path}"\r\n'
+                    f'echo staged_path={staged_path} >> "{log_path}"\r\n'
                     ":wait\r\n"
                     f'tasklist /FI "IMAGENAME eq {os.path.basename(current_exe)}" '
                     f'2>NUL | find /I "{os.path.basename(current_exe)}" >NUL\r\n'
                     "if not errorlevel 1 (\r\n"
+                    f'  echo [%date% %time%] still running, waiting >> "{log_path}"\r\n'
                     "  timeout /t 1 /nobreak >NUL\r\n"
                     "  goto wait\r\n"
                     ")\r\n"
-                    f'del "{current_exe}"\r\n'
-                    f'move /Y "{staged_path}" "{current_exe}"\r\n'
-                    f'start "" "{current_exe}"\r\n'
+                    f'echo [%date% %time%] process no longer listed >> "{log_path}"\r\n'
+                    "REM Windows can report the process gone from tasklist a\r\n"
+                    "REM moment before it actually releases the exe's file\r\n"
+                    "REM lock/mapping. Give it a real pause -- not just 1s --\r\n"
+                    "REM before the first move attempt.\r\n"
+                    "timeout /t 3 /nobreak >NUL\r\n"
+                    "set RETRIES=20\r\n"
+                    ":retry_move\r\n"
+                    f'del "{staged_path}.movedone" >NUL 2>&1\r\n'
+                    f'(move /Y "{staged_path}" "{current_exe}" >> "{log_path}" 2>&1) '
+                    f'&& (echo done > "{staged_path}.movedone")\r\n'
+                    f'if not exist "{staged_path}.movedone" (\r\n'
+                    "  set /a RETRIES-=1\r\n"
+                    f'  echo [%date% %time%] move failed, retries left: %RETRIES% >> "{log_path}"\r\n'
+                    "  if %RETRIES% gtr 0 (\r\n"
+                    "    timeout /t 1 /nobreak >NUL\r\n"
+                    "    goto retry_move\r\n"
+                    "  )\r\n"
+                    f'  echo [%date% %time%] GAVE UP -- move never succeeded >> "{log_path}"\r\n'
+                    ") else (\r\n"
+                    f'  echo [%date% %time%] move succeeded >> "{log_path}"\r\n'
+                    f'  del "{staged_path}.movedone" >NUL 2>&1\r\n'
+                    ")\r\n"
                     "del \"%~f0\"\r\n"
+                    "exit\r\n"
                 )
                 with open(script_path, "w", encoding="utf-8") as f:
                     f.write(script)
@@ -330,9 +391,9 @@ class _ExeSwapWorker(QThread):
                 script = (
                     "#!/bin/sh\n"
                     f'while pgrep -f "{os.path.basename(current_exe)}" >/dev/null; do sleep 1; done\n'
+                    "sleep 1\n"
                     f'mv -f "{staged_path}" "{current_exe}"\n'
                     f'chmod +x "{current_exe}"\n'
-                    f'"{current_exe}" &\n'
                     f'rm -- "$0"\n'
                 )
                 with open(script_path, "w", encoding="utf-8") as f:
@@ -1049,7 +1110,11 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-        extract_btn = self._btn(t("update.update_button",        default="Extract & Install"),    primary=True)
+        if is_frozen_build():
+            extract_label = t("update.install_button", default="Install")
+        else:
+            extract_label = t("update.update_button", default="Extract & Install")
+        extract_btn = self._btn(extract_label, primary=True)
         open_btn    = self._btn(t("update.open_download_folder", default="Open Downloads Folder"), primary=False)
         close_btn   = self._btn(t("update.close",                default="Close"),                primary=False)
         extract_btn.clicked.connect(self._start_extract)
@@ -1118,11 +1183,11 @@ class _UpdateDialog(QDialog):
 
         lay.addWidget(self._sep())
 
-        restart_btn = self._btn(t("update.restart_now",   default="Restart Now"),   primary=True)
+        self._restart_btn = self._btn(t("update.restart_now",   default="Restart Now"),   primary=True)
         later_btn   = self._btn(t("update.restart_later", default="Restart Later"), primary=False)
-        restart_btn.clicked.connect(self._restart_app)
+        self._restart_btn.clicked.connect(self._restart_app)
         later_btn.clicked.connect(self.reject)
-        lay.addWidget(restart_btn)
+        lay.addWidget(self._restart_btn)
         lay.addWidget(later_btn)
         return f
 
@@ -1228,7 +1293,11 @@ class _UpdateDialog(QDialog):
         self._complete_lbl.setText(
             f"Downloaded version {self._new_version}.\n\n"
             "Your settings and custom vehicles have been preserved.\n\n"
-            "Click Restart Now to finish installing the update."
+            "Click Close & Install, then reopen BeamSkin Studio "
+            "yourself once it closes."
+        )
+        self._restart_btn.setText(
+            t("update.close_and_install", default="Close && Install")
         )
         self._stack.setCurrentIndex(_PAGE_COMPLETE)
         self.adjustSize()
@@ -1288,7 +1357,10 @@ class _UpdateDialog(QDialog):
         if is_frozen_build():
             log.debug("_restart_app: frozen build, no swap staged, relaunching %s",
                       sys.executable)
-            subprocess.Popen([sys.executable])
+            clean_env = os.environ.copy()
+            for var in ("PYTHONHOME", "PYTHONPATH", "_MEIPASS2"):
+                clean_env.pop(var, None)
+            subprocess.Popen([sys.executable], env=clean_env)
         elif sys.platform == "win32" and os.path.exists(batch_launcher):
             log.debug("_restart_app: using batch_launcher %s", batch_launcher)
             subprocess.Popen([batch_launcher], cwd=app_dir, shell=True)

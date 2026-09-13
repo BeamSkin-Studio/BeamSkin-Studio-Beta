@@ -28,6 +28,27 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.25.Beta",
+        "date": "13-09-2026",
+        "entries": [
+            title("⚙️ Improvements"),
+            subtitle("EXE Updater"),
+            item("The EXE Updater no longer has automated restart after update, this is because it never worked and always gave a python failure. You will need to start the exe manualy after the exe closes itself after updating"),
+            separator(),
+            title("🐛 Bug Fixes"),
+            subtitle("Lansdale skinning"),
+            item("Fixed an issue causing lansdale skins to not show at all."),
+            subtitle("Mirmar Skinning"),
+            item("Fixed an issue causing Mirmar skins to not show correctly."),
+            subtitle("Rockbouncer skinning"),
+            item("Fixed an issue causing rockbouncer skins to be colorable when they shouldn't."),
+            subtitle("Utv skinning"),
+            item("Fixed an issue causing utv skins to be colorable when they shouldn't."),
+        ]
+    },
+
+
+    {
         "version": "0.9.21.Beta",
         "date": "12-09-2026",
         "entries": [

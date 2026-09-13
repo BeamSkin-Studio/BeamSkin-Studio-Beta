@@ -730,6 +730,8 @@
     "download_update": "下载更新",
     "maybe_later": "稍后再说",
     "update_button": "解压并安装",
+    "install_button": "安装",
+    "close_and_install": "关闭并安装",
     "open_download_folder": "打开下载文件夹",
     "subtitle": "BeamSkin Studio 的新版本已准备安装",
     "current": "当前",
