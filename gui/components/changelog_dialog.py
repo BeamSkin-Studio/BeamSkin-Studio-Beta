@@ -4,16 +4,15 @@ import threading
 import os, json
 from typing import Optional
 
-from PySide6.QtCore    import Qt, QTimer, Signal, QObject
-from PySide6.QtGui     import QColor
+from PySide6.QtCore    import Qt, QTimer, Signal, QObject, QRectF, QEvent
+from PySide6.QtGui     import QPainterPath, QRegion
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QWidget, QPushButton, QComboBox,
+    QScrollArea, QWidget, QPushButton, QComboBox, QApplication,
 )
 
-from gui.theme   import COLORS, font, drop_shadow, fade_in
+from gui.theme   import COLORS, font, drop_shadow
 from gui.widgets import AnimButton
-from gui.icon_helper import set_window_icon
 
 try:
     from core.localization import t, get_current_language
@@ -31,19 +30,15 @@ except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
     _TRANSLATE_AVAIL = False
 
-_LOCALE_MAP = {
-    "en": "en", "fr": "fr", "de": "de", "es": "es", "it": "it",
-    "pt": "pt", "nl": "nl", "ru": "ru", "pl": "pl", "cs": "cs",
-    "sv": "sv", "no": "no", "da": "da", "fi": "fi", "uk": "uk",
-    "zh": "zh-CN", "ja": "ja", "ko": "ko", "ar": "ar",
-    "en_US": "en", "en_GB": "en",
+_LOCALE_OVERRIDES = {
+    "zh": "zh-CN",
 }
 
 
 def _target_lang() -> str:
     try:
         code = get_current_language()
-        return _LOCALE_MAP.get(code, code[:2].lower())
+        return _LOCALE_OVERRIDES.get(code, code[:2].lower())
     except Exception as _exc:
         print(f"[WARNING] _target_lang: {type(_exc).__name__}: {_exc}")
         return 'en'
@@ -166,6 +161,29 @@ def fetch_remote_changelog_for_version(version: str) -> dict | None:
     return changelogs[0] if changelogs else None
 
 
+class _RoundedMaskFilter(QObject):
+
+    def __init__(self, widget: QWidget, radius: int = 8):
+        super().__init__(widget)
+        self._widget = widget
+        self._radius = radius
+        widget.installEventFilter(self)
+        self._apply()
+
+    def _apply(self):
+        rect = self._widget.rect()
+        if rect.isEmpty():
+            return
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(rect), self._radius, self._radius)
+        self._widget.setMask(QRegion(path.toFillPolygon().toPolygon()))
+
+    def eventFilter(self, obj, event):
+        if obj is self._widget and event.type() in (QEvent.Resize, QEvent.Show):
+            self._apply()
+        return False
+
+
 class _FetchSignals(QObject):
     done   = Signal(object)
     failed = Signal()
@@ -210,18 +228,25 @@ def show_update_changelog(parent: "QWidget", version: str) -> None:
 
 
 class _TranslationSignals(QObject):
-    done = Signal(list)
+    done   = Signal(list)
+    failed = Signal()
 
 
 class ChangelogDialog(QDialog):
+    FIXED_WIDTH  = 620
+    HEADER_H     = 60
+    FOOTER_H     = 52
+    BODY_MARGIN  = 12
+    MIN_DIALOG_H = 300
+    MAX_DIALOG_H = 720
+
     def __init__(self, parent: QWidget, changelog_data: dict,
                  *, preview_mode: bool = False, browsable: bool = False):
         super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
-        set_window_icon(self)
         self.setModal(True)
-        self.setFixedSize(620, 720)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background:transparent;")
+        self.setFixedSize(self.FIXED_WIDTH, self.MIN_DIALOG_H)
 
         self._data         = changelog_data
         self._entries      = list(changelog_data.get("entries", []))
@@ -229,9 +254,13 @@ class ChangelogDialog(QDialog):
         self._date         = changelog_data.get("date", "")
         self._translating  = False
         self._preview_mode = preview_mode
-        self._sub_lbl: Optional[QLabel] = None
+        self._title_lbl: Optional[QLabel] = None
+        self._date_lbl:  Optional[QLabel] = None
         self._signals      = _TranslationSignals(self)
         self._signals.done.connect(self._apply_translation)
+        self._signals.failed.connect(self._on_translation_failed)
+
+        self._parent_ref = parent
 
         self._browsable     = browsable
         self._all_versions: list[str] = []
@@ -247,16 +276,48 @@ class ChangelogDialog(QDialog):
                 print(f"[WARNING] __init__: {type(_exc).__name__}: {_exc}")
                 self._version_index = 0
 
+        self._build()
+
+    def _resize_to_content(self):
+        inner_w = self.FIXED_WIDTH - 28 - 8
+
+        self._content_w.setFixedWidth(inner_w)
+        self._content_layout.activate()
+        QApplication.processEvents()
+        content_h = self._content_w.sizeHint().height()
+        self._content_w.setMinimumWidth(0)
+        self._content_w.setMaximumWidth(16777215)
+
+        min_body = self.MIN_DIALOG_H - self.HEADER_H - self.FOOTER_H - self.BODY_MARGIN
+        max_body = self.MAX_DIALOG_H - self.HEADER_H - self.FOOTER_H - self.BODY_MARGIN
+        body_h   = max(min_body, min(content_h, max_body))
+        total_h  = self.HEADER_H + self.BODY_MARGIN + body_h + self.FOOTER_H
+
+        self.setFixedSize(self.FIXED_WIDTH, total_h)
+        self._card.setGeometry(0, 0, self.FIXED_WIDTH, total_h)
+
+        mask_path = QPainterPath()
+        mask_path.addRoundedRect(QRectF(self.rect()), 12, 12)
+        self.setMask(QRegion(mask_path.toFillPolygon().toPolygon()))
+
+        parent = self._parent_ref
         if parent:
             top = parent.window()
             pg = top.frameGeometry()
-            self.move(pg.x() + (pg.width()  - 620) // 2,
-                      pg.y() + (pg.height() - 720) // 2)
+            self.move(pg.x() + (pg.width()  - self.FIXED_WIDTH) // 2,
+                      pg.y() + (pg.height() - total_h) // 2)
+        else:
+            sg = QApplication.primaryScreen().geometry()
+            self.move((sg.width()  - self.FIXED_WIDTH) // 2,
+                      (sg.height() - total_h) // 2)
 
-        self._build()
-        drop_shadow(self._card, 36, (0, 10))
-        fade_in(self._card, 220)
 
+    def _title_text(self) -> str:
+        return t("changelog.title", default="What's New with {version}?",
+                 version=self._version)
+
+    def _date_text(self) -> str:
+        return f"·  {self._date}" if self._date else ""
 
     def _load_all_versions(self) -> list:
         try:
@@ -299,12 +360,12 @@ class ChangelogDialog(QDialog):
 
         self._card = QFrame(self)
         self._card.setObjectName("mainCard")
-        self._card.setGeometry(0, 0, 620, 720)
+        self._card.setGeometry(0, 0, self.FIXED_WIDTH, self.MIN_DIALOG_H)
         self._card.setStyleSheet(f"""
             QFrame#mainCard {{
-                background-color: {COLORS['app_bg']};
-                border-radius: 18px;
-                border: none;
+                background-color: {COLORS['topbar_bg']};
+                border-radius: 12px;
+                border: 1px solid {COLORS['border']};
             }}
         """)
 
@@ -314,67 +375,50 @@ class ChangelogDialog(QDialog):
 
         hdr = QFrame()
         hdr.setObjectName("dlgHeader")
-        hdr.setFixedHeight(100)
+        hdr.setFixedHeight(60)
         hdr.setStyleSheet(f"""
             QFrame#dlgHeader {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 {COLORS['card_bg']},
-                    stop:1 {COLORS['frame_bg']});
-                border-top-left-radius: 18px;
-                border-top-right-radius: 18px;
+                background-color: {COLORS['topbar_bg']};
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
                 border-bottom-left-radius: 0px;
                 border-bottom-right-radius: 0px;
                 border: none;
-                border-bottom: 1px solid {COLORS['border']};
             }}
         """)
 
 
         hdr_row = QHBoxLayout(hdr)
-        hdr_row.setContentsMargins(24, 8, 24, 0)
-        hdr_row.setSpacing(16)
+        hdr_row.setContentsMargins(20, 0, 16, 0)
+        hdr_row.setSpacing(12)
 
-        badge = QFrame()
-        badge.setFixedSize(50, 50)
-        badge.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 {COLORS['accent']},
-                    stop:1 {COLORS.get('accent_dim', COLORS['accent'])});
-                border-radius: 14px;
-                border: none;
-            }}
-        """)
-        b_lay = QVBoxLayout(badge)
-        b_lay.setContentsMargins(0, 0, 0, 0)
-        b_icon = QLabel("✦")
-        b_icon.setFont(font(20, "bold"))
-        b_icon.setAlignment(Qt.AlignCenter)
-        b_icon.setStyleSheet("color:white;background:transparent;border:none;")
-        b_lay.addWidget(b_icon)
-        hdr_row.addWidget(badge)
+        marker = QFrame()
+        marker.setFixedSize(3, 22)
+        marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        hdr_row.addWidget(marker, 0, Qt.AlignVCenter)
 
-        txt_col = QVBoxLayout()
-        txt_col.setSpacing(5)
-
-        wn_lbl = QLabel(t("changelog.title", default="What's New"))
-        wn_lbl.setFont(font(17, "bold"))
-        wn_lbl.setStyleSheet(
+        title_lbl = QLabel(self._title_text())
+        title_lbl.setFont(font(17, "bold"))
+        title_lbl.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
-        txt_col.addWidget(wn_lbl)
+        title_lbl.setFixedHeight(22)
+        hdr_row.addWidget(title_lbl, 0, Qt.AlignVCenter)
 
-        sub_text = f"Version {self._version}"
-        if self._date:
-            sub_text += f"  ·  {self._date}"
-        sub_lbl = QLabel(sub_text)
-        sub_lbl.setFont(font(11))
-        sub_lbl.setStyleSheet(
+        date_lbl = QLabel(self._date_text())
+        date_lbl.setFont(font(11))
+        date_lbl.setStyleSheet(
             f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
-        txt_col.addWidget(sub_lbl)
-        hdr_row.addLayout(txt_col, 1)
-        self._sub_lbl = sub_lbl
+        date_lbl.setFixedHeight(22)
+        hdr_row.addWidget(date_lbl, 0, Qt.AlignVCenter)
+        date_lbl.setVisible(bool(self._date))
+        hdr_row.addStretch(1)
+
+        self._title_lbl = title_lbl
+        self._date_lbl  = date_lbl
 
         if self._browsable:
             nav_row = QHBoxLayout()
@@ -474,11 +518,24 @@ class ChangelogDialog(QDialog):
         root.addWidget(hdr)
 
         scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.viewport().setAttribute(Qt.WA_StyledBackground, True)
+        scroll.viewport().setStyleSheet(
+            f"background:{COLORS['app_bg']}; border-radius:8px;"
+        )
+
+        self._viewport_mask = _RoundedMaskFilter(scroll.viewport(), radius=8)
+
         scroll.setStyleSheet(f"""
-            QScrollArea {{ background:transparent; border:none; }}
-            QScrollArea > QWidget > QWidget {{ background:{COLORS['app_bg']}; }}
+            QScrollArea {{
+                background:transparent;
+                border:none;
+                border-radius:8px;
+            }}
+            QScrollArea > QWidget {{ background:transparent; border-radius:8px; }}
+            QScrollArea > QWidget > QWidget {{ background:transparent; }}
             QScrollBar:vertical {{
                 background: transparent;
                 width: 4px;
@@ -498,31 +555,35 @@ class ChangelogDialog(QDialog):
             QScrollBar::sub-page:vertical {{ background: transparent; }}
         """)
         self._content_w = QWidget()
-        self._content_w.setStyleSheet(f"background:{COLORS['app_bg']};")
+        self._content_w.setStyleSheet("background:transparent;")
         self._content_layout = QVBoxLayout(self._content_w)
         self._content_layout.setContentsMargins(20, 20, 20, 16)
         self._content_layout.setSpacing(0)
         scroll.setWidget(self._content_w)
-        root.addWidget(scroll, 1)
+
+        body_wrap = QWidget()
+        body_wrap.setStyleSheet(f"background:{COLORS['topbar_bg']};")
+        body_lay = QVBoxLayout(body_wrap)
+        body_lay.setContentsMargins(14, 6, 14, 6)
+        body_lay.setSpacing(0)
+        body_lay.addWidget(scroll)
+        root.addWidget(body_wrap, 1)
 
         ftr = QFrame()
         ftr.setObjectName("dlgFooter")
-        ftr.setFixedHeight(68)
+        ftr.setFixedHeight(52)
         ftr.setStyleSheet(f"""
             QFrame#dlgFooter {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 {COLORS['card_bg']},
-                    stop:1 {COLORS['frame_bg']});
+                background-color: {COLORS['topbar_bg']};
                 border: none;
-                border-top: 1px solid {COLORS['border']};
                 border-top-left-radius: 0px;
                 border-top-right-radius: 0px;
-                border-bottom-left-radius: 18px;
-                border-bottom-right-radius: 18px;
+                border-bottom-left-radius: 12px;
+                border-bottom-right-radius: 12px;
             }}
         """)
         ftr_row = QHBoxLayout(ftr)
-        ftr_row.setContentsMargins(24, 0, 24, 0)
+        ftr_row.setContentsMargins(24, 6, 24, 6)
         close_label = (
             t("changelog.close_preview", default="Close")
             if self._preview_mode
@@ -541,6 +602,7 @@ class ChangelogDialog(QDialog):
         root.addWidget(ftr)
 
         self._render_entries(self._entries)
+        drop_shadow(self._card, 28, (0, 8))
 
 
     def _clear_content(self):
@@ -587,7 +649,7 @@ class ChangelogDialog(QDialog):
             else:
                 self._render_section_card(section)
 
-        self._content_layout.addStretch()
+        self._resize_to_content()
 
 
     def _render_preamble_entry(self, entry: dict):
@@ -629,61 +691,28 @@ class ChangelogDialog(QDialog):
 
 
     def _render_section_card(self, section: dict):
-        self._content_layout.addSpacing(12)
-
-        accent_c = QColor(COLORS['accent'])
-        glow_color = f"rgba({accent_c.red()},{accent_c.green()},{accent_c.blue()},55)"
-        glow_wrap = QFrame()
-        glow_wrap.setObjectName("glowWrap")
-        glow_wrap.setStyleSheet(f"""
-            QFrame#glowWrap {{
-                background-color: {glow_color};
-                border-radius: 15px;
-                border: none;
-            }}
-        """)
-        glow_lay = QVBoxLayout(glow_wrap)
-        glow_lay.setContentsMargins(5, 5, 5, 5)
-        glow_lay.setSpacing(0)
+        self._content_layout.addSpacing(10)
 
         card = QFrame()
+        card.setObjectName("sectionCard")
         card.setStyleSheet(f"""
             QFrame#sectionCard {{
                 background-color: {COLORS['card_bg']};
-                border-radius: 12px;
+                border-radius: 10px;
                 border: 1px solid {COLORS['border']};
             }}
         """)
-        card.setObjectName("sectionCard")
         card_lay = QVBoxLayout(card)
-        card_lay.setContentsMargins(0, 0, 0, 0)
-        card_lay.setSpacing(0)
+        card_lay.setContentsMargins(10, 10, 10, 10)
+        card_lay.setSpacing(6)
 
-        title_row = QFrame()
-        title_row.setObjectName("titleRow")
-        title_row.setStyleSheet(f"""
-            QFrame#titleRow {{
-                background: transparent;
-                border: none;
-                border-bottom: 1px solid {COLORS['border']};
-            }}
-        """)
-        tr_lay = QHBoxLayout(title_row)
-        tr_lay.setContentsMargins(16, 11, 16, 11)
-        title_lbl = QLabel(section["title"]["text"])
-        title_lbl.setFont(font(14, "bold"))
-        title_lbl.setWordWrap(True)
-        title_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
-        )
-        tr_lay.addWidget(title_lbl)
-        card_lay.addWidget(title_row)
+        card_lay.addWidget(self._section_header(section["title"]["text"]))
 
         if section["children"]:
             body = QWidget()
             body.setStyleSheet("background:transparent;border:none;")
             body_lay = QVBoxLayout(body)
-            body_lay.setContentsMargins(12, 10, 12, 12)
+            body_lay.setContentsMargins(0, 2, 0, 0)
             body_lay.setSpacing(6)
 
             for child in section["children"]:
@@ -707,7 +736,7 @@ class ChangelogDialog(QDialog):
                 elif ctype == "item":
                     row = QFrame()
                     row.setStyleSheet(
-                        f"background:{COLORS['frame_bg']};border-radius:7px;border:none;"
+                        f"background:{COLORS['frame_bg']};border-radius:7px;border:1px solid {COLORS['border']};"
                     )
                     rl = QHBoxLayout(row)
                     rl.setContentsMargins(10, 7, 12, 7)
@@ -737,7 +766,7 @@ class ChangelogDialog(QDialog):
                         QFrame {{
                             background-color: {COLORS['frame_bg']};
                             border-radius: 7px;
-                            border: none;
+                            border: 1px solid {COLORS['border']};
                         }}
                     """)
                     nl = QHBoxLayout(note_card)
@@ -753,8 +782,32 @@ class ChangelogDialog(QDialog):
 
             card_lay.addWidget(body)
 
-        glow_lay.addWidget(card)
-        self._content_layout.addWidget(glow_wrap)
+        self._content_layout.addWidget(card)
+
+    def _section_header(self, text: str) -> QFrame:
+        header = QFrame()
+        header.setFixedHeight(24)
+        header.setStyleSheet("background:transparent;border:none;")
+        row = QHBoxLayout(header)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        row.addWidget(marker)
+
+        label = QLabel(text.upper())
+        label.setFont(font(10, "bold"))
+        label.setWordWrap(False)
+        label.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        row.addWidget(label)
+        row.addStretch()
+        return header
 
 
     def _update_remote_data(self, data: dict):
@@ -762,11 +815,11 @@ class ChangelogDialog(QDialog):
         self._date    = data.get("date", "")
         self._entries = list(data.get("entries", []))
 
-        if self._sub_lbl is not None:
-            sub_text = f"Version {self._version}"
-            if self._date:
-                sub_text += f"  ·  {self._date}"
-            self._sub_lbl.setText(sub_text)
+        if self._title_lbl is not None:
+            self._title_lbl.setText(self._title_text())
+        if self._date_lbl is not None:
+            self._date_lbl.setText(self._date_text())
+            self._date_lbl.setVisible(bool(self._date))
 
         self._translating = False
         if self._translate_btn:
@@ -790,20 +843,38 @@ class ChangelogDialog(QDialog):
 
         def _worker():
             target = _target_lang()
+            translator = _GT(source="en", target=target)
             out = []
+            any_success = False
             for entry in self._entries:
                 if entry.get("type") == "separator" or not entry.get("text", "").strip():
                     out.append(entry)
                     continue
                 try:
-                    translated = _GT(source="en", target=target).translate(entry["text"])
-                    out.append({**entry, "text": translated or entry["text"]})
+                    translated = translator.translate(entry["text"])
+                    if translated and translated != entry["text"]:
+                        any_success = True
+                        out.append({**entry, "text": translated})
+                    else:
+                        out.append(entry)
                 except Exception as _exc:
                     print(f"[WARNING] _worker: {type(_exc).__name__}: {_exc}")
                     out.append(entry)
-            self._signals.done.emit(out)
+
+            if any_success:
+                self._signals.done.emit(out)
+            else:
+                self._signals.failed.emit()
 
         threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_translation_failed(self):
+        self._translating = False
+        if self._translate_btn:
+            self._translate_btn.setText(
+                "⚠️  " + t("changelog.translate_failed", default="Translation failed")
+            )
+            self._translate_btn.setEnabled(True)
 
     def _apply_translation(self, entries: list):
         self._render_entries(entries)
@@ -822,6 +893,7 @@ class ChangelogDialog(QDialog):
 
     def show(self):
         self.exec()
+
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:

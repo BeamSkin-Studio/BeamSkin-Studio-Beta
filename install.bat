@@ -155,11 +155,12 @@ if %errorlevel% neq 0 (
 :: ── [5/7] Install / upgrade dependencies ────────────────────────────────────
 echo [5/7] Installing / upgrading required dependencies...
 
-call :install_if_missing "PIL"      "Pillow"   "Pillow - image processing"
-call :install_if_missing "PySide6"  "PySide6"  "PySide6 - GUI framework"
-call :install_if_missing "requests" "requests" "requests - HTTP"
-call :install_if_missing "win32api" "pywin32"  "pywin32 - Windows APIs"
-call :install_if_missing "imageio"  "imageio"  "imageio - extended DDS/texture support"
+call :install_if_missing "PIL"             "Pillow"          "Pillow - image processing"
+call :install_if_missing "PySide6"         "PySide6"         "PySide6 - GUI framework"
+call :install_if_missing "requests"        "requests"        "requests - HTTP"
+call :install_if_missing "win32api"        "pywin32"         "pywin32 - Windows APIs"
+call :install_if_missing "imageio"         "imageio"         "imageio - extended DDS/texture support"
+call :install_if_missing "deep_translator" "deep-translator" "deep-translator - changelog translation"
 
 :: imageio plugin for DDS variants (BC7 / DX10 etc.)
 echo   Checking imageio-ffmpeg (DDS plugin)...
@@ -190,7 +191,7 @@ goto :after_helpers
 
 :: ── [6/7] Verify all core imports ───────────────────────────────────────────
 echo [6/7] Verifying installation...
-%PY% -c "import PySide6; import PIL; import requests; import win32api; import imageio; print('[OK] All core dependencies verified')"
+%PY% -c "import PySide6; import PIL; import requests; import win32api; import imageio; import deep_translator; print('[OK] All core dependencies verified')"
 if %errorlevel% neq 0 (
     call :manual_fallback
     exit /b 1

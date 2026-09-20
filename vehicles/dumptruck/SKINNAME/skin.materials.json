@@ -16,15 +16,15 @@
           30
         ],
         "diffuseMapUseUV": 1,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/dumptruck/dumptruck_body_mat_m.data.png",
         "normalMap": "/vehicles/dumptruck/dumptruck_body_mat_nm.normal.png",
-        "roughnessFactor": 0.248999998
+        "roughnessFactor": 0.15
       },
       {
         "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_body_ao.data.png",
         "baseColorMap": "vehicles/dumptruck/SKINNAME/dumptruck_skin_SKINNAME.dds",
-        "clearCoatFactor": null,
+        "clearCoatFactor": 1,
         "detailBaseColorMapStrength": 0.00999999978,
         "detailMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_b.color.png",
         "detailNormalMap": "/vehicles/common/generic_mat_tex/tiled_plain_noise/tile_plain_noise_small_nm.normal.png",
@@ -34,11 +34,11 @@
           15
         ],
         "diffuseMapUseUV": null,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/dumptruck/dumptruck_body_mat_m.data.png",
         "normalMap": "/vehicles/dumptruck/dumptruck_body_mat_nm.normal.png",
         "opacityMap": "/vehicles/dumptruck/dumptruck_body_mat_c.data.png",
-        "roughnessFactor": null
+        "roughnessFactor": 0.15
       }
     ],
     "activeLayers": 2,
@@ -54,15 +54,15 @@
       {
         "ambientOcclusionMap": "/vehicles/dumptruck/dumptruck_cab_ao.data.png",
         "baseColorMap": "vehicles/dumptruck/SKINNAME/dumptruck_skin_SKINNAME.dds",
-        "clearCoatFactor": null,
-        "metallicFactor": 1,
+        "clearCoatFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/dumptruck/dumptruck_cab_m.data.png",
         "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
         "roughnessMap": "/vehicles/dumptruck/dumptruck_cab_r.data.png"
       },
       {
         "clearCoatFactor": 1,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "normalMap": "/vehicles/dumptruck/dumptruck_cab_nm.normal.png",
         "opacityMap": "/vehicles/dumptruck/dumptruck_cab_c.data.png"
       }
@@ -71,4 +71,5 @@
     "dynamicCubemap": true,
     "translucentBlendOp": "None",
     "version": 1.5
-  },
+  }
+}

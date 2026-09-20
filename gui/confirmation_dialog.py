@@ -115,49 +115,40 @@ class DangerConfirmationDialog(QDialog):
             QFrame {{
                 background-color: {COLORS['frame_bg']};
                 border-radius: 16px;
-                border: 1.5px solid {err};
+                border: 1px solid {COLORS['border']};
             }}
         """)
 
-        glow = QGraphicsDropShadowEffect(self._card)
-        glow.setBlurRadius(40)
-        glow.setOffset(0, 0)
-        glow.setColor(QColor(err + "77"))
-        self._card.setGraphicsEffect(glow)
+        drop_shadow(self._card, blur=32, offset=(0, 8), color="#00000088")
 
         root = QVBoxLayout(self._card)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
+        root.setContentsMargins(28, 24, 28, 24)
+        root.setSpacing(16)
 
-        accent_strip = QFrame()
-        accent_strip.setFixedHeight(4)
-        accent_strip.setStyleSheet(f"""
-            QFrame {{
-                background-color: {err};
-                border-top-left-radius: 14px;
-                border-top-right-radius: 14px;
-                border-bottom-left-radius: 0;
-                border-bottom-right-radius: 0;
-                border: none;
-            }}
-        """)
-        root.addWidget(accent_strip)
+        header = QFrame()
+        header.setFixedHeight(30)
+        header.setStyleSheet("background:transparent;border:none;")
+        header_row = QHBoxLayout(header)
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{err};border:none;border-radius:1px;"
+        )
+        header_row.addWidget(marker)
+
+        icon_title_lbl = QLabel(f"{icon}  {title}".upper())
+        icon_title_lbl.setFont(font(14, "bold"))
+        icon_title_lbl.setStyleSheet(f"color:{err};background:transparent;border:none;")
+        header_row.addWidget(icon_title_lbl)
+        header_row.addStretch()
+        root.addWidget(header)
 
         content = QVBoxLayout()
-        content.setContentsMargins(28, 18, 28, 24)
+        content.setContentsMargins(0, 0, 0, 0)
         content.setSpacing(10)
-
-        icon_lbl = QLabel(icon)
-        icon_lbl.setFont(font(38))
-        icon_lbl.setAlignment(Qt.AlignCenter)
-        icon_lbl.setStyleSheet("background:transparent;border:none;")
-        content.addWidget(icon_lbl)
-
-        title_lbl = QLabel(title)
-        title_lbl.setFont(font(18, "bold"))
-        title_lbl.setAlignment(Qt.AlignCenter)
-        title_lbl.setStyleSheet(f"color:{err};background:transparent;border:none;")
-        content.addWidget(title_lbl)
 
         if irreversible:
             irrev_lbl = QLabel(t("dialog.irreversible", default="This action cannot be undone"))
@@ -175,7 +166,7 @@ class DangerConfirmationDialog(QDialog):
             QFrame {{
                 background-color: {COLORS['card_bg']};
                 border-radius: 10px;
-                border: 1px solid {err}44;
+                border: 1px solid {COLORS['border']};
             }}
         """)
         msg_inner = QVBoxLayout(msg_card)
@@ -210,7 +201,7 @@ class DangerConfirmationDialog(QDialog):
                 color: #ffffff;
                 border-radius: 8px;
                 border: none;
-                padding: 8px 24px;
+                padding: 4px 12px;
                 font-size: 14px;
                 font-weight: bold;
             }}

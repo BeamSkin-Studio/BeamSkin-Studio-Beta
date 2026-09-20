@@ -55,12 +55,17 @@ except Exception as _e:
     traceback.print_exc()
 
 try:
-    from core.settings import get_mods_folder_path as _get_mods_folder_path
+    from core.settings import (
+        get_mods_folder_path as _get_mods_folder_path,
+        get_vehicle_previews_dir as _get_vehicle_previews_dir,
+    )
 except Exception as _e:
     import traceback
     print(f"[WARNING] add_vehicles tab: settings unavailable ({type(_e).__name__}: {_e})")
     traceback.print_exc()
     def _get_mods_folder_path(): return ""
+    def _get_vehicle_previews_dir():
+        return os.path.join(os.path.expanduser("~"), "BeamSkinStudio", "vehicle_previews")
 
 
 def _mods_start_dir() -> str:
@@ -82,8 +87,7 @@ def _carid_exists(carid: str) -> bool:
 def _copy_uv_maps_to_images(carid: str, uv_map_paths: list) -> None:
     if not uv_map_paths:
         return
-    _gui_dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    dest_dir  = os.path.join(_gui_dir, "images", "vehicles", carid)
+    dest_dir = os.path.join(_get_vehicle_previews_dir(), carid)
     os.makedirs(dest_dir, exist_ok=True)
     for src in uv_map_paths:
         try:

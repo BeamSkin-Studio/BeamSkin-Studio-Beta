@@ -48,6 +48,7 @@ class StateManager:
         self.theme_mode: str = self._load_theme_preference()
         self.testing_mode: bool = self._load_testing_mode_preference()
         self.confirm_on_save: bool = self._load_confirm_on_save_preference()
+        self.texture_previews_enabled: bool = self._load_texture_previews_preference()
 
         self._local_added_vehicles: Dict[str, str] = {}
         if self._settings_module is not None:
@@ -103,6 +104,27 @@ class StateManager:
         if isinstance(self.app_settings, dict):
             return bool(self.app_settings.get("confirm_on_save", True))
         return True
+
+    def _load_texture_previews_preference(self) -> bool:
+        if self._settings_module is not None:
+            return bool(getattr(self._settings_module, "app_settings", {}).get(
+                "texture_previews_enabled", True
+            ))
+        if isinstance(self.app_settings, dict):
+            return bool(self.app_settings.get("texture_previews_enabled", True))
+        return True
+
+    def set_texture_previews_enabled(self, enabled: bool) -> None:
+        print(f"[DEBUG] set_texture_previews_enabled: enabled={enabled}")
+        self.texture_previews_enabled = enabled
+        if self._settings_module is not None:
+            try:
+                self._settings_module.app_settings["texture_previews_enabled"] = enabled
+                self._settings_module.save_settings()
+            except Exception as e:
+                print(f"[WARNING] Could not persist texture_previews_enabled: {e}")
+        elif isinstance(self.app_settings, dict):
+            self.app_settings["texture_previews_enabled"] = enabled
 
     def set_confirm_on_save(self, enabled: bool) -> None:
         print(f"[DEBUG] set_confirm_on_save: enabled={enabled}")

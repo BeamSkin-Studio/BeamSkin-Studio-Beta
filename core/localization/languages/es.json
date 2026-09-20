@@ -106,9 +106,9 @@
     "skins_header": "Skins",
     "add_skin": "➕ Añadir skin",
     "update_skin": "💾 Actualizar skin",
-    "save_project": "💾 Guardar proyecto",
-    "load_project": "📁 Cargar proyecto",
-    "clear_project": " 🧹 Borrar proyecto",
+    "save_project": "💾 Guardar",
+    "load_project": "📁 Cargar",
+    "clear_project": " 🧹 Borrar",
     "add_vehicle": "Añadir vehículo al proyecto",
     "add_vehicle_to_project": "Añadir vehículo ",
     "vehicles_in_project": "Vehículos en el proyecto",
@@ -116,6 +116,8 @@
     "output_mode": "Modo de salida",
     "steam_path": "Carpeta de Mods",
     "custom_location": "Ubicación personalizada",
+    "zip_output": "ZIP",
+    "output_location": "Ubicación de salida",
     "skin_count": "skins",
     "skin": "skin",
     "skins": "skins",
@@ -133,6 +135,8 @@
     "retro_rough_met_hint": "Mapa de rugosidad/metalicidad (rough_met.png) para la capa retrorreflectante.",
     "retro_mask": "Máscara Retro",
     "retro_mask_hint": "Máscara de opacidad (PNG) que indica qué áreas del skin deben ser retrorreflectantes.",
+    "use_secondary_uv": "Usar UV secundaria",
+    "use_secondary_uv_hint": "Puede solucionar un skin que se aplica incorrectamente al vehículo. Pruébalo si tu skin se ve mal.",
     "base_Color_Map": "Base Color Map",
     "color_Palette_Map": "Color Palette Map",
     "display_name": "Nombre",
@@ -191,6 +195,7 @@
       "load_error": "Error al cargar: {error}",
       "no_material_properties": "No se encontraron propiedades de material editables para este vehículo.",
       "invalid_material_value": "Valor no válido para {prop_name}: '{value}'",
+      "invalid_detail_scale": "Escala de detalle no válida '{value}': usa dos números como 1500, 750. Se usó el valor predeterminado (1500, 750).",
       "no_info_fields": "No se encontraron campos de información editables para este vehículo.",
       "invalid_info_value": "'{field}' debe ser un número — se ignora '{value}'",
       "mod_generation_unavailable": "La función de generación de mods no está disponible.",
@@ -198,13 +203,23 @@
       "export_error_debug": "Error de exportación ({type}): {error}\nActiva el modo depuración en Ajustes para ver los registros completos.",
       "missing_files": "Archivos faltantes:\n{files}",
       "preset_saved": "Preajuste '{name}' guardado.",
+      "preset_saved_alongside_builtin": "Guardado como tu propio ajuste '{name}'. El incluido '{name}' no se ha modificado.",
       "preset_loaded": "Preajuste '{name}' cargado.",
       "preset_deleted": "Preajuste '{name}' eliminado.",
       "preset_name_required": "Introduce un nombre para el preajuste primero.",
       "preset_not_found": "Preajuste '{name}' no encontrado.",
       "preset_save_failed": "Error al guardar el preajuste '{name}'.",
       "preset_load_failed": "Error al cargar el preajuste '{name}'.",
-      "preset_delete_failed": "Error al eliminar el preajuste '{name}'."
+      "preset_delete_failed": "Error al eliminar el preajuste '{name}'.",
+      "layer_missing_dds": "A la capa {n} le falta su mapa de color base (.dds).",
+      "layer_missing_dds_variant": "A la capa {n} le falta su mapa de color base de variante (.dds).",
+      "layer_missing_colorable": "A la capa {n} le falta su mapa de datos o su mapa de paleta de color.",
+      "layer_missing_colorable_variant": "A la capa {n} le falta su mapa de datos o su mapa de paleta de color de variante.",
+      "layer_missing_emissive": "La capa {n} tiene activado Brillante pero le falta su mapa emisivo.",
+      "invalid_layer_value": "Valor no válido para {field}: '{value}'. Se usará 0.0 por defecto.",
+      "layer_limit_reached": "Has alcanzado el número máximo de capas para este skin.",
+      "overwrite_failed": "No se pudo eliminar el mod existente: {error}",
+      "please_select_datamap": "Selecciona un mapa de datos antes de continuar."
     },
     "clear_project_window": {
       "clear_project_confirm_title": "¿Borrar proyecto?",
@@ -223,6 +238,7 @@
     "export_copying": "Copiando archivos de plantilla...",
     "export_zipping": "Creando archivo ZIP...",
     "unpacked_output": "Sin comprimir",
+    "select_output": "Seleccionar carpeta de salida…",
     "export_unpacking": "Escribiendo carpeta del mod…",
     "export_complete": "¡Exportación completada!",
     "export_error": "Error: función de generación no disponible",
@@ -236,7 +252,11 @@
     "preset": "Preajuste",
     "preset_name_placeholder": "Nombre del preajuste…",
     "preset_picker_title": "Cargar Preajuste",
+    "preset_tab_builtin": "Incluidos",
+    "preset_tab_yours": "Tuyos",
     "no_presets_saved": "Aún no hay preajustes guardados.",
+    "no_builtin_presets": "No hay ajustes preestablecidos incluidos.",
+    "no_presets_match": "Ningún ajuste coincide con tu búsqueda.",
     "cancel_edit": "❌ Cancelar",
     "no_cars_match": "Ningún coche coincide con '{query}'",
     "config_type_label": "Tipo de config.",
@@ -268,22 +288,28 @@
     "dialog_select_layer_file": "Seleccionar Archivo de Capa",
     "layer_factors": "Factores de Capa",
     "layer_n": "Capa {n}",
+    "detail_scale": "Escala de Detalle (X, Y)",
+    "detail_scale_placeholder": "p. ej. 1500, 750",
+    "detail_scale_hint": "Cuántas veces se repiten los mapas de detalle sobre el UV. Más alto = patrón más pequeño. Déjalo vacío para usar 1500, 750.",
     "material_stage_n": "Etapa {n}",
     "metallic_factor": "Factor Metálico",
     "metallic_map": "Mapa Metálico",
     "normal_map": "Mapa de Normales",
     "opacity_map": "Mapa de Opacidad",
+    "opacity_detail_map": "Mapa de Detalle de Opacidad",
     "retroreflectivity": "Retrorreflectividad",
     "roughness_factor": "Factor de Rugosidad",
     "roughness_map": "Mapa de Rugosidad",
-    "save_project_as": "💾 Guardar proyecto como..."
+    "roughness_detail_map": "Mapa de Detalle de Rugosidad",
+    "metallic_detail_map": "Mapa de Detalle Metálico",
+    "save_project_as": "💾 Guardar como..."
   },
   "howto": {
     "title": "Cómo usar",
     "page_title": "📚 Cómo usar BeamSkin Studio",
     "page_subtitle": "Guía completa para crear y gestionar skins de vehículos para BeamNG.drive",
     "search_placeholder": "Buscar documentación...",
-    "view_all": "📖 Ver todo",
+    "view_all": "Ver todo",
     "search_results": "🔍 Resultados para '{term}'",
     "no_results": "❌ Sin resultados para '{term}'",
     "try_different": "Prueba con palabras clave diferentes o navega por los capítulos.",
@@ -526,7 +552,18 @@
     "current_version": "Versión actual:",
     "skipped_cleared": "Versión omitida borrada — se mostrarán las actualizaciones de nuevo.",
     "skipped_version": "Versión omitida: {skipped}",
-    "updates": "Actualizaciones"
+    "updates": "Actualizaciones",
+    "data_folder": "Carpeta de Datos de BeamSkin Studio",
+    "data_folder_desc": "Dónde se almacenan los vehículos añadidos, los proyectos y los ajustes. Cambiar esto mueve tus datos existentes a la nueva ubicación.",
+    "migrate_data_button": "Migrar Mis Datos",
+    "data_browse_title": "Elegir Carpeta de Datos",
+    "data_not_writable": "No se puede escribir en la carpeta",
+    "data_path_updated": "Carpeta de datos actualizada — los datos existentes se han movido.",
+    "data_migration_incomplete": "Carpeta cambiada, pero algunos archivos pueden no haberse movido",
+    "confirm_on_save": "💾  Confirmar Antes de Guardar",
+    "view_changelog": "📜  Historial de Cambios",
+    "legacy_migrate_desc": "Actualmente estás usando las antiguas carpetas de datos relativas a la instalación, junto a la aplicación. Migra para mover tus vehículos, proyectos y ajustes a una carpeta de datos dedicada.",
+    "legacy_migrate_not_found": "Ya no se pueden encontrar los datos antiguos — no hay nada que migrar."
   },
   "about": {
     "about_section": "Acerca de",
@@ -795,7 +832,12 @@
     "paths_title": "Configurar rutas de BeamNG.drive",
     "paths_desc": "Estas rutas se usan para validar e instalar tus mods de skin.",
     "browse_beamng_title": "Seleccionar carpeta de instalación de BeamNG.drive",
-    "browse_mods_title": "Seleccionar carpeta de mods de BeamNG"
+    "browse_mods_title": "Seleccionar carpeta de mods de BeamNG",
+    "data_folder": "Carpeta de Datos de BeamSkin Studio",
+    "browse_data_title": "Elegir Carpeta de Datos",
+    "data_valid": "✓ La carpeta es escribible",
+    "data_invalid": "✗ No se puede escribir en la carpeta — se ha restablecido la predeterminada",
+    "data_folder_desc": "Dónde se almacenan tus vehículos añadidos, proyectos y ajustes. La ubicación predeterminada funciona para la mayoría de las personas — cambia esto solo si quieres tus datos en otra unidad."
   },
   "language_selection": {
     "selection": "Selección de idioma",
@@ -817,7 +859,7 @@
     "generation_error": "Error al generar el mod: {error}"
   },
   "changelog": {
-    "title": "Novedades",
+    "title": "¿Qué hay de nuevo en {version}?",
     "translate": "Traducir",
     "translating": "Traduciendo…",
     "translated": "Traducido",
@@ -826,7 +868,11 @@
     "fetching": "Obteniendo registro de cambios",
     "error_title": "⚠️  No se pudo cargar el registro",
     "error_body": "No se pudo acceder a GitHub. Comprueba tu conexión a internet.",
-    "error_note": "Aún puedes descargar la actualización — el registro aparecerá tras la instalación."
+    "error_note": "Aún puedes descargar la actualización — el registro aparecerá tras la instalación.",
+    "newer": "Versión más reciente",
+    "older": "Versión anterior",
+    "version_label": "Versión {version}",
+    "translate_failed": "Error al traducir"
   },
   "dialog": {
     "cancel": "Cancelar",
@@ -1027,7 +1073,10 @@
     "add_existing_dialog_title": "Añadir archivo(s) de proyecto existente(s)",
     "file_filter": "Archivos de proyecto (*.bsproject *.json);;Todos los archivos (*.*)",
     "add_failed_banner": "⚠  No se pudieron leer {count} archivo(s): {names}{extra}",
-    "browse_dialog_title": "Abrir archivo de proyecto"
+    "browse_dialog_title": "Abrir archivo de proyecto",
+    "delete_confirm_title": "¿Eliminar Proyecto?",
+    "sort_last_opened": "Abiertos recientemente",
+    "sort_last_saved": "Modificados recientemente"
   },
   "mod_scanner": {
     "path_not_exist": "La ruta no existe",
@@ -1036,5 +1085,15 @@
     "no_vehicles_dir": "No se encontró el directorio vehicles/ en el mod",
     "cannot_read_dir": "No se puede leer el directorio vehicles/",
     "extract_failed": "Error al extraer ZIP: {error}"
+  },
+  "legacy_migration": {
+    "title": "Se encontraron datos de una versión anterior",
+    "desc": "BeamSkin Studio ahora guarda tus datos en una carpeta dedicada en lugar de junto a la aplicación. Encontramos proyectos y vehículos de una instalación anterior — elige dónde conservarlos y copiaremos todo. Tus archivos antiguos permanecerán intactos.",
+    "found_at": "Encontrado en:",
+    "stats": "{vehicles} vehículo(s) añadido(s) · {projects} proyecto(s) guardado(s) · ~{size} KB",
+    "dest_label": "Copiar datos a:",
+    "browse_title": "Elegir carpeta de datos",
+    "skip": "No migrar",
+    "migrate": "Migrar mis datos"
   }
 }

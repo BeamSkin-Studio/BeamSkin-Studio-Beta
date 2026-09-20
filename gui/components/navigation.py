@@ -2,12 +2,12 @@ from __future__ import annotations
 import os
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PySide6.QtCore   import Qt, Signal
-from PySide6.QtGui    import QPixmap
+from PySide6.QtCore   import Qt, Signal, QRectF
+from PySide6.QtGui    import QPixmap, QFontMetrics, QPainter, QColor, QPen, QBrush
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
     QScrollArea, QLineEdit, QButtonGroup, QRadioButton,
-    QFileDialog, QGraphicsOpacityEffect,
+    QFileDialog, QGraphicsOpacityEffect, QSizePolicy,
 )
 
 from gui.theme   import COLORS, font, fade_in
@@ -122,9 +122,8 @@ class VehicleVariantExpander(QFrame):
                 QLabel {{
                     color: {COLORS['text_secondary']};
                     background: transparent;
-                    border: 1px solid {COLORS['border']};
-                    border-radius: 3px;
-                    padding: 0px 4px;
+                    border: none;
+                    padding: 0px 2px;
                 }}
             """)
             hrow.addWidget(mod_badge)
@@ -134,9 +133,8 @@ class VehicleVariantExpander(QFrame):
         badge.setStyleSheet(f"""
             color:{COLORS['text_secondary']};
             background:transparent;
-            border:1px solid {COLORS['border']};
-            border-radius:6px;
-            padding:0px 5px;
+            border:none;
+            padding:0px 2px;
         """)
         hrow.addWidget(badge)
 
@@ -181,7 +179,7 @@ class VehicleVariantExpander(QFrame):
     def _apply_header_style(self, hover: bool):
         self._header.setStyleSheet(f"""
             QFrame {{
-                background:{COLORS['card_bg']};
+                background:{COLORS['frame_bg']};
                 border-radius:8px;
                 border:1px solid {COLORS['border']};
             }}
@@ -241,7 +239,13 @@ class NavPill(QPushButton):
         self.setMinimumHeight(36)
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.NoFocus)
+        self._lock_width(text)
         self._apply(False)
+
+    def _lock_width(self, text: str):
+        metrics = QFontMetrics(font(13, "bold"))
+        text_width = metrics.horizontalAdvance(text)
+        self.setFixedWidth(max(text_width + 24, 80))
 
     def _apply(self, active: bool):
         self._active = active
@@ -263,15 +267,15 @@ class NavPill(QPushButton):
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: transparent;
-                    color: {COLORS['text_secondary']};
+                    background-color: {COLORS['card_hover']};
+                    color: {COLORS['text']};
                     border-radius: 8px;
                     border: none;
                     padding: 6px 16px;
                     font-size: 13px;
                 }}
                 QPushButton:hover {{
-                    background-color: {COLORS['card_hover']};
+                    background-color: {COLORS['card_bg']};
                     color: {COLORS['text']};
                 }}
             """)
@@ -343,7 +347,8 @@ class Topbar(QFrame):
             btn.clicked.connect(lambda checked=False, n=name: self.view_changed.emit(n))
             self.menu_buttons[name] = btn
             layout.addWidget(btn)
-            layout.addSpacing(2)
+            if name != items[-1][1]:
+                layout.addSpacing(8)
 
         layout.addStretch()
 
@@ -410,7 +415,8 @@ class Sidebar(QFrame):
 
     def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.setFixedWidth(300)
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(460)
         self.setObjectName("SidebarFrame")
         self.setStyleSheet(f"""
             #SidebarFrame {{
@@ -432,6 +438,34 @@ class Sidebar(QFrame):
         self._locked = False
 
         self._build()
+        self._apply_content_width()
+
+    def _apply_content_width(self) -> None:
+        labels = [
+            t("project.mod_name", default="Mod Name"),
+            t("project.author_name", default="Author"),
+            t("project.steam_path", default="Save to Steam Mods"),
+            t("project.custom_location", default="Custom Location"),
+            t("project.output_location", default="Output Location"),
+            t("project.add_vehicle", default="ADD VEHICLES"),
+            t("common.browse", default="Browse"),
+        ]
+        metrics = QFontMetrics(font(13, "bold"))
+        longest = max(
+            (metrics.horizontalAdvance(label) for label in labels),
+            default=0,
+        )
+
+        vehicle_names = list(state.vehicle_ids.values()) + list(state.added_vehicles.values())
+        if vehicle_names:
+            vehicle_widths = sorted(
+                metrics.horizontalAdvance(name) for name in vehicle_names
+            )
+            idx = min(len(vehicle_widths) - 1, int(len(vehicle_widths) * 0.9))
+            longest = max(longest, vehicle_widths[idx])
+
+        desired = max(300, min(360, longest + 80))
+        self.setFixedWidth(desired)
 
 
     def _build(self):
@@ -439,47 +473,59 @@ class Sidebar(QFrame):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{ background:transparent; border:none; }}
-            QScrollArea > QWidget > QWidget {{ background:transparent; }}
-        """)
-
         inner = QWidget()
         inner.setStyleSheet("background:transparent;")
         inner_layout = QVBoxLayout(inner)
         inner_layout.setContentsMargins(14, 14, 14, 14)
         inner_layout.setSpacing(8)
 
-        sec = QLabel(t("project.title", default="PROJECT").upper())
-        sec.setFont(font(11, "bold"))
-        sec.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;letter-spacing:1px;"
-        )
-        inner_layout.addWidget(sec)
+        details_panel = QFrame()
+        details_panel.setObjectName("projectDetailsPanel")
+        details_panel.setStyleSheet(f"""
+            QFrame#projectDetailsPanel {{
+                background: {COLORS['card_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        details_layout = QVBoxLayout(details_panel)
+        details_layout.setContentsMargins(8, 8, 8, 8)
+        details_layout.setSpacing(6)
+        details_layout.addWidget(self._section_header(
+            t("project.details", default="PROJECT DETAILS"), contained=True
+        ))
 
         self._mod_entry = LabelledEntry(
             t("project.mod_name", default="Mod Name"),
             t("project.mod_name_placeholder", default="MySkinPack"),
         )
         self._mod_entry.set_text(self._mod_name_text)
-        inner_layout.addWidget(self._mod_entry)
+        details_layout.addWidget(self._mod_entry)
 
         self._author_entry = LabelledEntry(
             t("project.author_name", default="Author"),
             t("project.author_name_placeholder", default="Your name"),
         )
         self._author_entry.set_text(self._author_text)
-        inner_layout.addWidget(self._author_entry)
+        details_layout.addWidget(self._author_entry)
 
-        inner_layout.addWidget(HSeparator())
+        inner_layout.addWidget(details_panel)
 
-        out_lbl = QLabel(t("project.output_mode", default="Output Mode"))
-        out_lbl.setFont(font(11, "bold"))
-        out_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
-        inner_layout.addWidget(out_lbl)
+        inner_layout.addWidget(self._section_divider())
+        output_panel = QFrame()
+        output_panel.setStyleSheet(f"""
+            QFrame {{
+                background: {COLORS['card_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        output_layout = QVBoxLayout(output_panel)
+        output_layout.setContentsMargins(8, 8, 8, 8)
+        output_layout.setSpacing(6)
+        output_layout.addWidget(self._section_header(
+            t("project.output_mode", default="OUTPUT"), contained=True
+        ))
 
         unpacked_frame = QFrame()
         unpacked_frame.setFixedHeight(44)
@@ -488,52 +534,151 @@ class Sidebar(QFrame):
         uf_row.setContentsMargins(10, 0, 10, 0)
         uf_row.setSpacing(8)
 
-        self._unpacked_lbl = QLabel(t("project.unpacked_output"))
-        self._unpacked_lbl.setFont(font(13, "bold"))
-        self._unpacked_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;"
-        )
-        uf_row.addWidget(self._unpacked_lbl, 1)
+        format_track = QFrame()
+        format_track.setObjectName("formatTrack")
+        format_track.setStyleSheet(f"""
+            QFrame#formatTrack {{
+                background: {COLORS['frame_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+            }}
+        """)
+        format_row = QHBoxLayout(format_track)
+        format_row.setContentsMargins(0, 0, 0, 0)
+        format_row.setSpacing(0)
 
-        self._unpacked_toggle = ToggleSwitch()
-        self._unpacked_toggle.setChecked(self.unpacked)
-        self._unpacked_toggle.stateChanged.connect(self._on_unpacked_changed)
-        uf_row.addWidget(self._unpacked_toggle)
-        inner_layout.addWidget(unpacked_frame)
+        segment_style = f"""
+            QPushButton {{
+                background: transparent;
+                color: {COLORS['text_secondary']};
+                border: 1px solid transparent;
+                border-radius: 7px;
+                padding: 5px 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {COLORS['text']};
+                background: {COLORS['card_hover']};
+            }}
+            QPushButton:checked {{
+                background: {COLORS['accent']};
+                color: {COLORS['accent_text']};
+                border-color: {COLORS['accent_hover']};
+            }}
+        """
+        zip_button = QPushButton(t("project.zip_output", default="ZIP"))
+        zip_button.setCheckable(True)
+        zip_button.setMinimumHeight(30)
+        zip_button.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        zip_button.setStyleSheet(segment_style)
+
+        unpacked_button = QPushButton(
+            t("project.unpacked_output", default="Unpacked")
+        )
+        unpacked_button.setCheckable(True)
+        unpacked_button.setMinimumHeight(30)
+        unpacked_button.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
+        unpacked_button.setStyleSheet(segment_style)
+
+        self._output_format_group = QButtonGroup(self)
+        self._output_format_group.setExclusive(True)
+        self._output_format_group.addButton(zip_button, 0)
+        self._output_format_group.addButton(unpacked_button, 1)
+        zip_button.setChecked(not self.unpacked)
+        unpacked_button.setChecked(self.unpacked)
+        zip_button.toggled.connect(
+            lambda checked: self._on_generate_format_toggled(checked, False)
+        )
+        unpacked_button.toggled.connect(
+            lambda checked: self._on_generate_format_toggled(checked, True)
+        )
+        self._unpacked_toggle = unpacked_button
+        format_row.addWidget(zip_button, 1)
+        format_row.addWidget(unpacked_button, 1)
+        uf_row.addWidget(format_track, 1)
+        output_layout.addWidget(unpacked_frame)
+
+        output_layout.addSpacing(16)
+        output_location_header = QFrame()
+        output_location_header.setFixedHeight(22)
+        output_location_header.setStyleSheet(
+            "background:transparent;border:none;"
+        )
+        location_header_row = QHBoxLayout(output_location_header)
+        location_header_row.setContentsMargins(2, 0, 0, 0)
+        location_header_row.setSpacing(6)
+
+        location_marker = QFrame()
+        location_marker.setFixedSize(3, 14)
+        location_marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        location_header_row.addWidget(location_marker)
+
+        self._output_location_lbl = QLabel(
+            t("project.output_location", default="Output Location").upper()
+        )
+        self._output_location_lbl.setFont(font(10, "bold"))
+        self._output_location_lbl.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        location_header_row.addWidget(self._output_location_lbl)
+        location_header_row.addStretch()
+        output_layout.addWidget(output_location_header)
 
         steam_frame = QFrame()
         steam_frame.setFixedHeight(44)
-        steam_frame.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['frame_bg']};
-                border-radius:8px;
-                border:1px solid {COLORS['border']};
-            }}
-        """)
+        steam_frame.setStyleSheet("background:transparent;border:none;")
         sf_row = QHBoxLayout(steam_frame)
         sf_row.setContentsMargins(10, 0, 10, 0)
-        self._steam_radio = QRadioButton(
+        self._steam_radio = RingRadioButton(
             t("project.steam_path", default="Save to Steam Mods")
         )
         self._steam_radio.setFont(font(13, "bold"))
         self._steam_radio.setStyleSheet(_radio_qss())
         self._steam_radio.setChecked(self.output_mode == "steam")
         sf_row.addWidget(self._steam_radio)
-        inner_layout.addWidget(steam_frame)
+        output_layout.addWidget(steam_frame)
 
         custom_frame = QFrame()
         custom_frame.setFixedHeight(44)
-        custom_frame.setStyleSheet(steam_frame.styleSheet())
+        custom_frame.setStyleSheet("background:transparent;border:none;")
         cf_row = QHBoxLayout(custom_frame)
         cf_row.setContentsMargins(10, 0, 10, 0)
-        self._custom_radio = QRadioButton(
+        self._custom_radio = RingRadioButton(
             t("project.custom_location", default="Custom Location")
         )
         self._custom_radio.setFont(font(13, "bold"))
         self._custom_radio.setStyleSheet(_radio_qss())
         self._custom_radio.setChecked(self.output_mode == "custom")
         cf_row.addWidget(self._custom_radio)
-        inner_layout.addWidget(custom_frame)
+
+        browse_btn = QPushButton(t('common.browse', default='Browse'))
+        browse_btn.setFont(font(11, "bold"))
+        browse_btn.setFixedHeight(32)
+        browse_btn.setCursor(Qt.PointingHandCursor)
+        browse_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {COLORS['text']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 8px;
+                padding: 4px 12px;
+            }}
+            QPushButton:hover {{
+                color: {COLORS['text']};
+                background: {COLORS['card_hover']};
+                border-color: {COLORS['accent']};
+            }}
+        """)
+        browse_btn.clicked.connect(self._browse_custom_output)
+        cf_row.addStretch()
+        cf_row.addWidget(browse_btn)
+        output_layout.addWidget(custom_frame)
 
         self._custom_path_frame = QFrame()
         self._custom_path_frame.setStyleSheet("background:transparent;border:none;")
@@ -561,25 +706,7 @@ class Sidebar(QFrame):
         """)
         cp_row.addWidget(self._custom_entry, 1)
 
-        browse_btn = QPushButton("📁")
-        browse_btn.setFixedSize(32, 32)
-        browse_btn.setCursor(Qt.PointingHandCursor)
-        browse_btn.setStyleSheet(f"""
-            QPushButton {{
-                background:{COLORS['card_bg']};
-                color:{COLORS['text']};
-                border:1px solid {COLORS['border']};
-                border-radius:6px;
-                font-size:14px;
-            }}
-            QPushButton:hover {{
-                border-color:{COLORS['accent']};
-                background:{COLORS['card_hover']};
-            }}
-        """)
-        browse_btn.clicked.connect(self._browse_custom_output)
-        cp_row.addWidget(browse_btn)
-        inner_layout.addWidget(self._custom_path_frame)
+        output_layout.addWidget(self._custom_path_frame)
 
         self._output_group = QButtonGroup(self)
         self._output_group.addButton(self._steam_radio)
@@ -589,12 +716,24 @@ class Sidebar(QFrame):
         self._custom_radio.toggled.connect(self._on_output_mode_changed)
         self._update_custom_path_visibility()
 
-        inner_layout.addWidget(HSeparator())
+        inner_layout.addWidget(output_panel)
+        inner_layout.addWidget(self._section_divider())
 
-        veh_lbl = QLabel(t("project.add_vehicle", default="Add Vehicle"))
-        veh_lbl.setFont(font(11, "bold"))
-        veh_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
-        inner_layout.addWidget(veh_lbl)
+        vehicles_panel = QFrame()
+        vehicles_panel.setObjectName("vehiclesPanel")
+        vehicles_panel.setStyleSheet(f"""
+            QFrame#vehiclesPanel {{
+                background: {COLORS['card_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        vehicles_layout = QVBoxLayout(vehicles_panel)
+        vehicles_layout.setContentsMargins(8, 8, 8, 8)
+        vehicles_layout.setSpacing(6)
+        vehicles_layout.addWidget(self._section_header(
+            t("project.add_vehicle", default="ADD VEHICLES"), contained=True
+        ))
 
         self._add_all_btn = QPushButton("⚡  Add All Vehicles & Variants")
         self._add_all_btn.setFont(font(12, "bold"))
@@ -614,7 +753,7 @@ class Sidebar(QFrame):
         """)
         self._add_all_btn.clicked.connect(self._add_all_vehicles)
         self._add_all_btn.setVisible(state.testing_mode)
-        inner_layout.addWidget(self._add_all_btn)
+        vehicles_layout.addWidget(self._add_all_btn)
 
         self._search = QLineEdit()
         self._search.setPlaceholderText(
@@ -635,19 +774,73 @@ class Sidebar(QFrame):
             QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
         """)
         self._search.textChanged.connect(self._filter_vehicles)
-        inner_layout.addWidget(self._search)
+        vehicles_layout.addWidget(self._search)
 
-        self._vehicle_list = QVBoxLayout()
+        vehicle_scroll = QScrollArea()
+        vehicle_scroll.setWidgetResizable(True)
+        vehicle_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        vehicle_scroll.setStyleSheet("""
+            QScrollArea{background:transparent;border:none;}
+            QScrollArea>QWidget>QWidget{background:transparent;}
+        """)
+
+        vehicle_container = QWidget()
+        vehicle_container.setStyleSheet("background:transparent;")
+        self._vehicle_list = QVBoxLayout(vehicle_container)
         self._vehicle_list.setSpacing(4)
-        self._vehicle_list.setContentsMargins(0, 0, 0, 0)
-        inner_layout.addLayout(self._vehicle_list)
-        inner_layout.addStretch()
+        self._vehicle_list.setContentsMargins(0, 0, 4, 0)
+        self._vehicle_list.setAlignment(Qt.AlignTop)
+        vehicle_scroll.setWidget(vehicle_container)
+        vehicle_scroll.setMinimumHeight(120)
+        vehicles_layout.addWidget(vehicle_scroll, 1)
 
-        scroll.setWidget(inner)
-        root.addWidget(scroll)
+        inner_layout.addWidget(vehicles_panel, 1)
+
+        root.addWidget(inner)
 
         self._inner = inner
         self.set_locked(self._locked)
+
+    def _section_header(self, text: str, contained: bool = False) -> QFrame:
+        header = QFrame()
+        header.setFixedHeight(30)
+        if contained:
+            header.setStyleSheet("background:transparent;border:none;")
+        else:
+            header.setStyleSheet(f"""
+                QFrame {{
+                    background: {COLORS['card_bg']};
+                    border: 1px solid {COLORS['border']};
+                    border-radius: 7px;
+                }}
+            """)
+        row = QHBoxLayout(header)
+        row.setContentsMargins(6, 0, 10, 0)
+        row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        row.addWidget(marker)
+
+        label = QLabel(text.upper())
+        label.setFont(font(10, "bold"))
+        label.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        row.addWidget(label)
+        row.addStretch()
+        return header
+
+    def _section_divider(self) -> QFrame:
+        divider = QFrame()
+        divider.setFixedHeight(1)
+        divider.setStyleSheet(
+            f"background:{COLORS['border']};border:none;"
+        )
+        return divider
 
 
     def populate_vehicles(self, add_callback: Callable[[str, str, str], None]):
@@ -902,14 +1095,19 @@ class Sidebar(QFrame):
         self.output_mode = "steam" if self._steam_radio.isChecked() else "custom"
         self._update_custom_path_visibility()
 
+    def _on_generate_format_toggled(self, checked: bool, unpacked: bool):
+        if checked:
+            self._on_unpacked_changed(unpacked)
+
     def _on_unpacked_changed(self, state_val: int):
-        self.unpacked = (state_val == 2)
+        self.unpacked = bool(state_val) if isinstance(state_val, bool) else state_val == 2
 
     def _update_custom_path_visibility(self):
         self._custom_path_frame.setVisible(self.output_mode == "custom")
 
     def _browse_custom_output(self):
         print("[DEBUG] _browse_custom_output: opening output folder dialog")
+        self._custom_radio.setChecked(True)
         path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
         if path:
             self.custom_output = path
@@ -975,6 +1173,7 @@ class Sidebar(QFrame):
         self._vehicle_cards       = []
         self._variant_expanders   = {}
         self._build()
+        self._apply_content_width()
         if self._populate_callback:
             self.populate_vehicles(self._populate_callback)
 
@@ -984,18 +1183,68 @@ def _radio_qss() -> str:
         QRadioButton {{
             color: {COLORS['text']};
             font-size: 13px;
-            spacing: 8px;
+            font-weight: bold;
+            spacing: 10px;
             background: transparent;
         }}
         QRadioButton::indicator {{
-            width: 16px;
-            height: 16px;
-            border-radius: 8px;
-            border: 2px solid {COLORS['border']};
-            background: {COLORS['frame_bg']};
-        }}
-        QRadioButton::indicator:checked {{
-            border-color: {COLORS['accent']};
-            background: {COLORS['accent']};
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+            image: none;
         }}
     """
+
+
+class RingRadioButton(QRadioButton):
+
+    _SIZE      = 20
+    _RING_W    = 1.5
+    _DOT_INSET = 5
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._hovered = False
+        self.setAttribute(Qt.WA_Hover, True)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+
+        cy = self.height() / 2.0
+        d  = float(self._SIZE)
+        rw = self._RING_W
+        ring_rect = QRectF(rw / 2.0, cy - d / 2.0 + rw / 2.0, d - rw, d - rw)
+
+        checked = self.isChecked()
+        if checked or self._hovered:
+            ring_col = QColor(COLORS["accent"])
+        else:
+            ring_col = QColor(COLORS["border"])
+
+        p.setPen(QPen(ring_col, rw))
+        p.setBrush(Qt.NoBrush)
+        p.drawEllipse(ring_rect)
+
+        if checked:
+            i = float(self._DOT_INSET)
+            dot_rect = QRectF(i, cy - d / 2.0 + i, d - 2 * i, d - 2 * i)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(QColor(COLORS["accent"])))
+            p.drawEllipse(dot_rect)
+
+        p.end()

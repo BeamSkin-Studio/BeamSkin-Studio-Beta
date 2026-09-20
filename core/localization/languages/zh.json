@@ -106,9 +106,9 @@
     "skins_header": "涂装",
     "add_skin": "➕ 添加涂装",
     "update_skin": "💾 更新涂装",
-    "save_project": "💾 保存项目",
-    "load_project": "📁 加载项目",
-    "clear_project": " 🧹 清除项目",
+    "save_project": "💾 保存",
+    "load_project": "📁 加载",
+    "clear_project": " 🧹 清除",
     "add_vehicle": "将车辆添加到项目",
     "add_vehicle_to_project": "添加车辆 ",
     "vehicles_in_project": "项目中的车辆",
@@ -116,6 +116,8 @@
     "output_mode": "输出模式",
     "steam_path": "模组文件夹",
     "custom_location": "自定义位置",
+    "zip_output": "ZIP",
+    "output_location": "输出位置",
     "skin_count": "个涂装",
     "skin": "涂装",
     "skins": "个涂装",
@@ -134,6 +136,8 @@
     "retro_mask": "逆反射遮罩",
     "retro_mask_hint": "不透明度遮罩（PNG），标记皮肤上哪些区域应具有逆反射效果。",
     "glowing_skin": "发光涂装",
+    "use_secondary_uv": "使用第二组UV",
+    "use_secondary_uv_hint": "可以修复错误应用到车辆上的涂装。如果涂装显示异常，可以尝试切换此选项。",
     "emissive_map": "自发光贴图",
     "base_Color_Map": "基础颜色贴图",
     "color_Palette_Map": "颜色调色板贴图",
@@ -193,6 +197,7 @@
       "load_error": "加载错误：{error}",
       "no_material_properties": "未找到此车辆的可编辑材质属性。",
       "invalid_material_value": "{prop_name} 的值无效：'{value}'",
+      "invalid_detail_scale": "细节缩放 '{value}' 无效——请使用两个数字，例如 1500, 750。已使用默认值 (1500, 750)。",
       "no_info_fields": "未找到此车辆的可编辑信息字段。",
       "invalid_info_value": "“{field}” 必须为数字 — 已忽略 “{value}”",
       "mod_generation_unavailable": "模组生成功能不可用。",
@@ -200,13 +205,23 @@
       "export_error_debug": "导出错误（{type}）：{error}\n在设置中启用调试模式以获取完整日志。",
       "missing_files": "缺少文件：\n{files}",
       "preset_saved": "预设“{name}”已保存。",
+      "preset_saved_alongside_builtin": "已另存为你自己的预设“{name}”。内置的“{name}”未被更改。",
       "preset_loaded": "预设“{name}”已加载。",
       "preset_deleted": "预设“{name}”已删除。",
       "preset_name_required": "请先输入预设名称。",
       "preset_not_found": "未找到预设“{name}”。",
       "preset_save_failed": "保存预设“{name}”失败。",
       "preset_load_failed": "加载预设“{name}”失败。",
-      "preset_delete_failed": "删除预设“{name}”失败。"
+      "preset_delete_failed": "删除预设“{name}”失败。",
+      "layer_missing_dds": "图层 {n} 缺少基础颜色贴图（.dds）文件。",
+      "layer_missing_dds_variant": "图层 {n} 缺少变体基础颜色贴图（.dds）文件。",
+      "layer_missing_colorable": "图层 {n} 缺少数据贴图或颜色调色板贴图。",
+      "layer_missing_colorable_variant": "图层 {n} 缺少变体数据贴图或颜色调色板贴图。",
+      "layer_missing_emissive": "图层 {n} 已启用发光，但缺少自发光贴图。",
+      "invalid_layer_value": "{field} 的值无效：“{value}”。将使用默认值 0.0。",
+      "layer_limit_reached": "此涂装的图层数量已达上限。",
+      "overwrite_failed": "无法删除现有模组：{error}",
+      "please_select_datamap": "请先选择数据贴图。"
     },
     "clear_project_window": {
       "clear_project_confirm_title": "清除项目？",
@@ -225,6 +240,7 @@
     "export_copying": "正在复制模板文件...",
     "export_zipping": "正在创建 ZIP 压缩包...",
     "unpacked_output": "已解压",
+    "select_output": "选择输出文件夹…",
     "export_unpacking": "正在写入模组文件夹…",
     "export_complete": "导出成功！",
     "export_error": "错误：生成功能不可用",
@@ -238,7 +254,11 @@
     "preset": "预设",
     "preset_name_placeholder": "预设名称…",
     "preset_picker_title": "加载预设",
+    "preset_tab_builtin": "内置",
+    "preset_tab_yours": "我的",
     "no_presets_saved": "尚未保存任何预设。",
+    "no_builtin_presets": "没有可用的内置预设。",
+    "no_presets_match": "没有与搜索匹配的预设。",
     "cancel_edit": "❌ 取消",
     "no_cars_match": "没有车辆匹配 '{query}'",
     "config_type_label": "配置类型",
@@ -268,22 +288,28 @@
     "dialog_select_layer_file": "选择图层文件",
     "layer_factors": "图层系数",
     "layer_n": "图层 {n}",
+    "detail_scale": "细节缩放 (X, Y)",
+    "detail_scale_placeholder": "例如 1500, 750",
+    "detail_scale_hint": "细节贴图在 UV 上平铺的次数。数值越大，图案越小。留空则使用 1500, 750。",
     "material_stage_n": "阶段 {n}",
     "metallic_factor": "金属度系数",
     "metallic_map": "金属度贴图",
     "normal_map": "法线贴图",
     "opacity_map": "不透明度贴图",
+    "opacity_detail_map": "不透明度细节贴图",
     "retroreflectivity": "逆反射率",
     "roughness_factor": "粗糙度系数",
     "roughness_map": "粗糙度贴图",
-    "save_project_as": "💾 项目另存为..."
+    "roughness_detail_map": "粗糙度细节贴图",
+    "metallic_detail_map": "金属度细节贴图",
+    "save_project_as": "💾 另存为..."
   },
   "howto": {
     "title": "使用指南",
     "page_title": "📚 如何使用 BeamSkin Studio",
     "page_subtitle": "为 BeamNG.drive 创建和管理车辆涂装的完整指南",
     "search_placeholder": "搜索文档...",
-    "view_all": "📖 查看全部",
+    "view_all": "查看全部",
     "search_results": "🔍 '{term}' 的搜索结果",
     "no_results": "❌ 未找到 '{term}' 的相关结果",
     "try_different": "请尝试不同的关键词或浏览上方章节。",
@@ -526,7 +552,18 @@
     "checking_updates": "⏳  检查中…",
     "clear_skipped": "清除",
     "skipped_version": "已跳过版本：{skipped}",
-    "skipped_cleared": "已清除跳过的版本 — 将再次显示更新。"
+    "skipped_cleared": "已清除跳过的版本 — 将再次显示更新。",
+    "data_folder": "BeamSkin Studio 数据文件夹",
+    "data_folder_desc": "已添加的车辆、项目和设置的存储位置。更改此设置会将您现有的数据移动到新位置。",
+    "migrate_data_button": "迁移我的数据",
+    "data_browse_title": "选择数据文件夹",
+    "data_not_writable": "文件夹不可写入",
+    "data_path_updated": "数据文件夹已更新 — 现有数据已移动。",
+    "data_migration_incomplete": "文件夹已更改，但部分文件可能未成功移动",
+    "confirm_on_save": "💾  保存前确认",
+    "view_changelog": "📜  更新日志历史",
+    "legacy_migrate_desc": "您目前使用的是应用程序旁边的旧式安装相关数据文件夹。迁移可将您的车辆、项目和设置移动到专用的数据文件夹中。",
+    "legacy_migrate_not_found": "已找不到旧数据 — 无需迁移。"
   },
   "about": {
     "about_section": "关于",
@@ -795,7 +832,12 @@
     "paths_title": "配置 BeamNG.drive 路径",
     "paths_desc": "这些路径用于验证和安装您的涂装模组。",
     "browse_beamng_title": "选择 BeamNG.drive 安装文件夹",
-    "browse_mods_title": "选择 BeamNG 模组文件夹"
+    "browse_mods_title": "选择 BeamNG 模组文件夹",
+    "data_folder": "BeamSkin Studio 数据文件夹",
+    "browse_data_title": "选择数据文件夹",
+    "data_valid": "✓ 文件夹可写入",
+    "data_invalid": "✗ 文件夹不可写入 — 已恢复为默认值",
+    "data_folder_desc": "您添加的车辆、项目和设置的存储位置。默认位置适合大多数人 — 仅当您希望将数据存储在其他驱动器上时才需更改。"
   },
   "language_selection": {
     "selection": "语言选择",
@@ -817,7 +859,7 @@
     "generation_error": "模组生成失败：{error}"
   },
   "changelog": {
-    "title": "新功能",
+    "title": "{version} 有哪些新功能？",
     "translate": "翻译",
     "translating": "翻译中…",
     "translated": "已翻译",
@@ -826,7 +868,11 @@
     "fetching": "正在获取更新日志",
     "error_title": "⚠️  无法加载更新日志",
     "error_body": "无法访问 GitHub。请检查您的网络连接后重试。",
-    "error_note": "您仍然可以下载更新 — 安装后更新日志将自动显示。"
+    "error_note": "您仍然可以下载更新 — 安装后更新日志将自动显示。",
+    "newer": "较新版本",
+    "older": "较旧版本",
+    "version_label": "版本 {version}",
+    "translate_failed": "翻译失败"
   },
   "dialog": {
     "cancel": "取消",
@@ -1027,7 +1073,10 @@
     "add_existing_dialog_title": "添加现有项目存档",
     "file_filter": "项目文件（*.bsproject *.json）;;所有文件（*.*）",
     "add_failed_banner": "⚠  无法读取 {count} 个文件：{names}{extra}",
-    "browse_dialog_title": "打开项目文件"
+    "browse_dialog_title": "打开项目文件",
+    "delete_confirm_title": "删除项目？",
+    "sort_last_opened": "最近打开",
+    "sort_last_saved": "最近修改"
   },
   "mod_scanner": {
     "path_not_exist": "路径不存在",
@@ -1036,5 +1085,15 @@
     "no_vehicles_dir": "Mod中未找到vehicles/目录",
     "cannot_read_dir": "无法读取vehicles/目录",
     "extract_failed": "解压ZIP失败：{error}"
+  },
+  "legacy_migration": {
+    "title": "发现旧版本的数据",
+    "desc": "BeamSkin Studio 现在将数据存储在专用文件夹中，而不是应用程序旁边。我们发现了以前安装的项目和车辆——请选择保存位置，我们会将所有内容复制过去。您的旧文件将保持不变。",
+    "found_at": "发现于：",
+    "stats": "已添加 {vehicles} 个车辆 · 已保存 {projects} 个项目 · 约 {size} KB",
+    "dest_label": "将数据复制到：",
+    "browse_title": "选择数据文件夹",
+    "skip": "不迁移",
+    "migrate": "迁移我的数据"
   }
 }

@@ -145,8 +145,6 @@ class PathConfigurationSection(QFrame):
             browse_cb=self._browse_mods,
         ))
 
-        root.addWidget(HSeparator())
-
         self._data_section_container = QVBoxLayout()
         self._data_section_container.setSpacing(0)
         root.addLayout(self._data_section_container)
@@ -154,13 +152,42 @@ class PathConfigurationSection(QFrame):
         self._data_section_is_legacy: Optional[bool] = None
         self._rebuild_data_section()
 
+    @staticmethod
+    def _txt_data_folder() -> str:
+        return t("settings.data_folder", default="BeamSkin Studio Data Folder")
+
+    @staticmethod
+    def _txt_data_folder_desc() -> str:
+        return t(
+            "settings.data_folder_desc",
+            default="Where added vehicles, projects, and settings are stored. "
+                    "Changing this moves your existing data to the new location.",
+        )
+
+    @staticmethod
+    def _txt_legacy_desc() -> str:
+        return t(
+            "settings.legacy_migrate_desc",
+            default="You're currently using the old install-relative data folders "
+                    "next to the app. Migrate to move your vehicles, projects, and "
+                    "settings into a dedicated data folder.",
+        )
+
+    @staticmethod
+    def _txt_migrate_button() -> str:
+        return t("settings.migrate_data_button", default="Migrate My Data")
+
     def _rebuild_data_section(self):
         if self._data_section is not None:
             self._data_section_container.removeWidget(self._data_section)
+            self._data_section.setParent(None)
             self._data_section.deleteLater()
             self._data_section = None
 
-        for stale_attr in ("_data_entry", "_data_browse_btn", "_data_migrate_btn"):
+        for stale_attr in (
+            "_data_entry", "_data_browse_btn", "_data_migrate_btn",
+            "_data_status", "_data_row_label", "_data_row_desc",
+        ):
             if hasattr(self, stale_attr):
                 delattr(self, stale_attr)
 
@@ -168,12 +195,8 @@ class PathConfigurationSection(QFrame):
             self._data_section = self._build_legacy_migrate_row()
         else:
             self._data_section = self._path_row(
-                label=t("settings.data_folder", default="BeamSkin Studio Data Folder"),
-                desc=t(
-                    "settings.data_folder_desc",
-                    default="Where added vehicles, projects, and settings are stored. "
-                            "Changing this moves your existing data to the new location.",
-                ),
+                label=self._txt_data_folder(),
+                desc=self._txt_data_folder_desc(),
                 attr_name="data",
                 browse_cb=self._browse_data,
             )
@@ -242,7 +265,9 @@ class PathConfigurationSection(QFrame):
 
         status = QLabel("")
         status.setFont(font(11))
+        status.setWordWrap(True)
         status.setStyleSheet("background:transparent;border:none;")
+        status.hide()
         inner.addWidget(status)
 
         setattr(self, f"_{attr_name}_entry",      entry)
@@ -267,17 +292,12 @@ class PathConfigurationSection(QFrame):
         inner.setContentsMargins(16, 14, 16, 14)
         inner.setSpacing(8)
 
-        lbl = QLabel(t("settings.data_folder", default="BeamSkin Studio Data Folder"))
+        lbl = QLabel(self._txt_data_folder())
         lbl.setFont(font(13, "bold"))
         lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
         inner.addWidget(lbl)
 
-        d_lbl = QLabel(t(
-            "settings.legacy_migrate_desc",
-            default="You're currently using the old install-relative data folders "
-                    "next to the app. Migrate to move your vehicles, projects, and "
-                    "settings into a dedicated data folder.",
-        ))
+        d_lbl = QLabel(self._txt_legacy_desc())
         d_lbl.setFont(font(12))
         d_lbl.setWordWrap(True)
         d_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
@@ -288,7 +308,7 @@ class PathConfigurationSection(QFrame):
         btn_row.addStretch(1)
 
         migrate_btn = AnimButton(
-            t("settings.migrate_data_button", default="Migrate My Data"),
+            self._txt_migrate_button(),
             fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
             font_size=12, bold=True, padding="6px 16px",
         )
@@ -301,6 +321,7 @@ class PathConfigurationSection(QFrame):
         status.setFont(font(11))
         status.setWordWrap(True)
         status.setStyleSheet("background:transparent;border:none;")
+        status.hide()
         inner.addWidget(status)
 
         self._data_row_label      = lbl
@@ -369,8 +390,27 @@ class PathConfigurationSection(QFrame):
 
         if is_legacy_mode() != self._data_section_is_legacy:
             self._rebuild_data_section()
+        else:
+            self._retranslate_data_section()
 
         self._load_current_paths()
+
+    def _retranslate_data_section(self):
+        if hasattr(self, "_data_row_label"):
+            self._data_row_label.setText(self._txt_data_folder())
+
+        if self._data_section_is_legacy:
+            if hasattr(self, "_data_row_desc"):
+                self._data_row_desc.setText(self._txt_legacy_desc())
+            if hasattr(self, "_data_migrate_btn"):
+                self._data_migrate_btn.setText(self._txt_migrate_button())
+        else:
+            if hasattr(self, "_data_row_desc"):
+                self._data_row_desc.setText(self._txt_data_folder_desc())
+            if hasattr(self, "_data_browse_btn"):
+                self._data_browse_btn.setText(t("common.browse"))
+
+        self._clear_status("data")
 
 
     def _load_current_paths(self):
@@ -465,10 +505,23 @@ class PathConfigurationSection(QFrame):
                                     default="Folder changed, but some files may not have moved"), False)
 
     def _status(self, attr: str, text: str, ok: bool):
+        lbl: Optional[QLabel] = getattr(self, f"_{attr}_status", None)
+        if lbl is None:
+            return
+        if not text:
+            self._clear_status(attr)
+            return
         color = COLORS["success"] if ok else COLORS["error"]
-        lbl: QLabel = getattr(self, f"_{attr}_status")
         lbl.setText(text)
-        lbl.setStyleSheet(f"color:{color};background:transparent;")
+        lbl.setStyleSheet(f"color:{color};background:transparent;border:none;")
+        lbl.show()
+
+    def _clear_status(self, attr: str):
+        lbl: Optional[QLabel] = getattr(self, f"_{attr}_status", None)
+        if lbl is None:
+            return
+        lbl.setText("")
+        lbl.hide()
 
     def _validate_beamng(self, path: str, show_success: bool = True) -> bool:
         if not os.path.exists(path):
@@ -494,7 +547,7 @@ class PathConfigurationSection(QFrame):
         if show_success:
             self._status("beamng", t("settings.valid_beamng_install"), True)
         else:
-            self._beamng_status.setText("")
+            self._clear_status("beamng")
         return True
 
     def _validate_mods(self, path: str, show_success: bool = True) -> bool:
@@ -508,7 +561,7 @@ class PathConfigurationSection(QFrame):
         if show_success:
             self._status("mods", t("settings.valid_mods_folder"), True)
         else:
-            self._mods_status.setText("")
+            self._clear_status("mods")
         return True
 
 

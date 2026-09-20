@@ -249,5 +249,7 @@ def show_legacy_migration_dialog_if_needed(
         return False
 
     dialog = LegacyMigrationDialog(parent, info, on_done)
-    dialog.show()
+    if parent is not None:
+        parent._legacy_migration_dialog = dialog
+    dialog.exec()
     return True

@@ -9,6 +9,7 @@ imageio>=2.28.0
 
 # ── HTTP Requests (update checker, online tab) ────────────────────────────────
 requests>=2.31.0
+deep-translator>=1.11.4
 
 # ── Windows-specific (optional — better taskbar / file-dialog integration) ────
 pywin32>=306; sys_platform == 'win32'

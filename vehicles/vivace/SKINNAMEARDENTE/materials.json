@@ -11,11 +11,11 @@
         "colorPaletteMap": "/vehicles/vivace/ardente/ardente_skin_race_p.color.png",
         "colorPaletteMapUseUV": 1,
         "diffuseMapUseUV": null,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "normalDetailMapUseUV": 1,
         "normalMap": "vehicles/vivace/ardente/ardente_main_nm.normal.png",
         "opacityMapUseUV": null,
-        "roughnessFactor": null,
+        "roughnessFactor": 0.15,
 		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
         "detailNormalMapStrength": 0.100000001,
         "detailScale": [
@@ -31,11 +31,11 @@
         "detailNormalMapStrength": null,
         "detailScale": null,
         "diffuseMapUseUV": 1,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/vivace/ardente/ardente_main_m.data.png",
         "normalDetailMapUseUV": null,
         "normalMap": "/vehicles/vivace/ardente/ardente_main_nm.normal.png",
-        "roughnessFactor": null,
+        "roughnessFactor": 0.15,
         "roughnessMap": "/vehicles/vivace/ardente/ardente_main_r.data.png"
       }
     ],

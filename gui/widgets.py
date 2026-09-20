@@ -1,8 +1,9 @@
 from __future__ import annotations
+import re
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, Signal, Property
-from PySide6.QtGui import QColor, QPainter, QBrush, QFont, QEnterEvent
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, QEvent, Signal, Property
+from PySide6.QtGui import QColor, QPainter, QBrush, QFont, QEnterEvent, QFontMetrics
 from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QLineEdit, QVBoxLayout, QHBoxLayout, QGraphicsOpacityEffect, QStackedWidget
 
 from gui.theme import COLORS, font, drop_shadow, fade_in
@@ -250,7 +251,9 @@ class LabelledEntry(QWidget):
         if label:
             lbl = QLabel(label, self)
             lbl.setFont(font(11, "bold"))
-            lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+            lbl.setStyleSheet(
+                f"color:{COLORS['text']};background:transparent;border:none;"
+            )
             layout.addWidget(lbl)
 
         self.entry = QLineEdit(self)
@@ -306,6 +309,10 @@ _TYPE_ICONS = {
 }
 
 class Toast(QFrame):
+    _WIDTH      = 380
+    _MAX_HEIGHT = 260
+    _MARGIN     = 20
+
     def __init__(
         self,
         parent: QWidget,
@@ -315,12 +322,20 @@ class Toast(QFrame):
     ):
         super().__init__(parent)
 
+        if kind == "error":
+            duration = max(duration, 8000)
+        elif kind == "warning":
+            duration = max(duration, 5000)
+        else:
+            duration = max(duration, 1500 + len(message) * 40)
         self._duration = duration
+        self._hover    = False
         accent = _TYPE_COLORS.get(kind, COLORS["accent"])
         icon   = _TYPE_ICONS.get(kind, "ℹ️")
 
+        self.setObjectName("toastFrame")
         self.setStyleSheet(f"""
-            QFrame {{
+            #toastFrame {{
                 background-color: {COLORS['card_bg']};
                 border-radius: 10px;
                 border: 1px solid {accent};
@@ -335,28 +350,96 @@ class Toast(QFrame):
         icon_lbl = QLabel(icon)
         icon_lbl.setFont(font(18))
         icon_lbl.setStyleSheet("background:transparent;border:none;")
-        row.addWidget(icon_lbl)
+        icon_lbl.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        row.addWidget(icon_lbl, 0, Qt.AlignTop)
 
-        msg_lbl = QLabel(message)
+        msg_lbl = QLabel(self._make_wrappable(message))
         msg_lbl.setFont(font(13))
-        msg_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        msg_lbl.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
         msg_lbl.setWordWrap(True)
-        row.addWidget(msg_lbl, 1)
+        msg_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        msg_lbl.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        msg_lbl.setTextFormat(Qt.PlainText)
+        self._msg_lbl = msg_lbl
 
-        self.setFixedWidth(360)
-        self.adjustSize()
+        body: QWidget = msg_lbl
+        self.setFixedWidth(self._WIDTH)
+        m = row.contentsMargins()
+        icon_w = icon_lbl.sizeHint().width()
+        text_w = self._WIDTH - m.left() - m.right() - icon_w - row.spacing() - 4
+        msg_lbl.setFixedWidth(text_w)
+        text_h = msg_lbl.heightForWidth(text_w)
+        msg_lbl.setMinimumHeight(text_h)
+
+        max_body_h = self._MAX_HEIGHT - m.top() - m.bottom()
+        if text_h > max_body_h:
+            from PySide6.QtWidgets import QScrollArea
+            scroll = QScrollArea()
+            scroll.setWidget(msg_lbl)
+            scroll.setWidgetResizable(False)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setFixedHeight(max_body_h)
+            scroll.setFixedWidth(text_w + 14)
+            scroll.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            scroll.setContentsMargins(0, 0, 0, 0)
+            scroll.setViewportMargins(0, 0, 0, 0)
+            scroll.setStyleSheet(
+                "QScrollArea{background:transparent;border:none;}"
+                "QScrollArea > QWidget > QWidget{background:transparent;}"
+            )
+            body = scroll
+
+        row.addWidget(body, 1)
+
+        self.setFixedHeight(
+            min(self._MAX_HEIGHT, text_h + m.top() + m.bottom())
+        )
         self._reposition()
+
         fade_in(self, 200)
-        QTimer.singleShot(duration, self._dismiss)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._dismiss)
+        self._timer.start(duration)
+
+        parent.installEventFilter(self)
+
+    @staticmethod
+    def _make_wrappable(text: str) -> str:
+        def _soften(m):
+            return re.sub(r"([\\/_.:,-])", "\\1\u200b", m.group(0))
+        return re.sub(r"\S{24,}", _soften, text)
+
+    def enterEvent(self, event):
+        self._hover = True
+        if hasattr(self, "_timer"):
+            self._timer.stop()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        if hasattr(self, "_timer"):
+            self._timer.start(2000)
+        super().leaveEvent(event)
+
+    def eventFilter(self, obj, event):
+        if obj is self.parent() and event.type() == QEvent.Resize:
+            self._reposition()
+        return super().eventFilter(obj, event)
 
     def _reposition(self):
         p = self.parent()
         if p:
             pg = p.rect()
-            self.move(pg.right() - self.width() - 20,
-                      pg.bottom() - self.height() - 20)
+            self.move(pg.right() - self.width() - self._MARGIN,
+                      pg.bottom() - self.height() - self._MARGIN)
 
     def _dismiss(self):
+        if self._hover:
+            return
         fx = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(fx)
         anim = QPropertyAnimation(fx, b"opacity", self)
@@ -420,7 +503,7 @@ class VehicleCard(QFrame):
 
         self.setStyleSheet(f"""
             QFrame {{
-                background-color: {COLORS['card_bg']};
+                background-color: {COLORS['frame_bg']};
                 border-radius: 8px;
                 border: 1px solid {COLORS['border']};
             }}
@@ -441,6 +524,9 @@ class VehicleCard(QFrame):
         name_lbl.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
+        name_lbl.setToolTip(display_name)
+        _fm = QFontMetrics(name_lbl.font())
+        name_lbl.setText(_fm.elidedText(display_name, Qt.ElideRight, 220))
         row.addWidget(name_lbl, 1)
 
         if is_custom:
@@ -450,9 +536,8 @@ class VehicleCard(QFrame):
                 QLabel {{
                     color: {COLORS['text_secondary']};
                     background: transparent;
-                    border: 1px solid {COLORS['border']};
-                    border-radius: 3px;
-                    padding: 0px 4px;
+                    border: none;
+                    padding: 0px 2px;
                 }}
             """)
             row.addWidget(mod_badge)

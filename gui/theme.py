@@ -36,6 +36,8 @@ DARK_COLORS: dict[str, str] = {
     "separator":            "#1a1a1a",
     "overlay":              "rgba(10,10,10,0.85)",
     "glass_bg":             "rgba(20,20,20,0.75)",
+    "scroll_track":         "#0d0d0d",
+    "scroll_handle":        "#ffffff",
 }
 
 LIGHT_COLORS: dict[str, str] = {
@@ -66,6 +68,8 @@ LIGHT_COLORS: dict[str, str] = {
     "separator":            "#e0e0e0",
     "overlay":              "rgba(240,240,240,0.90)",
     "glass_bg":             "rgba(255,255,255,0.85)",
+    "scroll_track":         "#dcdcdc",
+    "scroll_handle":        "#1a1a1a",
 }
 
 COLORS: dict[str, str] = dict(DARK_COLORS)
@@ -232,34 +236,61 @@ QWidget {{
     border: none;
     outline: none;
 }}
+/* ---- scrollbars: dark track, white handle, accent on hover ---- */
 QScrollBar:vertical {{
-    background: {COLORS['frame_bg']};
-    width: 8px;
-    border-radius: 4px;
+    background: {COLORS['scroll_track']};
+    width: 10px;
+    margin: 0px;
+    border: none;
+    border-radius: 5px;
 }}
 QScrollBar::handle:vertical {{
-    background: {COLORS['border']};
-    border-radius: 4px;
+    background: {COLORS['scroll_handle']};
     min-height: 30px;
+    margin: 2px;
+    border-radius: 3px;
 }}
 QScrollBar::handle:vertical:hover {{
     background: {COLORS['accent']};
 }}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QScrollBar::handle:vertical:pressed {{
+    background: {COLORS['accent_hover']};
+}}
 QScrollBar:horizontal {{
-    background: {COLORS['frame_bg']};
-    height: 8px;
-    border-radius: 4px;
+    background: {COLORS['scroll_track']};
+    height: 10px;
+    margin: 0px;
+    border: none;
+    border-radius: 5px;
 }}
 QScrollBar::handle:horizontal {{
-    background: {COLORS['border']};
-    border-radius: 4px;
+    background: {COLORS['scroll_handle']};
     min-width: 30px;
+    margin: 2px;
+    border-radius: 3px;
 }}
 QScrollBar::handle:horizontal:hover {{
     background: {COLORS['accent']};
 }}
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+QScrollBar::handle:horizontal:pressed {{
+    background: {COLORS['accent_hover']};
+}}
+QScrollBar::add-line, QScrollBar::sub-line {{
+    width: 0px;
+    height: 0px;
+    background: none;
+    border: none;
+}}
+QScrollBar::add-page, QScrollBar::sub-page {{
+    background: {COLORS['scroll_track']};
+    border-radius: 5px;
+}}
+QScrollBar::up-arrow, QScrollBar::down-arrow,
+QScrollBar::left-arrow, QScrollBar::right-arrow {{
+    background: none;
+    width: 0px;
+    height: 0px;
+}}
 QToolTip {{
     background-color: {COLORS['card_bg']};
     color: {COLORS['text']};
@@ -458,8 +489,21 @@ def fade_in(
     start: float = 0.0,
     end: float = 1.0,
 ) -> QPropertyAnimation:
+    if widget.isWindow():
+        widget.setWindowOpacity(start)
+        widget.show()
+        anim = QPropertyAnimation(widget, b"windowOpacity", widget)
+        anim.setDuration(duration)
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.start(QPropertyAnimation.DeleteWhenStopped)
+        return anim
+
     existing = widget.graphicsEffect()
     if isinstance(existing, QGraphicsDropShadowEffect):
+        print("[WARNING] fade_in: widget has a drop shadow effect; "
+              "showing without fade (fade the parent window instead)")
         widget.show()
         return QPropertyAnimation(widget)
 

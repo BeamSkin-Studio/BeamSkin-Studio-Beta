@@ -654,6 +654,8 @@ def _generate_variant_dds_skin(
 
 MAX_TOTAL_LAYERS = 4
 
+_DEFAULT_DETAIL_SCALE = (1500, 750)
+
 _CUSTOM_LAYER_KEY_ORDER = [
     "diffuseMapUseUV",
     "clearCoatFactor",
@@ -662,6 +664,9 @@ _CUSTOM_LAYER_KEY_ORDER = [
     "metallicMapUseUV",
     "normalMapUseUV",
     "opacityMapUseUV",
+    "opacityDetailMapUseUV",
+    "detailMapUseUV",
+    "detailScale",
     "retroreflectivity",
     "roughnessFactor",
     "roughnessMapUseUV",
@@ -674,8 +679,11 @@ _CUSTOM_LAYER_KEY_ORDER = [
     "colorPaletteMap",
     "normalMap",
     "opacityMap",
+    "opacityDetailMap",
     "roughnessMap",
+    "roughnessDetailMap",
     "metallicMap",
+    "metallicDetailMap",
     "emissiveMap",
 ]
 
@@ -806,13 +814,21 @@ def _copy_layer_opacity(layer: dict, layer_idx: int, base_carid: str,
     return ref_body, ref_variant
 
 
+_DETAIL_MAP_EXTS = (".dds", ".png")
+
+
+def _detail_ext(src: str) -> str:
+    ext = os.path.splitext(src)[1].lower()
+    return ext if ext in _DETAIL_MAP_EXTS else ".png"
+
+
 def _copy_layer_map(layer: dict, layer_idx: int, base_carid: str,
                      skin_folder: str, dest_skin_folder: str,
                      skin_id: str, path_key: str, suffix: str,
-                     variant_suffix: str = ""):
+                     variant_suffix: str = "", keep_ext: bool = False):
     prefix = f"{skin_id}_layer{layer_idx}"
     print(f"[DEBUG] _copy_layer_map: layer_idx={layer_idx} path_key={path_key!r} "
-          f"suffix={suffix!r} variant_suffix={variant_suffix!r}")
+          f"suffix={suffix!r} variant_suffix={variant_suffix!r} keep_ext={keep_ext}")
 
     def _dest_ref(fn):
         return f"vehicles/{base_carid}/{skin_folder}/{fn}"
@@ -822,7 +838,8 @@ def _copy_layer_map(layer: dict, layer_idx: int, base_carid: str,
         print(f"[DEBUG] _copy_layer_map: no {path_key!r}, returning (None, None)")
         return None, None
 
-    fn = f"{prefix}_{suffix}.png"
+    ext = _detail_ext(src) if keep_ext else ".png"
+    fn = f"{prefix}_{suffix}{ext}"
     fn = _copy_dedup(src, dest_skin_folder, fn)
     ref_body = _dest_ref(fn)
     print(f"[DEBUG] _copy_layer_map: ref_body={ref_body}")
@@ -831,7 +848,8 @@ def _copy_layer_map(layer: dict, layer_idx: int, base_carid: str,
     if variant_suffix:
         src_2 = layer.get(f"{path_key}_2", "")
         if src_2:
-            fn_2 = f"{prefix}_{variant_suffix}_{suffix}.png"
+            ext_2 = _detail_ext(src_2) if keep_ext else ".png"
+            fn_2 = f"{prefix}_{variant_suffix}_{suffix}{ext_2}"
             fn_2 = _copy_dedup(src_2, dest_skin_folder, fn_2)
             ref_variant = _dest_ref(fn_2)
             print(f"[DEBUG] _copy_layer_map: ref_variant={ref_variant}")
@@ -907,16 +925,51 @@ def _norm_factor(value):
     return value
 
 
+def _parse_detail_scale(value):
+    if value is None:
+        return None
+    parts = None
+    if isinstance(value, (list, tuple)):
+        parts = list(value)
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        parts = [value, value]
+    elif isinstance(value, str):
+        txt = value.strip().strip("[]()")
+        if not txt:
+            return None
+        parts = [p for p in re.split(r"[,\s;xX]+", txt) if p]
+    if not parts:
+        return None
+    if len(parts) == 1:
+        parts = [parts[0], parts[0]]
+    if len(parts) != 2:
+        print(f"[WARNING] _parse_detail_scale: expected 2 values, got {value!r}")
+        return None
+    try:
+        nums = [float(p) for p in parts]
+    except (TypeError, ValueError):
+        print(f"[WARNING] _parse_detail_scale: non-numeric value {value!r}")
+        return None
+    if any(n <= 0 for n in nums):
+        print(f"[WARNING] _parse_detail_scale: scale must be > 0, got {value!r}")
+        return None
+    return [int(n) if n == int(n) else n for n in nums]
+
+
 def _build_layer_stage(layer: dict, base_color_ref, opacity_ref, emissive_ref,
-                        roughness_ref=None, metallic_ref=None, normal_ref=None) -> dict:
+                        roughness_ref=None, metallic_ref=None, normal_ref=None,
+                        opacity_detail_ref=None, roughness_detail_ref=None,
+                        metallic_detail_ref=None) -> dict:
     is_colorable = bool(layer.get("is_colorable"))
     print(f"[DEBUG] _build_layer_stage: is_colorable={is_colorable} "
           f"has_opacity={bool(opacity_ref)} has_normal={bool(normal_ref)} "
           f"has_roughness={bool(roughness_ref)} has_metallic={bool(metallic_ref)} "
+          f"has_opacity_detail={bool(opacity_detail_ref)} "
+          f"has_roughness_detail={bool(roughness_detail_ref)} "
+          f"has_metallic_detail={bool(metallic_detail_ref)} "
           f"glowing={bool(layer.get('glowing'))}")
 
     stage = {
-        "diffuseMapUseUV":         1,
         "clearCoatFactor":         _norm_factor(layer.get("clear_coat_factor", 0.4)),
         "clearCoatRoughnessFactor": _norm_factor(layer.get("clear_coat_roughness_factor", 0.1)),
         "metallicFactor":          _norm_factor(layer.get("metallic_factor", 0.0)),
@@ -932,9 +985,14 @@ def _build_layer_stage(layer: dict, base_color_ref, opacity_ref, emissive_ref,
     else:
         stage["baseColorMap"] = base_color_ref
 
+    use_secondary_uv = layer.get("diffuse_map_use_uv", False)
+    if use_secondary_uv:
+        stage["diffuseMapUseUV"] = 1
+
     if opacity_ref:
-        stage["opacityMap"]       = opacity_ref
-        stage["opacityMapUseUV"]  = 1
+        stage["opacityMap"] = opacity_ref
+        if use_secondary_uv:
+            stage["opacityMapUseUV"] = 1
 
     if normal_ref:
         stage["normalMap"]      = normal_ref
@@ -947,6 +1005,26 @@ def _build_layer_stage(layer: dict, base_color_ref, opacity_ref, emissive_ref,
     if metallic_ref:
         stage["metallicMap"]      = metallic_ref
         stage["metallicMapUseUV"] = 1
+
+    if opacity_detail_ref:
+        stage["opacityDetailMap"] = opacity_detail_ref
+        if use_secondary_uv:
+            stage["opacityDetailMapUseUV"] = 1
+
+    if roughness_detail_ref:
+        stage["roughnessDetailMap"] = roughness_detail_ref
+
+    if metallic_detail_ref:
+        stage["metallicDetailMap"] = metallic_detail_ref
+
+    if opacity_detail_ref or roughness_detail_ref or metallic_detail_ref:
+        if use_secondary_uv:
+            stage["detailMapUseUV"] = 1
+        scale = _parse_detail_scale(layer.get("detail_scale"))
+        if scale is None:
+            scale = list(_DEFAULT_DETAIL_SCALE)
+            print(f"[DEBUG] _build_layer_stage: no valid detail_scale, using default {scale}")
+        stage["detailScale"] = scale
 
     if layer.get("glowing") and emissive_ref:
         stage["emissiveMap"]      = emissive_ref
@@ -997,6 +1075,21 @@ def _inject_custom_layers(skin_data, base_carid, skin_folder, dest_skin_folder,
             layer, idx, base_carid, skin_folder, dest_skin_folder, skin_id,
             "metallic_map_path", "metallic", variant_suffix
         )
+        opacity_detail_body, opacity_detail_var = _copy_layer_map(
+            layer, idx, base_carid, skin_folder, dest_skin_folder, skin_id,
+            "opacity_detail_map_path", "opacity_detail.data", variant_suffix,
+            keep_ext=True
+        )
+        roughness_detail_body, roughness_detail_var = _copy_layer_map(
+            layer, idx, base_carid, skin_folder, dest_skin_folder, skin_id,
+            "roughness_detail_map_path", "roughness_detail.data", variant_suffix,
+            keep_ext=True
+        )
+        metallic_detail_body, metallic_detail_var = _copy_layer_map(
+            layer, idx, base_carid, skin_folder, dest_skin_folder, skin_id,
+            "metallic_detail_map_path", "metallic_detail.data", variant_suffix,
+            keep_ext=True
+        )
         normal_body, normal_var = _copy_layer_normal(
             layer, idx, base_carid, skin_folder, dest_skin_folder, skin_id, variant_suffix
         )
@@ -1010,13 +1103,17 @@ def _inject_custom_layers(skin_data, base_carid, skin_folder, dest_skin_folder,
                       f"but no emissive map — glow skipped for this layer")
 
         per_layer_refs.append({
-            "body":    (base_body, opacity_body, emissive_body, roughness_body, metallic_body, normal_body),
+            "body":    (base_body, opacity_body, emissive_body, roughness_body, metallic_body, normal_body,
+                        opacity_detail_body, roughness_detail_body, metallic_detail_body),
             "variant": (base_var if is_variant else base_body,
                         opacity_var if is_variant else opacity_body,
                         emissive_var if is_variant else emissive_body,
                         roughness_var if is_variant else roughness_body,
                         metallic_var if is_variant else metallic_body,
-                        normal_var if is_variant else normal_body),
+                        normal_var if is_variant else normal_body,
+                        opacity_detail_var if is_variant else opacity_detail_body,
+                        roughness_detail_var if is_variant else roughness_detail_body,
+                        metallic_detail_var if is_variant else metallic_detail_body),
         })
 
     mat_files = []
@@ -1070,10 +1167,13 @@ def _inject_custom_layers(skin_data, base_carid, skin_folder, dest_skin_folder,
                 refs = per_layer_refs[idx] if idx < len(per_layer_refs) else None
                 if not refs:
                     continue
-                base_ref, opacity_ref, emissive_ref, roughness_ref, metallic_ref, normal_ref = refs[body_key]
+                (base_ref, opacity_ref, emissive_ref, roughness_ref, metallic_ref, normal_ref,
+                 opacity_detail_ref, roughness_detail_ref, metallic_detail_ref) = refs[body_key]
 
                 stage = _build_layer_stage(layer, base_ref, opacity_ref, emissive_ref,
-                                            roughness_ref, metallic_ref, normal_ref)
+                                            roughness_ref, metallic_ref, normal_ref,
+                                            opacity_detail_ref, roughness_detail_ref,
+                                            metallic_detail_ref)
                 stages.append(stage)
                 modified = True
                 print(f"[DEBUG]   ✓ custom layer {idx} ({label}) appended to "

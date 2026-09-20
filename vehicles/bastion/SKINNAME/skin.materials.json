@@ -6,10 +6,11 @@
     "persistentId": "5c15b37e-b698-4bd3-83a8-702c9d774f53",
     "Stages": [
       {
+        "roughnessFactor": 0.15,
         "ambientOcclusionMap": "/vehicles/bastion/bastion_main_ao.data.png",
         "baseColorMap": "/vehicles/bastion/bastion_main_b.color.png",
         "colorPaletteMapUseUV": 1,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/bastion/bastion_main_m.data.png",
         "normalMap": "vehicles/bastion/bastion_main_nm.normal.png",
         "roughnessMap": "/vehicles/bastion/bastion_main_r.data.png"
@@ -19,11 +20,11 @@
         "baseColorMap": "/vehicles/bastion/skinname/bastion_skin_skinname.png",
         "clearCoatFactor": 1,
         "clearCoatMap": "/vehicles/bastion/bastion_main_cc.data.png",
-        "clearCoatRoughnessFactor": 0.1,
+        "clearCoatRoughnessFactor": 0.05,
         "colorPaletteMapUseUV": 1,
         "diffuseMapUseUV": 1,
-        "metallicFactor": 0.2,
-        "roughnessFactor": 0.4,
+        "metallicFactor": 0,
+        "roughnessFactor": 0.15,
         "metallicMap": "vehicles/bastion/bastion_main_m.data.png",
         "normalMap": "/vehicles/bastion/bastion_main_nm.normal.png",
         "opacityMap": "/vehicles/bastion/bastion_main_c.data.png",

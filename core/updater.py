@@ -16,7 +16,7 @@ from PySide6.QtGui     import QFont
 from PySide6.QtWidgets import (
     QDialog, QWidget, QFrame, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QProgressBar,
-    QStackedWidget, QApplication,
+    QStackedWidget, QApplication, QSizePolicy,
 )
 
 try:
@@ -32,7 +32,16 @@ try:
     from gui.theme import COLORS, font, fade_in
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
-    COLORS = {'card_bg': '#1e1e2e', 'frame_bg': '#181825', 'accent': '#7c3aed', 'accent_hover': '#6d28d9', 'accent_dim': '#5b21b6', 'accent_text': '#ffffff', 'text': '#cdd6f4', 'text_secondary': '#a6adc8', 'border': '#313244', 'card_hover': '#27273a', 'success': '#a6e3a1', 'error': '#f38ba8', 'warning': '#f9e2af'}
+    COLORS = {
+        'app_bg': '#0d0d0d', 'sidebar_bg': '#141414', 'topbar_bg': '#111111',
+        'frame_bg': '#1a1a1a', 'card_bg': '#1f1f1f', 'card_hover': '#2a2a2a',
+        'accent': '#ff6a00', 'accent_hover': '#ff8533', 'accent_dim': '#cc5500',
+        'accent_text': '#ffffff',
+        'text': '#f2f2f2', 'text_secondary': '#a8a8a8', 'text_muted': '#6e6e6e',
+        'border': '#2e2e2e', 'border_focus': '#ff6a00',
+        'success': '#4ade80', 'error': '#ff4d4f', 'error_hover': '#d93a3c',
+        'warning': '#f59e0b', 'warning_hover': '#d97706',
+    }
     def font(size=13, weight='normal'):
         f = QFont('Segoe UI', size)
         f.setBold(weight == 'bold')
@@ -642,6 +651,193 @@ _PAGE_COMPLETE    = 4
 _PAGE_DL_ERROR    = 5
 
 
+def _c(key: str, fallback: str = "") -> str:
+    return COLORS.get(key) or fallback
+
+def _rgba(hex_color: str, alpha: float) -> str:
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(ch * 2 for ch in h)
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    except ValueError:
+        return hex_color
+    return f"rgba({r},{g},{b},{int(alpha * 255)})"
+
+
+def _canvas() -> str:
+    return _c("sidebar_bg", _c("app_bg", _c("frame_bg", "#181825")))
+
+
+class _Panel(QFrame):
+
+    def __init__(self, parent: QWidget = None, tone: str = "card"):
+        super().__init__(parent)
+        self.setObjectName("updPanel")
+        bg     = _c("card_bg") if tone == "card" else _c("frame_bg")
+        border = _c("border")
+        if tone == "accent":
+            bg, border = _c("card_bg"), _c("accent")
+        self.setStyleSheet(f"""
+            QFrame#updPanel {{
+                background: {bg};
+                border: 1px solid {border};
+                border-radius: 10px;
+            }}
+        """)
+        self.lay = QVBoxLayout(self)
+        self.lay.setContentsMargins(8, 8, 8, 8)
+        self.lay.setSpacing(6)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
+
+class _SectionHeader(QFrame):
+
+    def __init__(self, text: str, right: QWidget = None):
+        super().__init__()
+        self.setFixedHeight(30)
+        self.setStyleSheet("background:transparent;border:none;")
+        row = QHBoxLayout(self)
+        row.setContentsMargins(6, 0, 6, 0)
+        row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{_c('accent')};border:none;border-radius:1px;"
+        )
+        row.addWidget(marker)
+
+        self.label = QLabel(text.upper())
+        self.label.setFont(font(10, "bold"))
+        self.label.setStyleSheet(
+            f"color:{_c('text')};background:transparent;border:none;"
+        )
+        row.addWidget(self.label)
+        row.addStretch()
+        if right is not None:
+            row.addWidget(right)
+
+    def set_text(self, text: str):
+        self.label.setText(text.upper())
+
+
+class _Chip(QLabel):
+
+    def __init__(self, text: str, kind: str = "muted"):
+        super().__init__(text)
+        self.setFont(font(9, "bold"))
+        self.setAlignment(Qt.AlignCenter)
+        self.setFixedHeight(20)
+        self.set_kind(kind)
+
+    def set_kind(self, kind: str):
+        if kind == "accent":
+            fg, bg, bd = _c("accent_text", "#ffffff"), _c("accent"), _c("accent_hover", _c("accent"))
+        elif kind == "success":
+            s = _c("success", "#4ade80")
+            fg, bg, bd = s, _rgba(s, 0.13), _rgba(s, 0.35)
+        elif kind == "error":
+            e = _c("error", "#e74c3c")
+            fg, bg, bd = e, _rgba(e, 0.13), _rgba(e, 0.35)
+        else:
+            fg, bg, bd = _c("text_secondary"), _c("frame_bg"), _c("border")
+        self.setStyleSheet(f"""
+            QLabel {{
+                color:{fg}; background:{bg};
+                border:1px solid {bd}; border-radius:6px;
+                padding:0 8px;
+            }}
+        """)
+
+
+class _StepRow(QFrame):
+
+    PENDING, ACTIVE, DONE, FAILED = range(4)
+
+    def __init__(self, title: str):
+        super().__init__()
+        self.setFixedHeight(40)
+        self._state = self.PENDING
+        self.setObjectName("stepRow")
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 0, 10, 0)
+        row.setSpacing(10)
+
+        self._dot = QLabel()
+        self._dot.setFixedSize(18, 18)
+        self._dot.setAlignment(Qt.AlignCenter)
+        row.addWidget(self._dot)
+
+        self._title = QLabel(title)
+        self._title.setFont(font(11, "bold"))
+        row.addWidget(self._title, 1)
+
+        self._detail = QLabel("")
+        self._detail.setFont(font(10))
+        row.addWidget(self._detail)
+
+        self.set_state(self.PENDING)
+
+    def set_detail(self, text: str):
+        self._detail.setText(text)
+
+    def set_state(self, state: int):
+        self._state = state
+        accent  = _c("accent")
+        success = _c("success", "#a6e3a1")
+        error   = _c("error", "#e74c3c")
+        muted   = _c("text_muted", _c("text_secondary"))
+
+        if state == self.ACTIVE:
+            border, bg = accent, _c("card_hover", _c("frame_bg"))
+            glyph, gfg, gbg = "●", _c("accent_text", "#ffffff"), accent
+            tfg = _c("text")
+        elif state == self.DONE:
+            border, bg = _c("border"), _c("frame_bg")
+            glyph, gfg, gbg = "✓", "#0b0b0b", success
+            tfg = _c("text")
+        elif state == self.FAILED:
+            border, bg = error, _c("frame_bg")
+            glyph, gfg, gbg = "✕", "white", error
+            tfg = _c("text")
+        else:
+            border, bg = _c("border"), _c("frame_bg")
+            glyph, gfg, gbg = "", muted, _c("card_bg")
+            tfg = _c("text_secondary")
+
+        self.setStyleSheet(f"""
+            QFrame#stepRow {{
+                background:{bg}; border:1px solid {border}; border-radius:8px;
+            }}
+        """)
+        self._dot.setText(glyph)
+        self._dot.setFont(font(9, "bold"))
+        self._dot.setStyleSheet(f"""
+            QLabel {{
+                background:{gbg}; color:{gfg};
+                border:1px solid {border if state == self.PENDING else gbg};
+                border-radius:9px;
+            }}
+        """)
+        self._title.setStyleSheet(f"color:{tfg};background:transparent;border:none;")
+        self._detail.setStyleSheet(
+            f"color:{_c('text_secondary')};background:transparent;border:none;"
+        )
+
+
+class _AutoStack(QStackedWidget):
+
+    def sizeHint(self):
+        w = self.currentWidget()
+        return w.sizeHint() if w is not None else super().sizeHint()
+
+    def minimumSizeHint(self):
+        w = self.currentWidget()
+        return w.minimumSizeHint() if w is not None else super().minimumSizeHint()
+
+
 class _UpdateDialog(QDialog):
     def __init__(self, parent: QWidget, new_version: str, on_done=None):
         super().__init__(parent)
@@ -653,21 +849,15 @@ class _UpdateDialog(QDialog):
         self._ex_worker   = None
         self._swap_worker      = None
         self._swap_script_path = None
+        self._drag_pos    = None
 
         self.setWindowTitle(t("update.title", default="Update Available"))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {COLORS['frame_bg']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 16px;
-            }}
-        """)
         self.setModal(True)
-        self.setFixedWidth(500)
+        self.setFixedWidth(460)
         self._build()
-        self.adjustSize()
+        self._refit()
 
 
     def _fire_done(self):
@@ -692,467 +882,635 @@ class _UpdateDialog(QDialog):
         self._fire_done()
         super().reject()
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.position().y() <= 46:
+            self._drag_pos = (event.globalPosition().toPoint()
+                              - self.frameGeometry().topLeft())
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
+
 
     def _build(self):
-        root = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        shell = QFrame(self)
+        shell.setObjectName("updShell")
+        shell.setStyleSheet(f"""
+            QFrame#updShell {{
+                background: {_canvas()};
+                border: 1px solid {_c('border')};
+                border-radius: 12px;
+            }}
+        """)
+        outer.addWidget(shell)
+
+        root = QVBoxLayout(shell)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        header = QFrame(self)
-        header.setFixedHeight(120)
-        header.setStyleSheet(f"""
-            QFrame {{
-                background: {COLORS['frame_bg']};
-                border-bottom: 1px solid {COLORS['border']};
-                border-top-left-radius: 16px;
-                border-top-right-radius: 16px;
-            }}
-        """)
+        self._titlebar = self._build_titlebar()
+        root.addWidget(self._titlebar)
 
-        header_vlay = QVBoxLayout(header)
-        header_vlay.setContentsMargins(0, 0, 0, 0)
-        header_vlay.setSpacing(0)
+        body = QWidget()
+        body.setStyleSheet("background:transparent;")
+        self._body_w = body
+        self._shell  = shell
+        body_lay = QVBoxLayout(body)
+        body_lay.setContentsMargins(14, 14, 14, 14)
+        body_lay.setSpacing(8)
 
-        stripe = QFrame()
-        stripe.setFixedHeight(3)
-        stripe.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 {COLORS['accent']},
-                    stop:0.6 {COLORS.get('accent_hover', COLORS['accent'])},
-                    stop:1 {COLORS['frame_bg']});
-                border:none;
-            }}
-        """)
-        header_vlay.addWidget(stripe)
-
-        hrow = QHBoxLayout()
-        hrow.setContentsMargins(28, 0, 28, 0)
-        hrow.setSpacing(18)
-        header_vlay.addLayout(hrow, 1)
-
-        badge = QFrame()
-        badge.setFixedSize(52, 52)
-        badge.setStyleSheet(f"""
-            QFrame {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 {COLORS['accent']},
-                    stop:1 {COLORS.get('accent_dim', COLORS['accent'])});
-                border-radius: 14px;
-                border: none;
-            }}
-        """)
-        badge_lay = QVBoxLayout(badge)
-        badge_lay.setContentsMargins(0, 0, 0, 0)
-        icon_lbl = QLabel("↑")
-        icon_lbl.setFont(font(24, "bold"))
-        icon_lbl.setAlignment(Qt.AlignCenter)
-        icon_lbl.setStyleSheet("color: white; background: transparent; border: none;")
-        badge_lay.addWidget(icon_lbl)
-        hrow.addWidget(badge)
-
-        tcol = QVBoxLayout()
-        tcol.setSpacing(4)
-        t1 = QLabel(t("update.title", default="Update Available"))
-        t1.setFont(font(18, "bold"))
-        t1.setStyleSheet(f"color:{COLORS['text']}; background:transparent;")
-        t2 = QLabel(t("update.subtitle", default="A new version of BeamSkin Studio is ready to install"))
-        t2.setFont(font(11))
-        t2.setStyleSheet(f"color:{COLORS['text_secondary']}; background:transparent;")
-        tcol.addWidget(t1)
-        tcol.addWidget(t2)
-        hrow.addLayout(tcol, 1)
-
-        root.addWidget(header)
-
-        self._stack = QStackedWidget(self)
-        self._stack.setStyleSheet(f"""
-            QStackedWidget {{
-                background: {COLORS['card_bg']};
-                border-bottom-left-radius: 16px;
-                border-bottom-right-radius: 16px;
-            }}
-        """)
+        self._stack = _AutoStack()
+        self._stack.setStyleSheet("background:transparent;")
         self._stack.addWidget(self._page_main())
         self._stack.addWidget(self._page_downloading())
         self._stack.addWidget(self._page_downloaded())
         self._stack.addWidget(self._page_extracting())
         self._stack.addWidget(self._page_complete())
         self._stack.addWidget(self._page_dl_error())
-        root.addWidget(self._stack)
+        self._stack.currentChanged.connect(self._refit)
+        body_lay.addWidget(self._stack)
+        body_lay.addStretch(1)
+        root.addWidget(body)
 
         fade_in(self, duration=200)
 
+    def _refit(self, _idx=None):
+        page = self._stack.currentWidget()
+        if page is None:
+            return
+        lay = page.layout()
 
-    def _body(self):
-        f = QFrame()
-        f.setStyleSheet(f"background:{COLORS['card_bg']}; border:none;")
+        body_m  = self._body_w.layout().contentsMargins()
+        shell_m = self._shell.layout().contentsMargins()
+        content_w = self.width() - 2 - body_m.left() - body_m.right()
+
+        self._stack.setMinimumHeight(0)
+        self._stack.setMaximumHeight(16777215)
+        page.setFixedWidth(content_w)
+        lay.invalidate()
+        lay.activate()
+
+        if lay.hasHeightForWidth():
+            page_h = lay.totalHeightForWidth(content_w)
+        else:
+            page_h = lay.sizeHint().height()
+        page_h = max(page_h, lay.minimumSize().height())
+
+        title_h = self._titlebar.height()
+        total = (title_h + body_m.top() + page_h + body_m.bottom()
+                 + shell_m.top() + shell_m.bottom() + 2)
+
+        self._stack.setFixedHeight(page_h)
+        self.setMinimumHeight(0)
+        self.setMaximumHeight(16777215)
+        self.setFixedHeight(total)
+
+    def _build_titlebar(self) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName("updTitle")
+        bar.setFixedHeight(46)
+        bar.setStyleSheet(f"""
+            QFrame#updTitle {{
+                background: {_c('topbar_bg', _c('frame_bg'))};
+                border: none;
+                border-bottom: 1px solid {_c('border')};
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
+            }}
+        """)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(14, 0, 10, 0)
+        row.setSpacing(10)
+
+        brand = QLabel("BEAMSKIN")
+        brand.setFont(font(12, "bold"))
+        brand.setStyleSheet(
+            f"color:{_c('text')};background:transparent;border:none;"
+        )
+        studio = QLabel("STUDIO")
+        studio.setFont(font(12, "bold"))
+        studio.setStyleSheet(
+            f"color:{_c('accent')};background:transparent;border:none;"
+        )
+        row.addWidget(brand)
+        row.addWidget(studio)
+
+        sep = QFrame()
+        sep.setFixedSize(1, 16)
+        sep.setStyleSheet(f"background:{_c('border')};border:none;")
+        row.addWidget(sep)
+
+        self._title_lbl = QLabel(t("update.title", default="Updater"))
+        self._title_lbl.setFont(font(11))
+        self._title_lbl.setStyleSheet(
+            f"color:{_c('text_secondary')};background:transparent;border:none;"
+        )
+        row.addWidget(self._title_lbl)
+        row.addStretch()
+
+        self._close_x = QPushButton("✕")
+        self._close_x.setFixedSize(28, 28)
+        self._close_x.setCursor(Qt.PointingHandCursor)
+        self._close_x.setFont(font(11, "bold"))
+        self._close_x.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {_c('text_secondary')};
+                border: 1px solid transparent;
+                border-radius: 8px;
+            }}
+            QPushButton:hover {{
+                background: {_c('error', '#e74c3c')};
+                color: white;
+            }}
+        """)
+        self._close_x.clicked.connect(self.reject)
+        row.addWidget(self._close_x)
+        return bar
+
+
+    def _page(self):
+        f = QWidget()
+        f.setStyleSheet("background:transparent;")
         lay = QVBoxLayout(f)
-        lay.setContentsMargins(28, 24, 28, 28)
-        lay.setSpacing(16)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        f.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        self._page_layouts = getattr(self, "_page_layouts", [])
+        self._page_layouts.append(lay)
         return f, lay
 
-    def _sep(self):
-        s = QFrame()
-        s.setFrameShape(QFrame.Shape.HLine)
-        s.setFixedHeight(1)
-        s.setStyleSheet(f"background:{COLORS['border']}; border:none;")
-        return s
+    def _divider(self):
+        d = QFrame()
+        d.setFixedHeight(1)
+        d.setStyleSheet(f"background:{_c('border')};border:none;")
+        return d
 
-    def _btn(self, text, primary=True):
-        b = QPushButton(text)
-        b.setFont(font(12, "bold" if primary else "normal"))
-        b.setFixedHeight(44)
+    _sep = _divider
+
+    def _btn(self, text, primary=True, danger=False, height=36):
+        b = QPushButton(self._esc_amp(text))
+        b.setFont(font(12, "bold"))
+        b.setFixedHeight(height)
         b.setCursor(Qt.PointingHandCursor)
-        if primary:
-            b.setStyleSheet(f"""
-                QPushButton {{
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                        stop:0 {COLORS['accent']},
-                        stop:1 {COLORS.get('accent_hover', COLORS['accent'])});
-                    color: white;
-                    border: none;
-                    border-radius: 10px;
-                    padding: 0 20px;
-                    letter-spacing: 0.3px;
-                }}
-                QPushButton:hover {{
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                        stop:0 {COLORS.get('accent_hover', COLORS['accent'])},
-                        stop:1 {COLORS.get('accent_dim', COLORS['accent'])});
-                }}
-                QPushButton:pressed {{
-                    background: {COLORS.get('accent_dim', COLORS['accent'])};
-                }}
-                QPushButton:disabled {{
-                    background: {COLORS['border']};
-                    color: {COLORS['text_secondary']};
-                }}
-            """)
+        if danger:
+            fg, fgh = _c("error", "#e74c3c"), _c("error_hover", "#c0392b")
+            tc, bd = "white", "none"
+        elif primary:
+            fg, fgh = _c("accent"), _c("accent_hover", _c("accent"))
+            tc, bd = _c("accent_text", "#ffffff"), "none"
         else:
-            b.setStyleSheet(f"""
-                QPushButton {{
-                    background: transparent;
-                    color: {COLORS['text_secondary']};
-                    border: 1px solid {COLORS['border']};
-                    border-radius: 10px;
-                    padding: 0 20px;
-                }}
-                QPushButton:hover {{
-                    background: {COLORS.get('card_hover', COLORS['frame_bg'])};
-                    color: {COLORS['text']};
-                    border-color: {COLORS['accent']};
-                }}
-                QPushButton:pressed {{
-                    background: {COLORS['frame_bg']};
-                }}
-                QPushButton:disabled {{
-                    color: {COLORS['text_secondary']};
-                }}
-            """)
+            fg, fgh = _c("card_bg"), _c("card_hover", _c("frame_bg"))
+            tc, bd = _c("text"), f"1px solid {_c('border')}"
+        hover_border = (f"border-color:{_c('accent')};" if not primary and not danger else "")
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background:{fg}; color:{tc};
+                border:{bd}; border-radius:8px;
+                padding:4px 14px;
+            }}
+            QPushButton:hover {{ background:{fgh}; {hover_border} }}
+            QPushButton:disabled {{
+                background:{_c('border')};
+                color:{_c('text_muted', _c('text_secondary'))};
+            }}
+        """)
         return b
 
-    def _ver_pill(self, label: str, version: str, accent: bool = False):
-        w = QFrame()
-        if accent:
-            w.setStyleSheet(f"""
-                QFrame {{
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                        stop:0 {COLORS['accent']},
-                        stop:1 {COLORS.get('accent_dim', COLORS['accent'])});
-                    border-radius: 10px;
-                    border: none;
-                }}
-            """)
-        else:
-            w.setStyleSheet(f"""
-                QFrame {{
-                    background: {COLORS['frame_bg']};
-                    border-radius: 10px;
-                    border: 1px solid {COLORS['border']};
-                }}
-            """)
-        col = QVBoxLayout(w)
-        col.setContentsMargins(16, 10, 16, 10)
-        col.setSpacing(3)
+    @staticmethod
+    def _esc_amp(text: str) -> str:
+        import re as _re
+        return _re.sub(r"(?<!&)&(?!&)", "&&", text or "")
 
-        lc = "rgba(255,255,255,0.65)" if accent else COLORS["text_secondary"]
-        vc = "white" if accent else COLORS["text"]
+    def _link_btn(self, text):
+        b = QPushButton(self._esc_amp(text))
+        b.setFont(font(10))
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFlat(True)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                color:{_c('text_secondary')}; background:transparent;
+                border:none; padding:4px 0;
+            }}
+            QPushButton:hover {{ color:{_c('text')}; text-decoration:underline; }}
+        """)
+        return b
 
-        lbl = QLabel(label)
-        lbl.setFont(font(9))
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setStyleSheet(f"color:{lc}; background:transparent; border:none; letter-spacing:0.5px;")
-
-        ver = QLabel(version)
-        ver.setFont(font(13, "bold"))
-        ver.setAlignment(Qt.AlignCenter)
-        ver.setStyleSheet(f"color:{vc}; background:transparent; border:none;")
-
-        col.addWidget(lbl)
-        col.addWidget(ver)
-        return w
-
-    def _center_lbl(self, text: str, size: int = 11, bold: bool = False, color: str = None):
+    def _lbl(self, text="", size=11, bold=False, color=None, wrap=True, align=None):
         lbl = QLabel(text)
         lbl.setFont(font(size, "bold" if bold else "normal"))
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setWordWrap(True)
+        lbl.setWordWrap(wrap)
+        lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        if align is not None:
+            lbl.setAlignment(align)
         lbl.setStyleSheet(
-            f"color:{color or COLORS['text_secondary']}; background:transparent; border:none;"
+            f"color:{color or _c('text_secondary')};background:transparent;border:none;"
         )
         return lbl
 
-    def _progress_bar(self, indeterminate: bool = False):
+    def _progress_bar(self, indeterminate: bool = False, height: int = 8):
         bar = QProgressBar()
         if indeterminate:
             bar.setRange(0, 0)
         else:
             bar.setRange(0, 100)
             bar.setValue(0)
-        bar.setFixedHeight(6)
+        bar.setFixedHeight(height)
+        bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         bar.setTextVisible(False)
         bar.setStyleSheet(f"""
             QProgressBar {{
-                background: {COLORS['frame_bg']};
-                border-radius: 3px;
-                border: none;
+                background: {_c('frame_bg')};
+                border: 1px solid {_c('border')};
+                border-radius: {height // 2 + 1}px;
             }}
             QProgressBar::chunk {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 {COLORS['accent']},
-                    stop:1 {COLORS.get('accent_hover', COLORS['accent'])});
-                border-radius: 3px;
+                background: {_c('accent')};
+                border-radius: {height // 2}px;
             }}
         """)
         return bar
 
-    def _status_card(self, text: str, color: str = None):
-        card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background: {COLORS['frame_bg']};
-                border-radius: 8px;
-                border: 1px solid {COLORS['border']};
+    def _stat_tile(self, caption: str, value: str = "—"):
+        tile = QFrame()
+        tile.setObjectName("statTile")
+        tile.setFixedHeight(52)
+        tile.setStyleSheet(f"""
+            QFrame#statTile {{
+                background:{_c('frame_bg')};
+                border:1px solid {_c('border')};
+                border-radius:8px;
             }}
         """)
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(14, 10, 14, 10)
-        lbl = QLabel(text)
-        lbl.setFont(font(10))
-        lbl.setWordWrap(True)
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setStyleSheet(
-            f"color:{color or COLORS['text_secondary']}; background:transparent; border:none;"
-        )
-        lay.addWidget(lbl)
-        return card, lbl
+        col = QVBoxLayout(tile)
+        col.setContentsMargins(10, 6, 10, 6)
+        col.setSpacing(1)
+        cap = self._lbl(caption.upper(), 8, bold=True,
+                        color=_c("text_muted", _c("text_secondary")), wrap=False)
+        val = self._lbl(value, 12, bold=True, color=_c("text"), wrap=False)
+        col.addWidget(cap)
+        col.addWidget(val)
+        return tile, val
 
-    def _success_badge(self):
-        badge = QFrame()
-        badge.setFixedSize(64, 64)
+    def _version_card(self, caption: str, version: str, accent: bool = False):
+        card = QFrame()
+        card.setObjectName("verCard")
+        if accent:
+            card.setStyleSheet(f"""
+                QFrame#verCard {{
+                    background:{_c('frame_bg')};
+                    border:1px solid {_c('accent')};
+                    border-radius:8px;
+                }}
+            """)
+        else:
+            card.setStyleSheet(f"""
+                QFrame#verCard {{
+                    background:{_c('frame_bg')};
+                    border:1px solid {_c('border')};
+                    border-radius:8px;
+                }}
+            """)
+        col = QVBoxLayout(card)
+        col.setContentsMargins(12, 8, 12, 8)
+        col.setSpacing(2)
+        cap = self._lbl(caption.upper(), 8, bold=True,
+                        color=_c("accent") if accent else _c("text_muted", _c("text_secondary")),
+                        wrap=False)
+        ver = self._lbl(version, 13, bold=True,
+                        color=_c("text"), wrap=False)
+        col.addWidget(cap)
+        col.addWidget(ver)
+        return card
+
+    def _status_banner(self, kind: str = "success"):
+        badge = QLabel("✓" if kind == "success" else "!")
+        badge.setFixedSize(52, 52)
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setFont(font(22, "bold"))
+        col = _c("success", "#a6e3a1") if kind == "success" else _c("error", "#e74c3c")
         badge.setStyleSheet(f"""
-            QFrame {{
-                background: {COLORS.get('success', '#a6e3a1')}22;
-                border-radius: 32px;
-                border: 2px solid {COLORS.get('success', '#a6e3a1')}66;
+            QLabel {{
+                background:{_rgba(col, 0.13)}; color:{col};
+                border:2px solid {_rgba(col, 0.4)}; border-radius:26px;
             }}
         """)
-        lay = QVBoxLayout(badge)
-        lay.setContentsMargins(0, 0, 0, 0)
-        icon = QLabel("✓")
-        icon.setFont(font(28, "bold"))
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setStyleSheet(
-            f"color:{COLORS.get('success', '#a6e3a1')}; background:transparent; border:none;"
-        )
-        lay.addWidget(icon)
         return badge
+
+    def _centered(self, w: QWidget):
+        row = QHBoxLayout()
+        row.addStretch()
+        row.addWidget(w)
+        row.addStretch()
+        return row
 
 
     def _page_main(self):
-        f, lay = self._body()
+        f, lay = self._page()
+
+        vp = _Panel()
+        self._main_chip = _Chip(t("update.chip_new", default="NEW"), "accent")
+        vp.lay.addWidget(_SectionHeader(
+            t("update.available", default="Update Available"), right=self._main_chip
+        ))
 
         row = QHBoxLayout()
-        row.setSpacing(12)
-        current_pill = self._ver_pill(
-            t("update.current", default="CURRENT"),
-            CURRENT_VERSION,
-            accent=False,
-        )
-        new_pill = self._ver_pill(
-            t("update.latest", default="NEW VERSION"),
-            self._new_version,
-            accent=True,
-        )
+        row.setContentsMargins(2, 0, 2, 0)
+        row.setSpacing(8)
         arrow = QLabel("→")
-        arrow.setFont(font(20, "bold"))
+        arrow.setFont(font(16, "bold"))
         arrow.setAlignment(Qt.AlignCenter)
-        arrow.setFixedWidth(36)
+        arrow.setFixedWidth(22)
         arrow.setStyleSheet(
-            f"color:{COLORS['accent']}; background:transparent; border:none;"
+            f"color:{_c('accent')};background:transparent;border:none;"
         )
-        row.addWidget(current_pill, 1)
+        row.addWidget(self._version_card(
+            t("update.current", default="Installed"), CURRENT_VERSION), 1)
         row.addWidget(arrow)
-        row.addWidget(new_pill, 1)
-        lay.addLayout(row)
+        row.addWidget(self._version_card(
+            t("update.latest", default="Available"), self._new_version, accent=True), 1)
+        vp.lay.addLayout(row)
 
-        lay.addWidget(self._sep())
+        vp.lay.addSpacing(2)
+        vp.lay.addWidget(self._lbl(
+            t("update.subtitle",
+              default="A new version of BeamSkin Studio is ready to install."),
+            10, wrap=True,
+        ))
+        lay.addWidget(vp)
 
+        lay.addWidget(self._divider())
+
+        ip = _Panel()
+        ip.lay.addWidget(_SectionHeader(t("update.whats_included", default="What's Included")))
         highlights = [
             ("⚡", t("update.feat1", default="Latest features & improvements")),
             ("🛡", t("update.feat2", default="Bug fixes & stability updates")),
-            ("⚙", t("update.feat3", default="Your settings will be preserved")),
+            ("⚙", t("update.feat3", default="Your settings and custom vehicles are preserved")),
         ]
-        for emoji, text in highlights:
-            row2 = QHBoxLayout()
-            row2.setSpacing(10)
-            dot = QLabel(emoji)
-            dot.setFont(font(13))
-            dot.setFixedWidth(24)
-            dot.setStyleSheet("background:transparent; border:none;")
-            desc = QLabel(text)
-            desc.setFont(font(11))
-            desc.setStyleSheet(
-                f"color:{COLORS['text_secondary']}; background:transparent; border:none;"
-            )
-            row2.addWidget(dot)
-            row2.addWidget(desc, 1)
-            lay.addLayout(row2)
-
-        lay.addWidget(self._sep())
+        for glyph, text in highlights:
+            item = QFrame()
+            item.setObjectName("featRow")
+            item.setFixedHeight(36)
+            item.setStyleSheet(f"""
+                QFrame#featRow {{
+                    background:{_c('frame_bg')};
+                    border:1px solid {_c('border')};
+                    border-radius:8px;
+                }}
+            """)
+            r = QHBoxLayout(item)
+            r.setContentsMargins(10, 0, 10, 0)
+            r.setSpacing(10)
+            g = QLabel(glyph)
+            g.setFont(font(12))
+            g.setFixedWidth(20)
+            g.setStyleSheet("background:transparent;border:none;")
+            r.addWidget(g)
+            r.addWidget(self._lbl(text, 10, color=_c("text"), wrap=False), 1)
+            ip.lay.addWidget(item)
 
         changelog_btn = self._btn(
             t("update.view_changelog", default="📋  What's New in this version"),
-            primary=False,
+            primary=False, height=32,
         )
         changelog_btn.clicked.connect(self._on_view_changelog)
-        lay.addWidget(changelog_btn)
+        ip.lay.addSpacing(2)
+        ip.lay.addWidget(changelog_btn)
+        lay.addWidget(ip)
 
-        lay.addWidget(self._sep())
+        lay.addWidget(self._divider())
 
         brow = QHBoxLayout()
-        brow.setSpacing(10)
+        brow.setSpacing(8)
         later_btn    = self._btn(t("update.maybe_later",     default="Maybe Later"),     primary=False)
         download_btn = self._btn(t("update.download_update", default="Download Update"), primary=True)
         later_btn.clicked.connect(self.reject)
         download_btn.clicked.connect(self._start_download)
-        brow.addWidget(later_btn)
-        brow.addWidget(download_btn, 1)
+        brow.addWidget(later_btn, 1)
+        brow.addWidget(download_btn, 2)
         lay.addLayout(brow)
 
-        skip_btn = QPushButton(
-            t("update.skip_version", default="Skip this version")
-        )
-        skip_btn.setFont(font(10))
-        skip_btn.setCursor(Qt.PointingHandCursor)
-        skip_btn.setFlat(True)
-        skip_btn.setStyleSheet(f"""
-            QPushButton {{
-                color: {COLORS['text_secondary']};
-                background: transparent;
-                border: none;
-                text-decoration: underline;
-                padding: 0;
-            }}
-            QPushButton:hover {{ color: {COLORS['text']}; }}
-        """)
+        skip_btn = self._link_btn(t("update.skip_version", default="Skip this version"))
         skip_btn.clicked.connect(self._skip_this_version)
         lay.addWidget(skip_btn, alignment=Qt.AlignCenter)
-
         return f
 
     def _page_downloading(self):
-        f, lay = self._body()
+        f, lay = self._page()
 
-        lay.addWidget(self._center_lbl(
-            t("update.downloading", default="Downloading update…"),
-            14, bold=True, color=COLORS["text"],
+        p = _Panel()
+        self._dl_chip = _Chip(t("update.chip_downloading", default="DOWNLOADING"), "accent")
+        p.lay.addWidget(_SectionHeader(
+            t("update.downloading_title", default="Downloading"), right=self._dl_chip
         ))
 
-        self._dl_file_lbl = self._center_lbl("", 10)
-        lay.addWidget(self._dl_file_lbl)
+        self._dl_file_lbl = self._lbl("", 10, color=_c("text_secondary"), wrap=False)
+        p.lay.addWidget(self._dl_file_lbl)
 
         prog_row = QHBoxLayout()
         prog_row.setSpacing(10)
         self._dl_bar = self._progress_bar()
         self._dl_pct_lbl = QLabel("0%")
-        self._dl_pct_lbl.setFont(font(10, "bold"))
-        self._dl_pct_lbl.setFixedWidth(36)
+        self._dl_pct_lbl.setFont(font(11, "bold"))
+        self._dl_pct_lbl.setFixedWidth(40)
         self._dl_pct_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._dl_pct_lbl.setStyleSheet(
-            f"color:{COLORS['accent']}; background:transparent; border:none;"
+            f"color:{_c('accent')};background:transparent;border:none;"
         )
         prog_row.addWidget(self._dl_bar, 1)
         prog_row.addWidget(self._dl_pct_lbl)
-        lay.addLayout(prog_row)
+        p.lay.addLayout(prog_row)
+        lay.addWidget(p)
 
-        self._dl_size_lbl = self._center_lbl("0 MB / … MB", 10)
-        lay.addWidget(self._dl_size_lbl)
+        tiles = QHBoxLayout()
+        tiles.setSpacing(8)
+        t_size, self._dl_size_lbl  = self._stat_tile(t("update.stat_downloaded", default="Downloaded"), "0.0 MB")
+        t_total, self._dl_total_lbl = self._stat_tile(t("update.stat_total", default="Total"), "…")
+        t_ver, _ = self._stat_tile(t("update.stat_version", default="Version"), self._new_version)
+        tiles.addWidget(t_size, 1)
+        tiles.addWidget(t_total, 1)
+        tiles.addWidget(t_ver, 1)
+        lay.addLayout(tiles)
+
+        lay.addWidget(self._divider())
+
+        cancel_btn = self._btn(t("update.cancel", default="Cancel"), primary=False)
+        cancel_btn.clicked.connect(self.reject)
+        lay.addWidget(cancel_btn)
         return f
 
     def _page_downloaded(self):
-        f, lay = self._body()
+        f, lay = self._page()
 
-        badge_row = QHBoxLayout()
-        badge_row.addStretch()
-        badge_row.addWidget(self._success_badge())
-        badge_row.addStretch()
-        lay.addLayout(badge_row)
-
-        lay.addWidget(self._center_lbl(
+        p = _Panel()
+        p.lay.addWidget(_SectionHeader(
             t("update.download_complete", default="Download Complete"),
-            15, bold=True, color=COLORS["text"],
+            right=_Chip(t("update.chip_ready", default="READY"), "success"),
         ))
+        self._dl_path_lbl = self._lbl("", 9, color=_c("text_secondary"), wrap=True)
+        path_box = QFrame()
+        path_box.setObjectName("pathBox")
+        path_box.setStyleSheet(f"""
+            QFrame#pathBox {{
+                background:{_c('frame_bg')};
+                border:1px solid {_c('border')};
+                border-radius:8px;
+            }}
+        """)
+        pb = QVBoxLayout(path_box)
+        pb.setContentsMargins(10, 8, 10, 8)
+        pb.addWidget(self._dl_path_lbl)
+        path_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        p.lay.addWidget(path_box)
+        lay.addWidget(p)
 
-        self._dl_path_card, self._dl_path_lbl = self._status_card("")
-        lay.addWidget(self._dl_path_card)
-
-        lay.addWidget(self._sep())
+        lay.addWidget(self._divider())
 
         if is_frozen_build():
             extract_label = t("update.install_button", default="Install")
         else:
             extract_label = t("update.update_button", default="Extract & Install")
-        extract_btn = self._btn(extract_label, primary=True)
+        extract_btn = self._btn(extract_label, primary=True, height=40)
         open_btn    = self._btn(t("update.open_download_folder", default="Open Downloads Folder"), primary=False)
-        close_btn   = self._btn(t("update.close",                default="Close"),                primary=False)
+        close_btn   = self._btn(t("update.close", default="Close"), primary=False)
         extract_btn.clicked.connect(self._start_extract)
         open_btn.clicked.connect(self._open_downloads)
         close_btn.clicked.connect(self.reject)
         lay.addWidget(extract_btn)
-        lay.addWidget(open_btn)
-        lay.addWidget(close_btn)
+
+        sub = QHBoxLayout()
+        sub.setSpacing(8)
+        sub.addWidget(open_btn, 2)
+        sub.addWidget(close_btn, 1)
+        lay.addLayout(sub)
         return f
 
     def _page_extracting(self):
-        f, lay = self._body()
+        f, lay = self._page()
 
-        lay.addWidget(self._center_lbl(
-            t("update.extracting", default="Installing update…"),
-            14, bold=True, color=COLORS["text"],
+        p = _Panel()
+        self._ex_chip = _Chip(t("update.chip_working", default="WORKING"), "accent")
+        p.lay.addWidget(_SectionHeader(
+            t("update.extracting", default="Installing Update"), right=self._ex_chip
         ))
-        self._ex_status_lbl = self._center_lbl("Please wait…", 11)
+
+        self._steps = [
+            ("prepare", _StepRow(t("update.step_prepare", default="Preparing"))),
+            ("extract", _StepRow(t("update.step_extract", default="Extracting archive"))),
+            ("copy",    _StepRow(t("update.step_copy",    default="Copying files"))),
+            ("clean",   _StepRow(t("update.step_clean",   default="Removing obsolete files"))),
+        ]
+        for _key, row in self._steps:
+            p.lay.addWidget(row)
+        lay.addWidget(p)
+
+        self._ex_status_lbl = self._lbl(
+            t("update.please_wait", default="Please wait…"),
+            10, wrap=True,
+        )
+        self._ex_status_lbl.setAlignment(Qt.AlignCenter)
+        self._ex_status_lbl.setFixedHeight(22)
         lay.addWidget(self._ex_status_lbl)
-        lay.addWidget(self._progress_bar(indeterminate=True))
+        lay.addWidget(self._progress_bar(indeterminate=True, height=6))
+        lay.addSpacing(4)
+
+        self._ex_status_lbl.setText = self._make_status_hook(self._ex_status_lbl)
+        self._set_stage("prepare")
         return f
 
-    def _page_dl_error(self):
-        f, lay = self._body()
+    def _make_status_hook(self, label: QLabel):
+        original = label.setText
 
-        lay.addWidget(self._center_lbl(
+        def _hook(text: str):
+            original(text)
+            low = (text or "").lower()
+            if "extract" in low:
+                self._set_stage("extract")
+            elif "copy" in low:
+                self._set_stage("copy")
+            elif "remov" in low or "obsolete" in low:
+                self._set_stage("clean")
+            elif "prepar" in low:
+                self._set_stage("prepare")
+        return _hook
+
+    def _set_stage(self, stage: str):
+        keys = [k for k, _ in self._steps]
+        if stage not in keys:
+            return
+        idx = keys.index(stage)
+        for i, (_k, row) in enumerate(self._steps):
+            if i < idx:
+                row.set_state(_StepRow.DONE)
+            elif i == idx:
+                row.set_state(_StepRow.ACTIVE)
+            else:
+                row.set_state(_StepRow.PENDING)
+
+    def _finish_stages(self, ok: bool):
+        if ok:
+            for _k, row in self._steps:
+                row.set_state(_StepRow.DONE)
+            return
+        failed_marked = False
+        for _k, row in self._steps:
+            if row._state == _StepRow.ACTIVE and not failed_marked:
+                row.set_state(_StepRow.FAILED)
+                failed_marked = True
+
+    def _page_dl_error(self):
+        f, lay = self._page()
+
+        p = _Panel(tone="accent")
+        p.setStyleSheet(f"""
+            QFrame#updPanel {{
+                background:{_c('card_bg')};
+                border:1px solid {_c('error', '#e74c3c')};
+                border-radius:10px;
+            }}
+        """)
+        p.lay.addWidget(_SectionHeader(
             t("update.dl_failed_title", default="Download Failed"),
-            15, bold=True, color=COLORS.get("error", "#f38ba8"),
+            right=_Chip(t("update.chip_error", default="ERROR"), "error"),
         ))
 
-        self._dl_error_lbl = self._center_lbl("", 10)
-        lay.addWidget(self._dl_error_lbl)
+        box = QFrame()
+        box.setObjectName("errBox")
+        box.setStyleSheet(f"""
+            QFrame#errBox {{
+                background:{_c('frame_bg')};
+                border:1px solid {_c('border')};
+                border-radius:8px;
+            }}
+        """)
+        bl = QVBoxLayout(box)
+        bl.setContentsMargins(10, 8, 10, 8)
+        self._dl_error_lbl = self._lbl("", 10, wrap=True)
+        bl.addWidget(self._dl_error_lbl)
+        box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        p.lay.addWidget(box)
+        lay.addWidget(p)
 
-        lay.addWidget(self._sep())
+        lay.addWidget(self._divider())
 
         browser_btn = self._btn(
             t("update.download_manually", default="Download Manually in Browser"),
-            primary=True,
+            primary=True, height=40,
         )
         close_btn = self._btn(t("update.close", default="Close"), primary=False)
         browser_btn.clicked.connect(self._open_browser_fallback)
@@ -1166,25 +1524,39 @@ class _UpdateDialog(QDialog):
         self.reject()
 
     def _page_complete(self):
-        f, lay = self._body()
+        f, lay = self._page()
 
-        badge_row = QHBoxLayout()
-        badge_row.addStretch()
-        badge_row.addWidget(self._success_badge())
-        badge_row.addStretch()
-        lay.addLayout(badge_row)
-
-        lay.addWidget(self._center_lbl(
-            t("update.update_complete", default="Update Complete!"),
-            16, bold=True, color=COLORS["text"],
+        p = _Panel()
+        p.lay.addWidget(_SectionHeader(
+            t("update.update_complete", default="Update Complete"),
+            right=_Chip(t("update.chip_done", default="DONE"), "success"),
         ))
-        self._complete_lbl = self._center_lbl("", 11)
-        lay.addWidget(self._complete_lbl)
+        p.lay.addSpacing(4)
+        p.lay.addLayout(self._centered(self._status_banner("success")))
+        p.lay.addSpacing(2)
 
-        lay.addWidget(self._sep())
+        self._complete_lbl = self._lbl("", 10, wrap=True, align=Qt.AlignCenter)
+        box = QFrame()
+        box.setObjectName("doneBox")
+        box.setStyleSheet(f"""
+            QFrame#doneBox {{
+                background:{_c('frame_bg')};
+                border:1px solid {_c('border')};
+                border-radius:8px;
+            }}
+        """)
+        bl = QVBoxLayout(box)
+        bl.setContentsMargins(12, 10, 12, 10)
+        bl.addWidget(self._complete_lbl)
+        box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        p.lay.addWidget(box)
+        lay.addWidget(p)
 
-        self._restart_btn = self._btn(t("update.restart_now",   default="Restart Now"),   primary=True)
-        later_btn   = self._btn(t("update.restart_later", default="Restart Later"), primary=False)
+        lay.addWidget(self._divider())
+
+        self._restart_btn = self._btn(t("update.restart_now", default="Restart Now"),
+                                      primary=True, height=40)
+        later_btn = self._btn(t("update.restart_later", default="Restart Later"), primary=False)
         self._restart_btn.clicked.connect(self._restart_app)
         later_btn.clicked.connect(self.reject)
         lay.addWidget(self._restart_btn)
@@ -1230,9 +1602,11 @@ class _UpdateDialog(QDialog):
 
         self._dl_file_lbl.setText(filename)
         self._dl_bar.setValue(0)
-        self._dl_size_lbl.setText("0 MB / … MB")
+        self._dl_pct_lbl.setText("0%")
+        self._dl_size_lbl.setText("0.0 MB")
+        self._dl_total_lbl.setText("…")
         self._stack.setCurrentIndex(_PAGE_DOWNLOADING)
-        self.adjustSize()
+        self._refit()
 
         self._dl_worker = _DownloadWorker(download_url, self._zip_path)
         self._dl_worker.progress.connect(self._on_dl_progress)
@@ -1241,22 +1615,19 @@ class _UpdateDialog(QDialog):
         self._dl_worker.start()
 
     def _on_dl_progress(self, done: int, total: int):
+        self._dl_size_lbl.setText(f"{done/1_048_576:.1f} MB")
         if total > 0:
             pct = int(done * 100 / total)
             self._dl_bar.setValue(pct)
             self._dl_pct_lbl.setText(f"{pct}%")
-            self._dl_size_lbl.setText(
-                f"{done/1_048_576:.1f} MB / {total/1_048_576:.1f} MB"
-            )
-        else:
-            self._dl_size_lbl.setText(f"{done/1_048_576:.1f} MB")
+            self._dl_total_lbl.setText(f"{total/1_048_576:.1f} MB")
 
     def _on_dl_finished(self, filepath: str):
         log.debug("_on_dl_finished: filepath=%s", filepath)
         self._zip_path = filepath
         self._dl_path_lbl.setText(f"Saved to:\n{filepath}")
         self._stack.setCurrentIndex(_PAGE_DOWNLOADED)
-        self.adjustSize()
+        self._refit()
 
     def _on_dl_failed(self, error: str):
         log.debug("Download failed: %s — showing error page", error)
@@ -1264,13 +1635,14 @@ class _UpdateDialog(QDialog):
             f"Error: {error}\n\nYou can download the update manually from GitHub."
         )
         self._stack.setCurrentIndex(_PAGE_DL_ERROR)
-        self.adjustSize()
+        self._refit()
 
     def _start_extract(self):
         if is_frozen_build():
             log.debug("_start_extract: frozen build, staging exe swap. new_exe=%s", self._zip_path)
             self._stack.setCurrentIndex(_PAGE_EXTRACTING)
-            self.adjustSize()
+            self._set_stage("prepare")
+            self._refit()
             self._swap_worker = _ExeSwapWorker(self._zip_path)
             self._swap_worker.status.connect(self._ex_status_lbl.setText)
             self._swap_worker.finished.connect(self._on_swap_finished)
@@ -1280,7 +1652,8 @@ class _UpdateDialog(QDialog):
 
         log.debug("_start_extract: zip_path=%s version=%s", self._zip_path, self._new_version)
         self._stack.setCurrentIndex(_PAGE_EXTRACTING)
-        self.adjustSize()
+        self._set_stage("prepare")
+        self._refit()
         self._ex_worker = _ExtractWorker(self._zip_path, self._new_version)
         self._ex_worker.status.connect(self._ex_status_lbl.setText)
         self._ex_worker.finished.connect(self._on_ex_finished)
@@ -1290,6 +1663,7 @@ class _UpdateDialog(QDialog):
     def _on_swap_finished(self, script_path: str):
         log.debug("_on_swap_finished: script_path=%s", script_path)
         self._swap_script_path = script_path
+        self._finish_stages(True)
         self._complete_lbl.setText(
             f"Downloaded version {self._new_version}.\n\n"
             "Your settings and custom vehicles have been preserved.\n\n"
@@ -1297,28 +1671,30 @@ class _UpdateDialog(QDialog):
             "yourself once it closes."
         )
         self._restart_btn.setText(
-            t("update.close_and_install", default="Close && Install")
+            t("update.close_and_install", default="Close & Install")
         )
         self._stack.setCurrentIndex(_PAGE_COMPLETE)
-        self.adjustSize()
+        self._refit()
 
     def _on_ex_finished(self, files_updated: int):
         log.debug("_on_ex_finished: files_updated=%s", files_updated)
+        self._finish_stages(True)
         self._complete_lbl.setText(
             f"Updated {files_updated} files to version {self._new_version}.\n\n"
             "Your settings and custom vehicles have been preserved.\n\n"
             "Please restart BeamSkin Studio to use the new version."
         )
         self._stack.setCurrentIndex(_PAGE_COMPLETE)
-        self.adjustSize()
+        self._refit()
 
     def _on_ex_failed(self, error: str):
         log.debug("_on_ex_failed: error=%s", error)
+        self._finish_stages(False)
         self._dl_path_lbl.setText(
             f"Extract failed: {error}\nYou can extract manually from the downloads folder."
         )
         self._stack.setCurrentIndex(_PAGE_DOWNLOADED)
-        self.adjustSize()
+        self._refit()
 
     def _open_downloads(self):
         folder = os.path.dirname(self._zip_path) if self._zip_path else get_downloads_folder()

@@ -7,14 +7,15 @@
       {
         "ambientOcclusionMap": "/vehicles/midsize/midsize_body_ao.data.png",
         "baseColorMap": "/vehicles/midsize/midsize_body_b.color.png",
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/midsize/midsize_body_m.data.png",
         "normalMap": "vehicles/midsize/midsize_body_nm.normal.png",
-        "roughnessFactor": 1,
+        "roughnessFactor": 0.15,
         "roughnessMap": "/vehicles/midsize/midsize_body_r.data.png",
         "useAnisotropic": true
       },
       {
+        "roughnessFactor": 0.15,
         "ambientOcclusionMap": "/vehicles/midsize/midsize_body_ao.data.png",
         "baseColorMap": "/vehicles/midsize/SKINNAME/midsize_skin_SKINNAME.dds",
         "diffuseMapUseUV": 1,

@@ -106,9 +106,9 @@
     "skins_header": "Skins",
     "add_skin": "➕ Lägg till skin",
     "update_skin": "💾 Uppdatera skin",
-    "save_project": "💾 Spara projekt",
-    "load_project": "📁 Ladda projekt",
-    "clear_project": " 🧹 Rensa projekt",
+    "save_project": "💾 Spara",
+    "load_project": "📁 Ladda",
+    "clear_project": " 🧹 Rensa",
     "add_vehicle": "Lägg till fordon i projektet",
     "add_vehicle_to_project": "Lägg till fordon ",
     "vehicles_in_project": "Fordon i projektet",
@@ -116,6 +116,8 @@
     "output_mode": "Utdataläge",
     "steam_path": "ModMapp",
     "custom_location": "Anpassad plats",
+    "zip_output": "ZIP",
+    "output_location": "Utdataplats",
     "skin_count": "skins",
     "skin": "skin",
     "skins": "skins",
@@ -134,6 +136,8 @@
     "retro_mask": "Retro-mask",
     "retro_mask_hint": "Opacitetsmask (PNG) som markerar vilka delar av skinnet som ska vara retroreflekterande.",
     "glowing_skin": "Glödande skin",
+    "use_secondary_uv": "Använd sekundär UV",
+    "use_secondary_uv_hint": "Kan åtgärda ett skin som appliceras felaktigt på fordonet. Testa att växla om ditt skin ser fel ut.",
     "emissive_map": "Emissionskarta",
     "base_Color_Map": "Basfärg karta",
     "color_Palette_Map": "Färgpalett karta",
@@ -193,6 +197,7 @@
       "load_error": "Inläsningsfel: {error}",
       "no_material_properties": "Inga redigerbara materialegenskaper hittades för detta fordon.",
       "invalid_material_value": "Ogiltigt värde för {prop_name}: '{value}'",
+      "invalid_detail_scale": "Ogiltig detaljskala '{value}' — använd två tal som 1500, 750. Standardvärdet (1500, 750) användes.",
       "no_info_fields": "Inga redigerbara infofält hittades för detta fordon.",
       "invalid_info_value": "'{field}' måste vara ett tal — ignorerar '{value}'",
       "mod_generation_unavailable": "Modgenereringsfunktionen är inte tillgänglig.",
@@ -200,13 +205,23 @@
       "export_error_debug": "Exportfel ({type}): {error}\nAktivera felsökningsläge i Inställningar för fullständiga loggar.",
       "missing_files": "Saknade filer:\n{files}",
       "preset_saved": "Förinställningen '{name}' sparades.",
+      "preset_saved_alongside_builtin": "Sparad som din egen förinställning '{name}'. Den inbyggda '{name}' är oförändrad.",
       "preset_loaded": "Förinställningen '{name}' laddades.",
       "preset_deleted": "Förinställningen '{name}' togs bort.",
       "preset_name_required": "Ange ett namn för förinställningen först.",
       "preset_not_found": "Förinställningen '{name}' hittades inte.",
       "preset_save_failed": "Det gick inte att spara förinställningen '{name}'.",
       "preset_load_failed": "Det gick inte att ladda förinställningen '{name}'.",
-      "preset_delete_failed": "Det gick inte att ta bort förinställningen '{name}'."
+      "preset_delete_failed": "Det gick inte att ta bort förinställningen '{name}'.",
+      "layer_missing_dds": "Lager {n} saknar sin basfärgkarta (.dds).",
+      "layer_missing_dds_variant": "Lager {n} saknar sin variant-basfärgkarta (.dds).",
+      "layer_missing_colorable": "Lager {n} saknar sin datakarta eller färgpalettkarta.",
+      "layer_missing_colorable_variant": "Lager {n} saknar sin variant-datakarta eller variant-färgpalettkarta.",
+      "layer_missing_emissive": "Lager {n} har Glödande aktiverat men saknar sin emissionskarta.",
+      "invalid_layer_value": "Ogiltigt värde för {field}: '{value}'. Använder 0.0 som standard.",
+      "layer_limit_reached": "Du har nått max antal lager för detta skin.",
+      "overwrite_failed": "Kunde inte ta bort befintlig mod: {error}",
+      "please_select_datamap": "Välj en datakarta innan du fortsätter."
     },
     "clear_project_window": {
       "clear_project_confirm_title": "Rensa projekt?",
@@ -225,6 +240,7 @@
     "export_copying": "Kopierar mallfiler...",
     "export_zipping": "Skapar ZIP-arkiv...",
     "unpacked_output": "Okomprimerat",
+    "select_output": "Välj utdatamapp…",
     "export_unpacking": "Skriver moddmapp…",
     "export_complete": "Export slutförd!",
     "export_error": "Fel: genereringsfunktion ej tillgänglig",
@@ -238,7 +254,11 @@
     "preset": "Förinställning",
     "preset_name_placeholder": "Namn på förinställning…",
     "preset_picker_title": "Ladda förinställning",
+    "preset_tab_builtin": "Inbyggda",
+    "preset_tab_yours": "Dina",
     "no_presets_saved": "Inga förinställningar sparade ännu.",
+    "no_builtin_presets": "Inga inbyggda förinställningar tillgängliga.",
+    "no_presets_match": "Inga förinställningar matchar din sökning.",
     "cancel_edit": "❌ Avbryt",
     "no_cars_match": "Inga bilar matchar '{query}'",
     "config_type_label": "Konfig.-typ",
@@ -268,22 +288,28 @@
     "dialog_select_layer_file": "Välj Lagerfil",
     "layer_factors": "Lagerfaktorer",
     "layer_n": "Lager {n}",
+    "detail_scale": "Detaljskala (X, Y)",
+    "detail_scale_placeholder": "t.ex. 1500, 750",
+    "detail_scale_hint": "Hur många gånger detaljkartorna upprepas över UV. Högre = mindre mönster. Lämna tomt för att använda 1500, 750.",
     "material_stage_n": "Steg {n}",
     "metallic_factor": "Metallic-faktor",
     "metallic_map": "Metallic-karta",
     "normal_map": "Normalkarta",
     "opacity_map": "Opacitetskarta",
+    "opacity_detail_map": "Opacitets-detaljkarta",
     "retroreflectivity": "Retroreflektivitet",
     "roughness_factor": "Ojämnhets-faktor",
     "roughness_map": "Ojämnhetskarta",
-    "save_project_as": "💾 Spara projekt som..."
+    "roughness_detail_map": "Ojämnhets-detaljkarta",
+    "metallic_detail_map": "Metallic-detaljkarta",
+    "save_project_as": "💾 Spara som..."
   },
   "howto": {
     "title": "Användningsguide",
     "page_title": "📚 Hur man använder BeamSkin Studio",
     "page_subtitle": "Komplett guide för att skapa och hantera fordonsutseenden för BeamNG.drive",
     "search_placeholder": "Sök i dokumentationen...",
-    "view_all": "📖 Visa alla",
+    "view_all": "Visa alla",
     "search_results": "🔍 Sökresultat för '{term}'",
     "no_results": "❌ Inga resultat hittades för '{term}'",
     "try_different": "Prova olika nyckelord eller bläddra bland kapitlen ovan.",
@@ -526,7 +552,18 @@
     "checking_updates": "⏳  Kontrollerar…",
     "clear_skipped": "Rensa",
     "skipped_version": "Hoppad version: {skipped}",
-    "skipped_cleared": "Hoppad version rensad — uppdateringar visas igen."
+    "skipped_cleared": "Hoppad version rensad — uppdateringar visas igen.",
+    "data_folder": "BeamSkin Studio Datamapp",
+    "data_folder_desc": "Var tillagda fordon, projekt och inställningar lagras. Om du ändrar detta flyttas din befintliga data till den nya platsen.",
+    "migrate_data_button": "Migrera Min Data",
+    "data_browse_title": "Välj Datamapp",
+    "data_not_writable": "Mappen är inte skrivbar",
+    "data_path_updated": "Datamapp uppdaterad — befintlig data har flyttats.",
+    "data_migration_incomplete": "Mappen ändrades, men vissa filer kanske inte har flyttats",
+    "confirm_on_save": "💾  Bekräfta Innan Sparande",
+    "view_changelog": "📜  Ändringslogg",
+    "legacy_migrate_desc": "Du använder för närvarande de gamla installationsrelativa datamapparna bredvid appen. Migrera för att flytta dina fordon, projekt och inställningar till en dedikerad datamapp.",
+    "legacy_migrate_not_found": "Den gamla datan kunde inte längre hittas — inget att migrera."
   },
   "about": {
     "about_section": "Om",
@@ -795,7 +832,12 @@
     "paths_title": "Konfigurera BeamNG.drive-sökvägar",
     "paths_desc": "Dessa sökvägar används för att validera och installera dina skin-modar.",
     "browse_beamng_title": "Välj BeamNG.drive-installationsmapp",
-    "browse_mods_title": "Välj BeamNG-modsmapp"
+    "browse_mods_title": "Välj BeamNG-modsmapp",
+    "data_folder": "BeamSkin Studio Datamapp",
+    "browse_data_title": "Välj Datamapp",
+    "data_valid": "✓ Mappen är skrivbar",
+    "data_invalid": "✗ Mappen är inte skrivbar — återställd till standard",
+    "data_folder_desc": "Var dina tillagda fordon, projekt och inställningar lagras. Standardplatsen fungerar för de flesta — ändra endast detta om du vill ha din data på en annan enhet."
   },
   "language_selection": {
     "selection": "Språkval",
@@ -817,7 +859,7 @@
     "generation_error": "Modgenerering misslyckades: {error}"
   },
   "changelog": {
-    "title": "Nyheter",
+    "title": "Vad är nytt i {version}?",
     "translate": "Översätt",
     "translating": "Översätter…",
     "translated": "Översatt",
@@ -826,7 +868,11 @@
     "fetching": "Hämtar nyheter",
     "error_title": "⚠️  Kunde inte ladda ändringsloggen",
     "error_body": "Det gick inte att nå GitHub. Kontrollera din internetanslutning och försök igen.",
-    "error_note": "Du kan fortfarande ladda ner uppdateringen — ändringsloggen visas automatiskt efter installationen."
+    "error_note": "Du kan fortfarande ladda ner uppdateringen — ändringsloggen visas automatiskt efter installationen.",
+    "newer": "Nyare version",
+    "older": "Äldre version",
+    "version_label": "Version {version}",
+    "translate_failed": "Översättning misslyckades"
   },
   "dialog": {
     "cancel": "Avbryt",
@@ -1027,7 +1073,10 @@
     "add_existing_dialog_title": "Lägg till befintliga projektfiler",
     "file_filter": "Projektfiler (*.bsproject *.json);;Alla filer (*.*)",
     "add_failed_banner": "⚠  Kunde inte läsa {count} fil(er): {names}{extra}",
-    "browse_dialog_title": "Öppna projektfil"
+    "browse_dialog_title": "Öppna projektfil",
+    "delete_confirm_title": "Ta bort projekt?",
+    "sort_last_opened": "Senast öppnade",
+    "sort_last_saved": "Senast ändrade"
   },
   "mod_scanner": {
     "path_not_exist": "Sökvägen finns inte",
@@ -1036,5 +1085,15 @@
     "no_vehicles_dir": "Ingen vehicles/-mapp hittades i modden",
     "cannot_read_dir": "Kunde inte läsa vehicles/-mappen",
     "extract_failed": "Misslyckades med att extrahera ZIP: {error}"
+  },
+  "legacy_migration": {
+    "title": "Data från en äldre version hittades",
+    "desc": "BeamSkin Studio lagrar nu dina data i en dedikerad mapp istället för bredvid appen. Vi hittade projekt och fordon från en tidigare installation — välj var du vill spara dem och vi kopierar allt. Dina gamla filer lämnas orörda.",
+    "found_at": "Hittades i:",
+    "stats": "{vehicles} tillagt fordon · {projects} sparat projekt · ~{size} KB",
+    "dest_label": "Kopiera data till:",
+    "browse_title": "Välj datamapp",
+    "skip": "Migrera inte",
+    "migrate": "Migrera mina data"
   }
 }

@@ -185,7 +185,8 @@ class _ProjectRow(QFrame):
             QPushButton {{
                 background:{COLORS['accent']};
                 color:{COLORS['accent_text']};
-                border-radius:7px;border:none;font-weight:bold;
+                border-radius:8px;border:none;font-weight:bold;
+                padding:4px 12px;
             }}
             QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
         """
@@ -193,7 +194,7 @@ class _ProjectRow(QFrame):
     def _remove_btn_style(self) -> str:
         return f"""
             QPushButton {{
-                background:transparent;
+                background:{COLORS['frame_bg']};
                 color:{COLORS['text_muted']};
                 border:1px solid {COLORS['border']};
                 border-radius:6px;
@@ -243,10 +244,17 @@ class ProjectBrowserDialog(QDialog):
         self.setMinimumSize(600, 400)
         self.setStyleSheet(f"""
             QDialog {{
-                background:{COLORS['app_bg']};
+                background:{COLORS['frame_bg']};
                 color:{COLORS['text']};
                 border: 1px solid {COLORS['border']};
                 border-radius: 14px;
+            }}
+            QToolTip {{
+                background:{COLORS['card_bg']};
+                color:white;
+                border:1px solid {COLORS['border']};
+                border-radius:6px;
+                padding:4px 8px;
             }}
         """)
 
@@ -259,18 +267,40 @@ class ProjectBrowserDialog(QDialog):
         self._load_and_populate()
 
 
+    def _sb_section_header_with_label(self, text: str):
+        header = QFrame()
+        header.setFixedHeight(30)
+        header.setStyleSheet("background:transparent;border:none;")
+        row = QHBoxLayout(header)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        row.addWidget(marker)
+
+        label = QLabel(text.upper())
+        label.setFont(font(14, "bold"))
+        label.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        row.addWidget(label)
+        row.addStretch()
+        return header, label
+
     def _setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(14)
 
         title_row = QHBoxLayout()
-        title_lbl = QLabel(t("project_browser.title"))
-        title_lbl.setFont(font(20, "bold"))
-        title_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
+        title_hdr, title_lbl = self._sb_section_header_with_label(
+            t("project_browser.title")
         )
-        title_row.addWidget(title_lbl)
+        title_row.addWidget(title_hdr)
         title_row.addStretch()
 
         self._count_lbl = QLabel("")
@@ -297,7 +327,7 @@ class ProjectBrowserDialog(QDialog):
                 border-radius:8px;
                 padding:4px 12px;
             }}
-            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
+            QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
         """)
         self._search.textChanged.connect(self._on_search)
         search_row.addWidget(self._search, 1)
@@ -400,7 +430,7 @@ class ProjectBrowserDialog(QDialog):
     def _secondary_btn_style(self) -> str:
         return f"""
             QPushButton {{
-                background:{COLORS['card_bg']};
+                background:{COLORS['frame_bg']};
                 color:{COLORS['text']};
                 border:1px solid {COLORS['border']};
                 border-radius:8px;

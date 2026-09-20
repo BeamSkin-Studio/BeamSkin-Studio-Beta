@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 from PySide6.QtCore    import Qt, QTimer, QPoint
-from PySide6.QtGui     import QPixmap, QCursor
+from PySide6.QtGui     import QPixmap, QCursor, QPainter, QPainterPath
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
 )
@@ -34,6 +34,7 @@ class HoverPreviewManager:
         self.overlay         = preview_overlay
         self._timer: Optional[QTimer] = None
         self._current_key: Optional[tuple] = None
+        self._preview_cache: dict[str, tuple[float, QPixmap]] = {}
 
 
     def show_hover_preview(self, carid: str, image_path: Optional[str] = None,
@@ -53,8 +54,8 @@ class HoverPreviewManager:
 
         self._clear_overlay()
 
-        ow, oh = 300, 240
-        self.overlay.setFixedSize(ow, oh)
+        ow = 300
+        self.overlay.setFixedWidth(ow)
 
         inner = QVBoxLayout(self.overlay)
         inner.setContentsMargins(8, 8, 8, 8)
@@ -68,20 +69,51 @@ class HoverPreviewManager:
             }}
         """)
         hdr_row = QHBoxLayout(hdr)
-        hdr_row.setContentsMargins(8, 4, 8, 4)
+        hdr_row.setContentsMargins(8, 2, 8, 2)
 
         vehicle_name = display_name or state.get_vehicle_name(carid)
         hdr_lbl = QLabel(f"{vehicle_name}  |  {carid}")
-        hdr_lbl.setFont(font(12, "bold"))
+        hdr_lbl.setFont(font(11, "bold"))
+        hdr_lbl.setFixedWidth(268)
+        hdr_lbl.setWordWrap(True)
+        hdr_lbl.setAlignment(Qt.AlignCenter)
         hdr_lbl.setStyleSheet(
             f"color:{COLORS['accent_text']};background:transparent;"
         )
         hdr_row.addWidget(hdr_lbl)
         inner.addWidget(hdr)
+        header_height = max(28, hdr_lbl.sizeHint().height() + 4)
+        hdr.setFixedHeight(header_height)
 
-        px = QPixmap(image_path).scaled(
-            280, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation
-        )
+        try:
+            image_mtime = os.path.getmtime(image_path)
+        except OSError:
+            image_mtime = 0.0
+
+        cached = self._preview_cache.get(image_path)
+        if cached and cached[0] == image_mtime:
+            px = cached[1]
+        else:
+            px = QPixmap(image_path).scaled(
+                280, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            if not px.isNull():
+                rounded = QPixmap(px.size())
+                rounded.fill(Qt.transparent)
+                painter = QPainter(rounded)
+                painter.setRenderHint(QPainter.Antialiasing)
+                clip = QPainterPath()
+                clip.addRoundedRect(0, 0, px.width(), px.height(), 8, 8)
+                painter.setClipPath(clip)
+                painter.drawPixmap(0, 0, px)
+                painter.end()
+                px = rounded
+                self._preview_cache[image_path] = (image_mtime, px)
+                if len(self._preview_cache) > 32:
+                    self._preview_cache.pop(next(iter(self._preview_cache)))
+
+            self.overlay.setFixedHeight(px.height() + 16 + 6 + header_height)
+
         img_lbl = QLabel()
         img_lbl.setPixmap(px)
         img_lbl.setAlignment(Qt.AlignCenter)
@@ -98,8 +130,9 @@ class HoverPreviewManager:
         y = cursor.y() + 10
         if x + ow > self.app.width():
             x = cursor.x() - ow - 20
-        if y + oh > self.app.height():
-            y = cursor.y() - oh - 10
+        overlay_height = self.overlay.height()
+        if y + overlay_height > self.app.height():
+            y = cursor.y() - overlay_height - 10
         x = max(10, x)
         y = max(10, y)
 
@@ -126,8 +159,7 @@ class HoverPreviewManager:
                 if w:
                     w.hide()
                     w.setParent(None)
-            _tmp = QWidget()
-            _tmp.setLayout(old_layout)
+            old_layout.deleteLater()
 
         for child in list(self.overlay.findChildren(QWidget)):
             child.hide()

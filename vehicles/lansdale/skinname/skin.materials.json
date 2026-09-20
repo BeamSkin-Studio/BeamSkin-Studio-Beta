@@ -6,14 +6,15 @@
     "persistentId": "d34bfeb2-4754-49be-9bfa-ae3dd9d95643",
     "Stages": [
       {
+        "roughnessFactor": 0.15,
         "ambientOcclusionMap": "/vehicles/lansdale/lansdale_main_ao.data.png",
         "baseColorFactor": null,
         "baseColorMap": "/vehicles/lansdale/lansdale_main_b.color.png",
-        "clearCoatFactor": null,
-        "clearCoatRoughnessFactor": null,
+        "clearCoatFactor": 1,
+        "clearCoatRoughnessFactor": 0.05,
         "colorPaletteMapUseUV": null,
         "diffuseMapUseUV": null,
-        "metallicFactor": 1,
+        "metallicFactor": 0,
         "metallicMap": "/vehicles/lansdale/lansdale_main_m.data.png",
         "normalMap": "/vehicles/lansdale/lansdale_main_nm.normal.png",
         "opacityFactor": 0,
@@ -35,7 +36,7 @@
         "opacityFactor": null,
         "opacityMap": "/vehicles/lansdale/lansdale_main_c.data.png",
         "pixelSpecular": null,
-        "roughnessFactor": 0.6,
+        "roughnessFactor": 0.15,
         "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
         "detailNormalMapStrength": 0.1,
         "detailScale": [

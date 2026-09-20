@@ -354,6 +354,7 @@ _DEFAULT_SETTINGS = {
     "beamng_install": "",
     "mods_folder": "",
     "theme_mode": "dark",
+    "texture_previews_enabled": True,
     "file_logging_enabled": False,
     "file_logging_append": False,
 }

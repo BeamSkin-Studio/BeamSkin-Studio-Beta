@@ -3,18 +3,63 @@ import os, json, threading
 from typing import Dict, List, Optional, Any, Callable
 
 from PySide6.QtCore    import Qt, QTimer, Signal
-from PySide6.QtGui     import QPixmap, QKeySequence, QShortcut
-from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QLineEdit, QComboBox, QProgressBar, QScrollArea, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QCheckBox
+from PySide6.QtGui     import QPixmap, QKeySequence, QShortcut, QFontMetrics
+from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QLineEdit, QComboBox, QProgressBar, QScrollArea, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QCheckBox, QGraphicsOpacityEffect, QSizePolicy
 
 from gui.theme   import COLORS, font
 from gui.widgets import ToggleSwitch
 from gui.state   import state
+
+
+def _muted() -> str:
+    return COLORS.get("text_muted", COLORS["text_secondary"])
+
+
+def _label_qss(color_key: str = "text") -> str:
+    return (
+        f"QLabel {{ color:{COLORS[color_key]}; background:transparent; border:none; }}"
+        f"QLabel:disabled {{ color:{_muted()}; }}"
+    )
 
 try:
     from core.localization import t
 except ImportError:
     print("[DEBUG] generator: core.localization not available — using passthrough t()")
     def t(key, **kw): return key
+
+
+def _wrapped_tooltip(text: str, max_width_px: int = 260) -> str:
+    escaped = (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+    return f'<div style="max-width:{max_width_px}px;">{escaped}</div>'
+
+
+class ElidedLabel(QLabel):
+
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(parent)
+        self._full_text = text
+        self.setToolTip(text)
+        super().setText(text)
+
+    def setText(self, text: str):
+        self._full_text = text
+        self.setToolTip(text)
+        self._apply_elision()
+
+    def setFont(self, f):
+        super().setFont(f)
+        self._apply_elision()
+
+    def resizeEvent(self, event):
+        self._apply_elision()
+        super().resizeEvent(event)
+
+    def _apply_elision(self):
+        metrics = QFontMetrics(self.font())
+        elided = metrics.elidedText(self._full_text, Qt.ElideRight, max(self.width(), 1))
+        super().setText(elided)
 
 try:
     from utils.file_ops import load_added_vehicles_json
@@ -67,6 +112,78 @@ except ImportError as _pb_imp_exc:
 _PRESET_KIND_LAYER_FACTORS      = "layer_factors"
 _PRESET_KIND_MATERIAL_PROPERTIES = "material_properties"
 
+_PRESET_SOURCE_BUILTIN = "builtin"
+_PRESET_SOURCE_USER    = "user"
+
+_PRESET_LIST_MIN_HEIGHT = 6 * 48 + 5 * 8
+
+_BUILTIN_PRESETS = {
+    _PRESET_KIND_LAYER_FACTORS: {
+        "Car Paint": {
+            "metallic_factor": 1.0,
+            "roughness_factor": 0.5,
+            "clear_coat_factor": 1.0,
+            "clear_coat_roughness_factor": 0.04,
+            "retroreflectivity": 0.0,
+        },
+        "Glossy Decals": {
+            "metallic_factor": 0.0,
+            "roughness_factor": 0.15,
+            "clear_coat_factor": 1.0,
+            "clear_coat_roughness_factor": 0.05,
+            "retroreflectivity": 0.0,
+        },
+        "Neon Satin": {
+            "metallic_factor": 0.80,
+            "roughness_factor": 0.65,
+            "clear_coat_factor": 1.00,
+            "clear_coat_roughness_factor": 0.05,
+            "retroreflectivity": 0.0,
+        },
+        "Matte": {
+            "metallic_factor": 0.0,
+            "roughness_factor": 0.9,
+            "clear_coat_factor": 0.0,
+            "clear_coat_roughness_factor": 0.0,
+            "retroreflectivity": 0.0,
+        },
+    },
+    _PRESET_KIND_MATERIAL_PROPERTIES: {
+        "Car Paint": {
+            "__all__": {
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.5,
+                "clearCoatFactor": 1.0,
+                "clearCoatRoughnessFactor": 0.04,
+            }
+        },
+        "Glossy Decals": {
+            "__all__": {
+                "clearCoatFactor": 1.0,
+                "clearCoatRoughnessFactor": 0.05,
+                "roughnessFactor": 0.15,
+                "metallicFactor": 0,
+            }
+        },
+        "Neon Satin": {
+            "__all__": {
+                "metallicFactor": 0.80,
+                "roughnessFactor": 0.65,
+                "clearCoatFactor": 1.00,
+                "clearCoatRoughnessFactor": 0.05,
+            }
+        },
+        "Matte": {
+            "__all__": {
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.9,
+                "clearCoatFactor": 0.0,
+                "clearCoatRoughnessFactor": 0.0,
+            }
+        },
+    }
+}
+
 
 def _presets_dir(kind: str) -> str:
     path = os.path.join(_get_data_dir(), "presets", kind)
@@ -82,31 +199,56 @@ def _sanitize_preset_filename(name: str) -> str:
     return cleaned
 
 
-def _list_presets(kind: str) -> List[str]:
+def _list_user_presets(kind: str) -> List[str]:
     d = _presets_dir(kind)
-    if not os.path.isdir(d):
-        print(f"[DEBUG] _list_presets: no presets dir for kind={kind!r} ({d!r})")
-        return []
     entries = []
     skipped = 0
-    for fn in os.listdir(d):
-        if not fn.lower().endswith(".json"):
-            continue
-        fp = os.path.join(d, fn)
-        try:
-            with open(fp, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            name = data.get("name") or os.path.splitext(fn)[0]
-            mtime = os.path.getmtime(fp)
-        except Exception as exc:
-            print(f"[DEBUG] _list_presets: failed to read {fp!r}: {exc}")
-            skipped += 1
-            continue
-        entries.append((name, mtime))
+    if os.path.isdir(d):
+        for fn in os.listdir(d):
+            if not fn.lower().endswith(".json"):
+                continue
+            fp = os.path.join(d, fn)
+            try:
+                with open(fp, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                name = data.get("name") or os.path.splitext(fn)[0]
+                mtime = os.path.getmtime(fp)
+            except Exception as exc:
+                print(f"[DEBUG] _list_presets: failed to read {fp!r}: {exc}")
+                skipped += 1
+                continue
+            entries.append((name, mtime))
+    else:
+        print(f"[DEBUG] _list_presets: no user preset dir for kind={kind!r} ({d!r})")
+
     entries.sort(key=lambda e: e[1], reverse=True)
     result = [name for name, _mtime in entries]
-    print(f"[DEBUG] _list_presets: kind={kind!r} found={len(result)} skipped={skipped}")
+    print(f"[DEBUG] _list_user_presets: kind={kind!r} found={len(result)} skipped={skipped}")
     return result
+
+
+def _list_builtin_presets(kind: str) -> List[str]:
+    return list(_BUILTIN_PRESETS.get(kind, {}).keys())
+
+
+def _list_presets(kind: str, source: str) -> List[str]:
+    if source == _PRESET_SOURCE_BUILTIN:
+        return _list_builtin_presets(kind)
+    return _list_user_presets(kind)
+
+
+def _user_preset_exists(kind: str, name: str) -> bool:
+    return os.path.isfile(_preset_filepath(kind, name))
+
+
+def _resolve_preset_source(kind: str, name: str, source: str = "") -> str:
+    if source in (_PRESET_SOURCE_BUILTIN, _PRESET_SOURCE_USER):
+        return source
+    if _user_preset_exists(kind, name):
+        return _PRESET_SOURCE_USER
+    if name in _BUILTIN_PRESETS.get(kind, {}):
+        return _PRESET_SOURCE_BUILTIN
+    return _PRESET_SOURCE_USER
 
 
 def _preset_filepath(kind: str, name: str) -> str:
@@ -118,6 +260,9 @@ def _save_preset(kind: str, name: str, values: Dict[str, Any]) -> bool:
     if not name:
         print("[DEBUG] _save_preset: aborted — empty name")
         return False
+    if name in _BUILTIN_PRESETS.get(kind, {}):
+        print(f"[DEBUG] _save_preset: {name!r} matches a built-in preset — "
+              f"saving as a separate user preset (built-in is untouched)")
     d = _presets_dir(kind)
     try:
         os.makedirs(d, exist_ok=True)
@@ -130,7 +275,13 @@ def _save_preset(kind: str, name: str, values: Dict[str, Any]) -> bool:
         return False
 
 
-def _load_preset(kind: str, name: str) -> Optional[Dict[str, Any]]:
+def _load_preset(kind: str, name: str,
+                 source: str = _PRESET_SOURCE_USER) -> Optional[Dict[str, Any]]:
+    if source == _PRESET_SOURCE_BUILTIN:
+        builtin = _BUILTIN_PRESETS.get(kind, {}).get(name)
+        if builtin is None:
+            print(f"[DEBUG] _load_preset: no built-in {kind}/{name!r}")
+        return builtin
     fp = _preset_filepath(kind, name)
     if not os.path.isfile(fp):
         print(f"[DEBUG] _load_preset: {kind}/{name!r} not found at {fp!r}")
@@ -144,7 +295,11 @@ def _load_preset(kind: str, name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _delete_preset(kind: str, name: str) -> bool:
+def _delete_preset(kind: str, name: str,
+                   source: str = _PRESET_SOURCE_USER) -> bool:
+    if source == _PRESET_SOURCE_BUILTIN:
+        print(f"[DEBUG] _delete_preset: refusing to delete built-in {kind}/{name!r}")
+        return False
     fp = _preset_filepath(kind, name)
     try:
         if os.path.isfile(fp):
@@ -163,6 +318,9 @@ print("[DEBUG] Loading class: GeneratorTab")
 def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Optional[QPixmap]:
     print(f"[DEBUG] _load_pixmap_robust: loading {path!r} (max={max_w}x{max_h})")
 
+    _PREVIEW_CAP_W = 2560
+    _PREVIEW_CAP_H = 1440
+
     ext = os.path.splitext(path)[1].lower()
 
     def _scale(px: QPixmap) -> QPixmap:
@@ -171,6 +329,19 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
         return px.scaled(max_w, max_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
     def _qt_load() -> Optional[QPixmap]:
+        if _PIL_OK:
+            try:
+                _PILImage.MAX_IMAGE_PIXELS = None
+                with _PILImage.open(path) as _probe:
+                    native_w, native_h = _probe.size
+                if native_w > _PREVIEW_CAP_W or native_h > _PREVIEW_CAP_H:
+                    print(
+                        f"[DEBUG] _qt_load: native {native_w}x{native_h} exceeds 1440p cap "
+                        f"— deferring to PIL for {os.path.basename(path)}"
+                    )
+                    return None
+            except Exception:
+                pass
         px = QPixmap(path)
         return _scale(px) if not px.isNull() else None
 
@@ -181,7 +352,8 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
             from PySide6.QtGui import QImage
             _PILImage.MAX_IMAGE_PIXELS = None
             img = _PILImage.open(path)
-            img.thumbnail((max_w * 2, max_h * 2), _PILImage.Resampling.LANCZOS)
+            img.thumbnail((_PREVIEW_CAP_W, _PREVIEW_CAP_H), _PILImage.Resampling.LANCZOS)
+            img.thumbnail((max_w, max_h), _PILImage.Resampling.LANCZOS)
             img = img.convert("RGBA")
             data = img.tobytes("raw", "RGBA")
             qi = QImage(data, img.width, img.height, QImage.Format.Format_RGBA8888)
@@ -239,6 +411,15 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
                     arr = _np.dstack([arr, _np.full(arr.shape[:2], 255, dtype=_np.uint8)])
                 arr = arr[:, :, :4].astype(_np.uint8)
                 h, w = arr.shape[:2]
+                if w > _PREVIEW_CAP_W or h > _PREVIEW_CAP_H:
+                    print(
+                        f"[DEBUG] _imageio_load: native {w}x{h} exceeds 1440p cap "
+                        f"— pre-scaling for {os.path.basename(path)}"
+                    )
+                    pil_img = _PilImg.fromarray(arr, "RGBA")
+                    pil_img.thumbnail((_PREVIEW_CAP_W, _PREVIEW_CAP_H), _PilImg.Resampling.LANCZOS)
+                    arr = _np.array(pil_img, dtype=_np.uint8)
+                    h, w = arr.shape[:2]
                 raw_bytes = bytes(arr.tobytes())
                 qi = QImage(raw_bytes, w, h, w * 4, QImage.Format.Format_RGBA8888)
                 qi = qi.copy()
@@ -258,6 +439,12 @@ def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Option
                 with open(path, "rb") as _fh:
                     raw = _fh.read()
                 with WandImage(blob=_patch_dxgi(raw), format="dds") as img:
+                    if img.width > _PREVIEW_CAP_W or img.height > _PREVIEW_CAP_H:
+                        print(
+                            f"[DEBUG] _wand_load: native {img.width}x{img.height} exceeds "
+                            f"1440p cap — resizing in Wand for {os.path.basename(path)}"
+                        )
+                        img.transform(resize=f"{_PREVIEW_CAP_W}x{_PREVIEW_CAP_H}>")
                     blob = img.make_blob("png")
                 qi = QImage()
                 qi.loadFromData(QByteArray(blob))
@@ -377,6 +564,7 @@ class GeneratorTab(QWidget):
 
         self._custom_layers: List[Dict[str, Any]] = []
         self._custom_layer_cards: List[Dict[str, Any]] = []
+        self._layer_add_in_progress = False
 
         self._pc_file_path   = ""
         self._jpg_file_path  = ""
@@ -387,11 +575,15 @@ class GeneratorTab(QWidget):
         self._project_emptied_since_load: bool = False
 
         self.material_properties_entries: Dict[str, Dict[str, QLineEdit]] = {}
+        self._material_preset_row: Optional[QWidget] = None
+        self._pending_material_preset: str = ""
+        self._pending_material_preset_source: str = ""
         self.info_data_entries: Dict[str, QLineEdit] = {}
         self._info_field_originals: Dict[str, Any] = {}
         self.car_id_list: List = self._build_car_id_list()
 
         self._setup_ui()
+        self._apply_gen_sidebar_width()
         self._setup_project_shortcuts()
 
         self._status_signal.connect(self._export_status.setText)
@@ -429,12 +621,61 @@ class GeneratorTab(QWidget):
 
     def _set_project_locked(self, locked: bool) -> None:
         self.setEnabled(not locked)
+        self._set_toggles_dimmed(locked)
+        self._set_glyph_buttons_dimmed(locked)
         try:
             mw = self.window()
             if mw and hasattr(mw, "sidebar"):
                 mw.sidebar.set_locked(locked)
         except RuntimeError as exc:
             print(f"[DEBUG] _set_project_locked: sidebar gone (mid-rebuild): {exc}")
+
+    def _set_toggles_dimmed(self, dimmed: bool) -> None:
+        if not hasattr(self, "_dimmed_toggles"):
+            self._dimmed_toggles = []
+
+        if dimmed:
+            for tog in self.findChildren(ToggleSwitch):
+                try:
+                    if tog.graphicsEffect() is not None:
+                        continue
+                    effect = QGraphicsOpacityEffect(tog)
+                    effect.setOpacity(0.35)
+                    tog.setGraphicsEffect(effect)
+                    self._dimmed_toggles.append(tog)
+                except RuntimeError as exc:
+                    print(f"[DEBUG] _set_toggles_dimmed: toggle gone: {exc}")
+        else:
+            for tog in self._dimmed_toggles:
+                try:
+                    tog.setGraphicsEffect(None)
+                except RuntimeError as exc:
+                    print(f"[DEBUG] _set_toggles_dimmed: toggle gone: {exc}")
+            self._dimmed_toggles = []
+
+    def _set_glyph_buttons_dimmed(self, dimmed: bool) -> None:
+        if not hasattr(self, "_dimmed_glyph_buttons"):
+            self._dimmed_glyph_buttons = []
+
+        if dimmed:
+            for btn in self.findChildren(QPushButton):
+                try:
+                    if any(ord(ch) > 0x2100 for ch in btn.text()):
+                        if btn.graphicsEffect() is not None:
+                            continue
+                        effect = QGraphicsOpacityEffect(btn)
+                        effect.setOpacity(0.45)
+                        btn.setGraphicsEffect(effect)
+                        self._dimmed_glyph_buttons.append(btn)
+                except RuntimeError as exc:
+                    print(f"[DEBUG] _set_glyph_buttons_dimmed: button gone: {exc}")
+        else:
+            for btn in self._dimmed_glyph_buttons:
+                try:
+                    btn.setGraphicsEffect(None)
+                except RuntimeError as exc:
+                    print(f"[DEBUG] _set_glyph_buttons_dimmed: button gone: {exc}")
+            self._dimmed_glyph_buttons = []
 
     def _on_generate_done(self, success: bool):
         print(f"[DEBUG] _on_generate_done: success={success}")
@@ -510,67 +751,184 @@ class GeneratorTab(QWidget):
         save_as_sc.activated.connect(self.save_project_as)
         self._save_as_shortcut = save_as_sc
 
+    def _sb_section_header(self, text: str) -> QFrame:
+        frame, _lbl = self._sb_section_header_with_label(text)
+        return frame
+
+    def _sb_section_header_with_label(self, text: str):
+        header = QFrame()
+        header.setFixedHeight(30)
+        header.setStyleSheet("background:transparent;border:none;")
+        row = QHBoxLayout(header)
+        row.setContentsMargins(6, 0, 10, 0)
+        row.setSpacing(6)
+
+        marker = QFrame()
+        marker.setFixedSize(3, 14)
+        marker.setStyleSheet(
+            f"background:{COLORS['accent']};border:none;border-radius:1px;"
+        )
+        row.addWidget(marker)
+
+        label = QLabel(text.upper())
+        label.setFont(font(10, "bold"))
+        label.setStyleSheet(
+            f"color:{COLORS['text']};background:transparent;border:none;"
+        )
+        row.addWidget(label)
+        row.addStretch()
+        return header, label
+
+    def _sb_section_divider(self) -> QFrame:
+        divider = QFrame()
+        divider.setFixedHeight(1)
+        divider.setStyleSheet(f"background:{COLORS['border']};border:none;")
+        return divider
+
+    def _apply_gen_sidebar_width(self) -> None:
+        metrics = QFontMetrics(font(13, "bold"))
+
+        save_label = t("project.save_project", default="Save project")
+        load_label = t("project.load_project", default="Load project")
+        paired_row_width = (
+            metrics.horizontalAdvance(save_label)
+            + metrics.horizontalAdvance(load_label)
+            + 24
+            + 8
+        )
+
+        labels = [
+            t("project.project_overview", default="Project Info"),
+            t("project.save_project_as", default="Save project as..."),
+            t("project.clear_project", default="Clear project"),
+            t("project.vehicles_in_project", default="Vehicles in project"),
+            t("common.search_vehicle", default="Search vehicles…"),
+        ]
+        try:
+            labels.extend(state.added_vehicles.values())
+        except Exception:
+            pass
+        longest = max(
+            (metrics.horizontalAdvance(label) for label in labels),
+            default=0,
+        )
+        longest = max(longest, paired_row_width)
+        desired = max(300, min(420, longest + 80))
+        self._gen_sidebar.setFixedWidth(desired)
+
     def _setup_ui(self):
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
         sidebar = QFrame()
+        sidebar.setObjectName("GenSidebarFrame")
         sidebar.setFixedWidth(320)
-        sidebar.setStyleSheet(f"background:{COLORS.get('sidebar_bg', COLORS['frame_bg'])};")
-        sb = QVBoxLayout(sidebar)
-        sb.setContentsMargins(15, 15, 15, 15)
+        sidebar.setStyleSheet(f"""
+            QFrame#GenSidebarFrame {{
+                background-color: {COLORS.get('sidebar_bg', COLORS['frame_bg'])};
+                border-right: 1px solid {COLORS['border']};
+            }}
+        """)
+        self._gen_sidebar = sidebar
+
+        sb_root = QVBoxLayout(sidebar)
+        sb_root.setContentsMargins(0, 0, 0, 0)
+        sb_root.setSpacing(0)
+
+        sb_scroll = QScrollArea()
+        sb_scroll.setWidgetResizable(True)
+        sb_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sb_scroll.setStyleSheet(f"""
+            QScrollArea {{ background:transparent; border:none; }}
+            QScrollArea > QWidget > QWidget {{ background:transparent; }}
+        """)
+
+        sb_inner = QWidget()
+        sb_inner.setStyleSheet("background:transparent;")
+        sb = QVBoxLayout(sb_inner)
+        sb.setContentsMargins(14, 14, 14, 14)
         sb.setSpacing(8)
 
-        self._proj_hdr_lbl = QLabel(t("project.project_overview"))
-        self._proj_hdr_lbl.setFont(font(13, "bold"))
-        self._proj_hdr_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+        info_panel = QFrame()
+        info_panel.setObjectName("genInfoPanel")
+        info_panel.setStyleSheet(f"""
+            QFrame#genInfoPanel {{
+                background: {COLORS['card_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        info_layout = QVBoxLayout(info_panel)
+        info_layout.setContentsMargins(8, 8, 8, 8)
+        info_layout.setSpacing(6)
+        _info_hdr, self._proj_hdr_lbl = self._sb_section_header_with_label(
+            t("project.project_overview", default="Project Info")
         )
-        sb.addWidget(self._proj_hdr_lbl)
+        info_layout.addWidget(_info_hdr)
 
         btn_row1 = QHBoxLayout()
-        self._save_btn  = self._mk_btn(t("project.save_project"),  self.save_project,  "primary", height=30)
-        self._load_btn  = self._mk_btn(t("project.load_project"),  self.load_project,  "primary", height=30)
+        self._save_btn = self._mk_btn(
+            t("project.save_project"), self.save_project, "primary", height=30
+        )
+        self._load_btn = self._mk_btn(
+            t("project.load_project"), self.load_project, "primary", height=30
+        )
         btn_row1.addWidget(self._save_btn)
         btn_row1.addWidget(self._load_btn)
-        sb.addLayout(btn_row1)
+        info_layout.addLayout(btn_row1)
 
+        btn_row2 = QHBoxLayout()
         self._save_as_btn = self._mk_btn(
-            t("project.save_project_as", default="Save As..."),
-            self.save_project_as, "secondary", height=26, font_size=11,
+            t("project.save_project_as", default="Save as..."),
+            self.save_project_as, "primary", height=26, font_size=11,
         )
-        sb.addWidget(self._save_as_btn)
+        self._clear_btn = self._mk_btn(
+            t("project.clear_project"), self.clear_project, "danger", height=26, font_size=11,
+        )
+        btn_row2.addWidget(self._save_as_btn)
+        btn_row2.addWidget(self._clear_btn)
+        info_layout.addLayout(btn_row2)
 
-        self._clear_btn = self._mk_btn(t("project.clear_project"), self.clear_project, "danger",  height=30)
-        sb.addWidget(self._clear_btn)
+        sb.addWidget(info_panel)
+        sb.addWidget(self._sb_section_divider())
 
-        sep = QFrame()
-        sep.setFixedHeight(2)
-        sep.setStyleSheet(f"background:{COLORS['border']};")
-        sb.addWidget(sep)
+        veh_panel = QFrame()
+        veh_panel.setObjectName("genVehPanel")
+        veh_panel.setStyleSheet(f"""
+            QFrame#genVehPanel {{
+                background: {COLORS['card_bg']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 10px;
+            }}
+        """)
+        veh_layout = QVBoxLayout(veh_panel)
+        veh_layout.setContentsMargins(8, 8, 8, 8)
+        veh_layout.setSpacing(6)
 
-        self._veh_lbl = QLabel(t("project.vehicles_in_project"))
-        self._veh_lbl.setFont(font(15, "bold"))
-        self._veh_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
-        sb.addWidget(self._veh_lbl)
+        _veh_hdr, self._veh_lbl = self._sb_section_header_with_label(
+            t("project.vehicles_in_project", default="Vehicles in project")
+        )
+        veh_layout.addWidget(_veh_hdr)
 
         self._project_search = QLineEdit()
         self._project_search.setPlaceholderText(t("common.search_vehicle"))
         self._project_search.setClearButtonEnabled(True)
-        self._project_search.setFixedHeight(32)
-        self._project_search.setFont(font(13))
+        self._project_search.setMinimumHeight(34)
+        self._project_search.setFont(font(12))
         self._project_search.setStyleSheet(f"""
             QLineEdit {{
                 background:{COLORS['frame_bg']};
                 color:{COLORS['text']};
                 border:1px solid {COLORS['border']};
                 border-radius:8px;
-                padding:4px 10px;
+                padding:5px 10px;
+                font-size:12px;
             }}
+            QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
         """)
         self._project_search.textChanged.connect(self.refresh_project_display)
-        sb.addWidget(self._project_search)
+        veh_layout.addWidget(self._project_search)
 
         proj_scroll = QScrollArea()
         proj_scroll.setWidgetResizable(True)
@@ -585,7 +943,13 @@ class GeneratorTab(QWidget):
         self._proj_layout.setContentsMargins(0, 0, 4, 0)
         self._proj_layout.setSpacing(4)
         proj_scroll.setWidget(self._project_overview_frame)
-        sb.addWidget(proj_scroll, 1)
+        veh_layout.addWidget(proj_scroll, 1)
+
+        sb.addWidget(veh_panel, 1)
+        sb.addStretch()
+
+        sb_scroll.setWidget(sb_inner)
+        sb_root.addWidget(sb_scroll)
 
         root.addWidget(sidebar)
 
@@ -605,7 +969,7 @@ class GeneratorTab(QWidget):
         self._add_skin_label = QLabel(t("project.add_skins_header"))
         self._add_skin_label.setFont(font(18, "bold"))
         self._add_skin_label.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
+            _label_qss()
         )
         self._add_skin_label.setVisible(False)
         self._right_col.addWidget(self._add_skin_label)
@@ -730,37 +1094,43 @@ class GeneratorTab(QWidget):
         col.setContentsMargins(15, 15, 15, 15)
         col.setSpacing(10)
 
-        hdr_row = QHBoxLayout()
-        self._skin_name_lbl = QLabel(t("project.skin_name"))
-        self._skin_name_lbl.setFont(font(12, "bold"))
-        self._skin_name_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
-        hdr_row.addWidget(self._skin_name_lbl)
-        hdr_row.addStretch()
-
+        add_config_row = QHBoxLayout()
+        add_config_row.addStretch()
         self._cfg_lbl = QLabel(t("project.add_config_data"))
         self._cfg_lbl.setFont(font(11, "bold"))
-        self._cfg_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
-        hdr_row.addWidget(self._cfg_lbl)
+        self._cfg_lbl.setStyleSheet(_label_qss())
+        add_config_row.addWidget(self._cfg_lbl)
         self._config_toggle = ToggleSwitch()
         self._config_toggle.stateChanged.connect(self._toggle_config_data)
-        hdr_row.addWidget(self._config_toggle)
-        col.addLayout(hdr_row)
+        add_config_row.addWidget(self._config_toggle)
+        col.addLayout(add_config_row)
 
         entry_row = QHBoxLayout()
+        entry_row.setSpacing(10)
+
+        skin_name_col = QVBoxLayout()
+        skin_name_col.setSpacing(4)
+        self._skin_name_lbl = QLabel(t("project.skin_name"))
+        self._skin_name_lbl.setFont(font(12, "bold"))
+        self._skin_name_lbl.setStyleSheet(_label_qss())
+        skin_name_col.addWidget(self._skin_name_lbl)
         self.skin_name_entry = QLineEdit()
         self.skin_name_entry.setPlaceholderText(t("project.skin_name_placeholder"))
         self.skin_name_entry.setFixedHeight(36)
         self.skin_name_entry.setFont(font(13))
         self.skin_name_entry.setStyleSheet(self._entry_style())
-        entry_row.addWidget(self.skin_name_entry)
+        skin_name_col.addWidget(self.skin_name_entry)
+        entry_row.addLayout(skin_name_col, 1)
 
+        config_name_col = QVBoxLayout()
+        config_name_col.setSpacing(4)
         self._config_name_lbl = QLabel(t("project.config_name"))
         self._config_name_lbl.setFont(font(12, "bold"))
         self._config_name_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
+            _label_qss()
         )
         self._config_name_lbl.setVisible(False)
-        entry_row.addWidget(self._config_name_lbl)
+        config_name_col.addWidget(self._config_name_lbl)
 
         self._config_name_entry = QLineEdit()
         self._config_name_entry.setPlaceholderText(t("project.config_name_placeholder"))
@@ -768,14 +1138,19 @@ class GeneratorTab(QWidget):
         self._config_name_entry.setFont(font(13))
         self._config_name_entry.setStyleSheet(self._entry_style())
         self._config_name_entry.setVisible(False)
-        entry_row.addWidget(self._config_name_entry)
+        config_name_col.addWidget(self._config_name_entry)
+        entry_row.addLayout(config_name_col, 1)
 
+        config_type_col = QVBoxLayout()
+        config_type_col.setSpacing(4)
         self._config_type_lbl = QLabel(t("project.type"))
         self._config_type_lbl.setFont(font(12, "bold"))
         self._config_type_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
+            _label_qss()
         )
         self._config_type_lbl.setVisible(False)
+        config_type_col.addWidget(self._config_type_lbl)
+
         self._config_type_combo = QComboBox()
         self._config_type_combo.addItems(self.config_types)
         self._config_type_combo.setFixedHeight(36)
@@ -789,16 +1164,25 @@ class GeneratorTab(QWidget):
                 padding:4px 10px;
             }}
             QComboBox::drop-down {{ border:none; }}
+            QComboBox:disabled {{ color:{_muted()};border-color:{COLORS['border']}; }}
         """)
         self._config_type_combo.setVisible(False)
-        entry_row.addWidget(self._config_type_lbl)
-        entry_row.addWidget(self._config_type_combo)
+        config_type_col.addWidget(self._config_type_combo)
+        entry_row.addLayout(config_type_col)
+
         col.addLayout(entry_row)
 
         self._dds_widget = QWidget()
-        self._dds_widget.setStyleSheet("background:transparent;")
+        self._dds_widget.setObjectName("ddsPanel")
+        self._dds_widget.setStyleSheet(f"""
+            QWidget#ddsPanel {{
+                background:{COLORS['frame_bg']};
+                border:1px solid {COLORS['border']};
+                border-radius:10px;
+            }}
+        """)
         dds_col = QVBoxLayout(self._dds_widget)
-        dds_col.setContentsMargins(0, 0, 0, 0)
+        dds_col.setContentsMargins(10, 10, 10, 10)
         dds_col.setSpacing(4)
 
         self._dds_label_1 = self._mk_label(t("project.dds_texture"), bold=True)
@@ -886,7 +1270,7 @@ class GeneratorTab(QWidget):
         info_row = QHBoxLayout()
         self._info_lbl = QLabel(t("project.edit_info_data", default="Edit Vehicle Info"))
         self._info_lbl.setFont(font(11, "bold"))
-        self._info_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        self._info_lbl.setStyleSheet(_label_qss())
         info_row.addWidget(self._info_lbl)
         self._info_toggle = ToggleSwitch()
         self._info_toggle.stateChanged.connect(self._toggle_info_data)
@@ -896,7 +1280,8 @@ class GeneratorTab(QWidget):
 
         self._info_data_widget = QWidget()
         self._info_data_widget.setStyleSheet(
-            f"background:{COLORS.get('sidebar_bg', COLORS['frame_bg'])};border-radius:8px;"
+            f"background:{COLORS.get('sidebar_bg', COLORS['frame_bg'])};"
+            f"border:1px solid {COLORS['border']};border-radius:10px;"
         )
         self._info_data_widget.setVisible(False)
         self._info_data_layout = QVBoxLayout(self._info_data_widget)
@@ -909,7 +1294,7 @@ class GeneratorTab(QWidget):
         clr_row = QHBoxLayout()
         self._clr_lbl = QLabel(t("project.colorable"))
         self._clr_lbl.setFont(font(11, "bold"))
-        self._clr_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        self._clr_lbl.setStyleSheet(_label_qss())
         clr_row.addWidget(self._clr_lbl)
         self._colorable_toggle = ToggleSwitch()
         self._colorable_toggle.stateChanged.connect(self._toggle_colorable)
@@ -923,7 +1308,7 @@ class GeneratorTab(QWidget):
         self._glow_lbl = QLabel(t("project.glowing_skin"))
         self._glow_lbl.setFont(font(11, "bold"))
         self._glow_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
+            _label_qss()
         )
         glow_row.addWidget(self._glow_lbl)
         self._glow_toggle = ToggleSwitch()
@@ -964,10 +1349,17 @@ class GeneratorTab(QWidget):
         col.addWidget(self._glow_widget)
 
         self._colorable_widget = QWidget()
-        self._colorable_widget.setStyleSheet("background:transparent;")
+        self._colorable_widget.setObjectName("colorablePanel")
+        self._colorable_widget.setStyleSheet(f"""
+            QWidget#colorablePanel {{
+                background:{COLORS['frame_bg']};
+                border:1px solid {COLORS['border']};
+                border-radius:10px;
+            }}
+        """)
         self._colorable_widget.setVisible(False)
         clr_col = QVBoxLayout(self._colorable_widget)
-        clr_col.setContentsMargins(0, 0, 0, 0)
+        clr_col.setContentsMargins(10, 10, 10, 10)
         clr_col.setSpacing(4)
 
         self._clr_body1_lbl = QLabel(t("project.normal_body"))
@@ -1058,7 +1450,7 @@ class GeneratorTab(QWidget):
         mat_row = QHBoxLayout()
         self._mat_lbl = QLabel(t("project.edit_materials"))
         self._mat_lbl.setFont(font(11, "bold"))
-        self._mat_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        self._mat_lbl.setStyleSheet(_label_qss())
         mat_row.addWidget(self._mat_lbl)
         self._material_toggle = ToggleSwitch()
         self._material_toggle.stateChanged.connect(self._toggle_material_properties)
@@ -1067,9 +1459,14 @@ class GeneratorTab(QWidget):
         col.addLayout(mat_row)
 
         self._material_props_widget = QWidget()
-        self._material_props_widget.setStyleSheet(
-            f"background:{COLORS['card_bg']};border-radius:8px;"
-        )
+        self._material_props_widget.setObjectName("matPropsPanel")
+        self._material_props_widget.setStyleSheet(f"""
+            QWidget#matPropsPanel {{
+                background:{COLORS['frame_bg']};
+                border:1px solid {COLORS['border']};
+                border-radius:10px;
+            }}
+        """)
         self._material_props_widget.setVisible(False)
         self._mat_props_layout = QVBoxLayout(self._material_props_widget)
         self._mat_props_layout.setContentsMargins(10, 10, 10, 10)
@@ -1079,26 +1476,28 @@ class GeneratorTab(QWidget):
         layers_hdr_row = QHBoxLayout()
         self._layers_lbl = QLabel(t("project.custom_layers"))
         self._layers_lbl.setFont(font(11, "bold"))
-        self._layers_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        self._layers_lbl.setStyleSheet(_label_qss())
         layers_hdr_row.addWidget(self._layers_lbl)
         layers_hdr_row.addStretch()
         self._add_layer_btn = self._mk_btn(
-            t("project.add_new_layer"), self._add_custom_layer,
+            t("project.add_new_layer"),
+            self._queue_add_custom_layer,
             "primary", width=140, height=32, font_size=11
         )
+        self._add_layer_btn.pressed.connect(self._begin_add_custom_layer)
         layers_hdr_row.addWidget(self._add_layer_btn)
         col.addLayout(layers_hdr_row)
 
         self._layers_hint = QLabel(t("project.custom_layers_hint"))
         self._layers_hint.setFont(font(10))
         self._layers_hint.setWordWrap(True)
-        self._layers_hint.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        self._layers_hint.setStyleSheet(_label_qss("text_secondary"))
         col.addWidget(self._layers_hint)
 
         self._layers_limit_lbl = QLabel("")
         self._layers_limit_lbl.setFont(font(10))
         self._layers_limit_lbl.setWordWrap(True)
-        self._layers_limit_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        self._layers_limit_lbl.setStyleSheet(_label_qss("text_secondary"))
         col.addWidget(self._layers_limit_lbl)
 
         self._layers_container = QWidget()
@@ -1160,7 +1559,7 @@ class GeneratorTab(QWidget):
             lbl = QLabel(t("project.add_from_sidebar"))
             lbl.setFont(font(13))
             lbl.setStyleSheet(
-                f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+                _label_qss("text_secondary")
             )
             lbl.setAlignment(Qt.AlignCenter)
             self._proj_layout.addWidget(lbl)
@@ -1183,7 +1582,7 @@ class GeneratorTab(QWidget):
             lbl = QLabel(t("project.no_cars_match", query=search_query))
             lbl.setFont(font(13))
             lbl.setStyleSheet(
-                f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+                _label_qss("text_secondary")
             )
             lbl.setAlignment(Qt.AlignCenter)
             self._proj_layout.addWidget(lbl)
@@ -1238,7 +1637,7 @@ class GeneratorTab(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(4)
 
-        acc   = COLORS["accent"]      if is_selected else COLORS["card_bg"]
+        acc   = COLORS["accent"]      if is_selected else COLORS["frame_bg"]
         acc_h = COLORS["accent_hover"] if is_selected else COLORS["card_hover"]
         txt   = COLORS["accent_text"]  if is_selected else COLORS["text"]
 
@@ -1325,7 +1724,7 @@ class GeneratorTab(QWidget):
             hdr = QLabel(t("project.skins_header"))
             hdr.setFont(font(10, "bold"))
             hdr.setStyleSheet(
-                f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+                _label_qss("text_secondary")
             )
             sf_col.addWidget(hdr)
 
@@ -1341,7 +1740,7 @@ class GeneratorTab(QWidget):
                       self.selected_skin_index == idx and
                       self.selected_car_for_skin == car_id)
         has_config = "config_data" in skin
-        row_bg = COLORS["accent"] if is_editing else COLORS["card_bg"]
+        row_bg = COLORS["accent"] if is_editing else COLORS["frame_bg"]
         row_h  = 75 if has_config else 38
 
         f = QFrame()
@@ -1355,17 +1754,14 @@ class GeneratorTab(QWidget):
         row.setContentsMargins(8, 4, 6, 4)
         row.setSpacing(6)
 
-        icon = QLabel("✏️" if is_editing else "🎨")
-        icon.setFont(font(14))
-        icon.setStyleSheet("background:transparent;")
-        row.addWidget(icon)
-
         info_col = QVBoxLayout()
         info_col.setSpacing(1)
         txt_c = COLORS["accent_text"] if is_editing else COLORS["text"]
-        n_lbl = QLabel(f"{idx + 1}. {skin['name']}")
+        full_name = f"{idx + 1}. {skin['name']}"
+        n_lbl = ElidedLabel(full_name)
         n_lbl.setFont(font(12, "bold"))
         n_lbl.setStyleSheet(f"color:{txt_c};background:transparent;border:none;")
+        n_lbl.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         info_col.addWidget(n_lbl)
 
         if has_config:
@@ -1681,6 +2077,10 @@ class GeneratorTab(QWidget):
             mat = self._collect_material_properties()
             if mat:
                 skin_data["material_properties"] = mat
+                mat_preset = self._collect_material_preset_name()
+                if mat_preset:
+                    skin_data["material_properties_preset"]        = mat_preset
+                    skin_data["material_properties_preset_source"] = self._collect_material_preset_source()
 
         if self._custom_layer_cards:
             if not self._validate_custom_layers():
@@ -1743,6 +2143,10 @@ class GeneratorTab(QWidget):
                                 layer["opacity_map_path_2"] = layer["opacity_map_path"]
                             if layer.get("normal_map_path") and not layer.get("normal_map_path_2"):
                                 layer["normal_map_path_2"] = layer["normal_map_path"]
+                            for _dk in ("opacity_detail_map_path", "roughness_detail_map_path",
+                                        "metallic_detail_map_path"):
+                                if layer.get(_dk) and not layer.get(f"{_dk}_2"):
+                                    layer[f"{_dk}_2"] = layer[_dk]
                             if layer.get("glowing") and layer.get("emissive_dds_path") and not layer.get("emissive_dds_path_2"):
                                 layer["emissive_dds_path_2"] = layer["emissive_dds_path"]
                             mirrored_layers.append(layer)
@@ -1756,7 +2160,9 @@ class GeneratorTab(QWidget):
                         for layer in broadcast_skin["custom_layers"]:
                             layer = dict(layer)
                             for k in ("data_map_path_2", "color_map_path_2", "dds_path_2",
-                                      "opacity_map_path_2", "normal_map_path_2", "emissive_dds_path_2"):
+                                      "opacity_map_path_2", "normal_map_path_2", "emissive_dds_path_2",
+                                      "opacity_detail_map_path_2", "roughness_detail_map_path_2",
+                                      "metallic_detail_map_path_2"):
                                 layer.pop(k, None)
                             stripped_layers.append(layer)
                         broadcast_skin["custom_layers"] = stripped_layers
@@ -1882,10 +2288,22 @@ class GeneratorTab(QWidget):
             self._toggle_info_data()
 
         if "material_properties" in skin:
+            stored_mat_preset = skin.get("material_properties_preset", "")
+            stored_mat_source = skin.get("material_properties_preset_source", "")
+            self._pending_material_preset = (
+                stored_mat_preset if isinstance(stored_mat_preset, str) else ""
+            )
+            self._pending_material_preset_source = (
+                stored_mat_source if isinstance(stored_mat_source, str) else ""
+            )
             self._material_toggle.setChecked(True)
             self._toggle_material_properties()
             self._load_material_properties_into_ui(skin["material_properties"])
+            self._pending_material_preset = ""
+            self._pending_material_preset_source = ""
         else:
+            self._pending_material_preset = ""
+            self._pending_material_preset_source = ""
             self._material_toggle.setChecked(False)
             self._toggle_material_properties()
 
@@ -2008,8 +2426,20 @@ class GeneratorTab(QWidget):
             mat = self._collect_material_properties()
             if mat:
                 skin["material_properties"] = mat
+                mat_preset = self._collect_material_preset_name()
+                if mat_preset:
+                    skin["material_properties_preset"]        = mat_preset
+                    skin["material_properties_preset_source"] = self._collect_material_preset_source()
+                else:
+                    skin.pop("material_properties_preset", None)
+                    skin.pop("material_properties_preset_source", None)
+            else:
+                skin.pop("material_properties_preset", None)
+                skin.pop("material_properties_preset_source", None)
         else:
             skin.pop("material_properties", None)
+            skin.pop("material_properties_preset", None)
+            skin.pop("material_properties_preset_source", None)
 
         if self._custom_layer_cards:
             if not self._validate_custom_layers():
@@ -2128,6 +2558,9 @@ class GeneratorTab(QWidget):
 
         self._clear_layout(self._mat_props_layout)
         self.material_properties_entries.clear()
+        self._material_preset_row = None
+        self._pending_material_preset = ""
+        self._pending_material_preset_source = ""
 
         self._clear_layout(self._info_data_layout)
         self.info_data_entries.clear()
@@ -2280,13 +2713,7 @@ class GeneratorTab(QWidget):
             label.setVisible(True)
             return
         if not getattr(state, 'texture_previews_enabled', True):
-            label.setText(f"📄  {os.path.basename(path)}")
-            label.setStyleSheet(
-                f"color:{COLORS['text_secondary']};"
-                "background:transparent;border:none;"
-            )
-            label.setAlignment(Qt.AlignCenter)
-            label.setVisible(True)
+            print(f"[DEBUG] _load_preview: previews disabled — skipping display for {path!r}")
             return
         px = _load_pixmap_robust(path)
         if px and not px.isNull():
@@ -2365,7 +2792,7 @@ class GeneratorTab(QWidget):
                          default="Leave a field blank to keep the template's default value."))
         hint.setFont(font(10))
         hint.setWordWrap(True)
-        hint.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        hint.setStyleSheet(_label_qss("text_secondary"))
         self._info_data_layout.addWidget(hint)
 
         fields_grid = QHBoxLayout()
@@ -2380,7 +2807,7 @@ class GeneratorTab(QWidget):
             fcol = QVBoxLayout()
             lbl = QLabel(key)
             lbl.setFont(font(9))
-            lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+            lbl.setStyleSheet(_label_qss("text_secondary"))
             fcol.addWidget(lbl)
 
             entry = QLineEdit()
@@ -2409,7 +2836,7 @@ class GeneratorTab(QWidget):
             dcol.setContentsMargins(0, 6, 0, 0)
             dlbl = QLabel(key)
             dlbl.setFont(font(9))
-            dlbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+            dlbl.setStyleSheet(_label_qss("text_secondary"))
             dcol.addWidget(dlbl)
 
             dentry = QLineEdit()
@@ -2546,6 +2973,16 @@ class GeneratorTab(QWidget):
         )
         self._add_layer_btn.setEnabled(remaining > 0)
 
+    def _queue_add_custom_layer(self, _checked: bool = False):
+        QTimer.singleShot(0, self._add_custom_layer)
+        QTimer.singleShot(500, self._finish_add_custom_layer)
+
+    def _begin_add_custom_layer(self):
+        self._layer_add_in_progress = True
+
+    def _finish_add_custom_layer(self):
+        self._layer_add_in_progress = False
+
     def _add_custom_layer(self, layer_data: Optional[Dict[str, Any]] = None):
         if layer_data is None and self._max_new_layers() <= 0:
             print("[DEBUG] _add_custom_layer: aborted — layer limit reached")
@@ -2563,6 +3000,7 @@ class GeneratorTab(QWidget):
     def _new_custom_layer_defaults(self) -> Dict[str, Any]:
         return {
             "is_colorable": False,
+            "diffuse_map_use_uv": True,
             "data_map_path": "", "color_map_path": "",
             "data_map_path_2": "", "color_map_path_2": "",
             "dds_path": "", "dds_path_2": "",
@@ -2570,6 +3008,12 @@ class GeneratorTab(QWidget):
             "metallic_map_path": "", "metallic_map_path_2": "",
             "opacity_map_path": "", "opacity_map_path_2": "",
             "normal_map_path": "", "normal_map_path_2": "",
+            "opacity_detail_map_path": "", "opacity_detail_map_path_2": "",
+            "roughness_detail_map_path": "", "roughness_detail_map_path_2": "",
+            "metallic_detail_map_path": "", "metallic_detail_map_path_2": "",
+            "detail_scale": "",
+            "factors_preset": "",
+            "factors_preset_source": "",
             "retroreflectivity": 0.0,
             "glowing": False,
             "emissive_dds_path": "", "emissive_dds_path_2": "",
@@ -2604,10 +3048,10 @@ class GeneratorTab(QWidget):
         is_var = self._needs_double_layer()
         v_suffix = self._selected_variant_suffix()
 
-        frame = QFrame()
+        frame = QFrame(self._layers_container)
         frame.setStyleSheet(
             f"QFrame{{background:{COLORS.get('sidebar_bg', COLORS['frame_bg'])};"
-            "border-radius:8px;}}"
+            f"border:1px solid {COLORS['border']};border-radius:10px;}}"
         )
         fc = QVBoxLayout(frame)
         fc.setContentsMargins(10, 10, 10, 10)
@@ -2630,7 +3074,7 @@ class GeneratorTab(QWidget):
         clr_row = QHBoxLayout()
         clr_lbl = QLabel(t("project.colorable"))
         clr_lbl.setFont(font(10, "bold"))
-        clr_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        clr_lbl.setStyleSheet(_label_qss())
         clr_row.addWidget(clr_lbl)
         clr_toggle = ToggleSwitch()
         clr_toggle.setChecked(bool(layer_data.get("is_colorable", False)))
@@ -2639,16 +3083,36 @@ class GeneratorTab(QWidget):
         fc.addLayout(clr_row)
         card["colorable_toggle"] = clr_toggle
 
+        uv_row = QHBoxLayout()
+        uv_row.setSpacing(4)
+        uv_lbl = QLabel(t("project.use_secondary_uv"))
+        uv_lbl.setFont(font(10, "bold"))
+        uv_lbl.setStyleSheet(_label_qss())
+        uv_row.addWidget(uv_lbl)
+        uv_info = QLabel("🛈")
+        uv_info.setFont(font(13))
+        uv_info.setStyleSheet(_label_qss("text_secondary"))
+        uv_info.setToolTip(_wrapped_tooltip(t("project.use_secondary_uv_hint")))
+        uv_info.setCursor(Qt.CursorShape.WhatsThisCursor)
+        uv_row.addWidget(uv_info)
+        uv_toggle = ToggleSwitch()
+        uv_toggle.setChecked(bool(layer_data.get("diffuse_map_use_uv", True)))
+        uv_toggle.setToolTip(_wrapped_tooltip(t("project.use_secondary_uv_hint")))
+        uv_row.addWidget(uv_toggle)
+        uv_row.addStretch()
+        fc.addLayout(uv_row)
+        card["diffuse_uv_toggle"] = uv_toggle
+
         opt_row = QHBoxLayout()
 
-        glow_widget = QWidget()
+        glow_widget = QWidget(frame)
         glow_widget.setVisible(False)
         glow_widget.setStyleSheet("background:transparent;")
         glow_col = QVBoxLayout(glow_widget)
         glow_col.setContentsMargins(0, 0, 0, 0)
         glow_lbl = QLabel(t("project.glowing_skin"))
         glow_lbl.setFont(font(9))
-        glow_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        glow_lbl.setStyleSheet(_label_qss("text_secondary"))
         glow_col.addWidget(glow_lbl)
         glow_toggle = ToggleSwitch()
         glow_toggle.setChecked(bool(layer_data.get("glowing", False)))
@@ -2659,7 +3123,7 @@ class GeneratorTab(QWidget):
         fc.addLayout(opt_row)
         card.update(glow_toggle=glow_toggle)
 
-        dds_widget = QWidget(); dds_widget.setStyleSheet("background:transparent;")
+        dds_widget = QWidget(frame); dds_widget.setStyleSheet("background:transparent;")
         dds_col = QVBoxLayout(dds_widget); dds_col.setContentsMargins(0, 0, 0, 0); dds_col.setSpacing(4)
         dds_lbl = self._mk_label(t("project.base_color_map_dds"), bold=True)
         dds_col.addWidget(dds_lbl)
@@ -2673,7 +3137,7 @@ class GeneratorTab(QWidget):
         dds_row.addWidget(dds_browse)
         dds_col.addLayout(dds_row)
 
-        dds_widget_2 = QWidget(); dds_widget_2.setStyleSheet("background:transparent;")
+        dds_widget_2 = QWidget(frame); dds_widget_2.setStyleSheet("background:transparent;")
         dds_widget_2.setVisible(is_var)
         dds2_col = QVBoxLayout(dds_widget_2); dds2_col.setContentsMargins(0, 4, 0, 0); dds2_col.setSpacing(4)
         dds2_lbl = QLabel(t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else "")
@@ -2703,7 +3167,7 @@ class GeneratorTab(QWidget):
         rm_row.addWidget(rm_browse)
         dds_col.addLayout(rm_row)
 
-        rm_widget_2 = QWidget(); rm_widget_2.setStyleSheet("background:transparent;")
+        rm_widget_2 = QWidget(frame); rm_widget_2.setStyleSheet("background:transparent;")
         rm_widget_2.setVisible(is_var)
         rm2_col = QVBoxLayout(rm_widget_2); rm2_col.setContentsMargins(0, 4, 0, 0); rm2_col.setSpacing(4)
         rm2_entry = QLineEdit(); rm2_entry.setPlaceholderText(
@@ -2731,7 +3195,7 @@ class GeneratorTab(QWidget):
         mm_row.addWidget(mm_browse)
         dds_col.addLayout(mm_row)
 
-        mm_widget_2 = QWidget(); mm_widget_2.setStyleSheet("background:transparent;")
+        mm_widget_2 = QWidget(frame); mm_widget_2.setStyleSheet("background:transparent;")
         mm_widget_2.setVisible(is_var)
         mm2_col = QVBoxLayout(mm_widget_2); mm2_col.setContentsMargins(0, 4, 0, 0); mm2_col.setSpacing(4)
         mm2_entry = QLineEdit(); mm2_entry.setPlaceholderText(
@@ -2755,7 +3219,7 @@ class GeneratorTab(QWidget):
             mm_entry=mm_entry, mm_entry_2=mm2_entry, mm_widget_2=mm_widget_2,
         )
 
-        clr_widget = QWidget(); clr_widget.setStyleSheet("background:transparent;")
+        clr_widget = QWidget(frame); clr_widget.setStyleSheet("background:transparent;")
         clrw_col = QVBoxLayout(clr_widget); clrw_col.setContentsMargins(0, 0, 0, 0); clrw_col.setSpacing(4)
 
         dm_lbl = self._mk_label(t("project.base_Color_Map"), bold=True)
@@ -2806,7 +3270,7 @@ class GeneratorTab(QWidget):
         mm_clr_row.addWidget(mm_clr_browse)
         clrw_col.addLayout(mm_clr_row)
 
-        clr_widget_2 = QWidget(); clr_widget_2.setStyleSheet("background:transparent;")
+        clr_widget_2 = QWidget(frame); clr_widget_2.setStyleSheet("background:transparent;")
         clr_widget_2.setVisible(is_var)
         clr2_col = QVBoxLayout(clr_widget_2); clr2_col.setContentsMargins(0, 6, 0, 0); clr2_col.setSpacing(4)
         clr2_lbl = QLabel(t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else "")
@@ -2878,7 +3342,7 @@ class GeneratorTab(QWidget):
         fc.addLayout(op_row)
         card["op_entry"] = op_entry
 
-        op_widget_2 = QWidget(); op_widget_2.setStyleSheet("background:transparent;")
+        op_widget_2 = QWidget(frame); op_widget_2.setStyleSheet("background:transparent;")
         op_widget_2.setVisible(is_var)
         op2_col = QVBoxLayout(op_widget_2); op2_col.setContentsMargins(0, 4, 0, 0); op2_col.setSpacing(4)
         op2_entry = QLineEdit(); op2_entry.setPlaceholderText(
@@ -2908,7 +3372,7 @@ class GeneratorTab(QWidget):
         fc.addLayout(nm_row)
         card["nm_entry"] = nm_entry
 
-        nm_widget_2 = QWidget(); nm_widget_2.setStyleSheet("background:transparent;")
+        nm_widget_2 = QWidget(frame); nm_widget_2.setStyleSheet("background:transparent;")
         nm_widget_2.setVisible(is_var)
         nm2_col = QVBoxLayout(nm_widget_2); nm2_col.setContentsMargins(0, 4, 0, 0); nm2_col.setSpacing(4)
         nm2_entry = QLineEdit(); nm2_entry.setPlaceholderText(
@@ -2925,6 +3389,61 @@ class GeneratorTab(QWidget):
         fc.addWidget(nm_widget_2)
         card.update(nm_entry_2=nm2_entry, nm_widget_2=nm_widget_2)
 
+        def _add_detail_row(label_key, data_key, entry_attr, widget_attr_2,
+                            entry_attr_2, data_key_2):
+            lbl = self._mk_label(t(label_key), bold=True)
+            fc.addWidget(lbl)
+            entry = QLineEdit(); entry.setPlaceholderText(t("common.nofile_selected"))
+            entry.setReadOnly(True); entry.setFixedHeight(32); entry.setFont(font(11))
+            entry.setStyleSheet(self._entry_style())
+            row = QHBoxLayout(); row.addWidget(entry)
+            browse = self._mk_btn(t("common.browse"),
+                                   lambda: self._browse_layer_file(card, data_key, entry, "dds_png"),
+                                   "primary", width=90, height=32, font_size=10)
+            row.addWidget(browse)
+            fc.addLayout(row)
+
+            widget_2 = QWidget(frame); widget_2.setStyleSheet("background:transparent;")
+            widget_2.setVisible(is_var)
+            col_2 = QVBoxLayout(widget_2); col_2.setContentsMargins(0, 4, 0, 0); col_2.setSpacing(4)
+            entry_2 = QLineEdit(); entry_2.setPlaceholderText(
+                t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            )
+            entry_2.setReadOnly(True); entry_2.setFixedHeight(32); entry_2.setFont(font(11))
+            entry_2.setStyleSheet(self._entry_style())
+            row_2 = QHBoxLayout(); row_2.addWidget(entry_2)
+            browse_2 = self._mk_btn(t("common.browse"),
+                                     lambda: self._browse_layer_file(card, data_key_2, entry_2, "dds_png"),
+                                     "primary", width=90, height=32, font_size=10)
+            row_2.addWidget(browse_2)
+            col_2.addLayout(row_2)
+            fc.addWidget(widget_2)
+            card[entry_attr] = entry
+            card[entry_attr_2] = entry_2
+            card[widget_attr_2] = widget_2
+
+        _add_detail_row("project.opacity_detail_map", "opacity_detail_map_path",
+                        "odm_entry", "odm_widget_2", "odm_entry_2", "opacity_detail_map_path_2")
+        _add_detail_row("project.roughness_detail_map", "roughness_detail_map_path",
+                        "rdm_entry", "rdm_widget_2", "rdm_entry_2", "roughness_detail_map_path_2")
+        _add_detail_row("project.metallic_detail_map", "metallic_detail_map_path",
+                        "mdm_entry", "mdm_widget_2", "mdm_entry_2", "metallic_detail_map_path_2")
+
+        ds_col = QVBoxLayout()
+        ds_lbl = QLabel(t("project.detail_scale"))
+        ds_lbl.setFont(font(9))
+        ds_lbl.setStyleSheet(_label_qss("text_secondary"))
+        ds_col.addWidget(ds_lbl)
+        ds_entry = QLineEdit(str(layer_data.get("detail_scale", "") or ""))
+        ds_entry.setPlaceholderText(t("project.detail_scale_placeholder"))
+        ds_entry.setToolTip(t("project.detail_scale_hint"))
+        ds_entry.setFixedHeight(30)
+        ds_entry.setFont(font(11))
+        ds_entry.setStyleSheet(self._entry_style())
+        ds_col.addWidget(ds_entry)
+        fc.addLayout(ds_col)
+        card["ds_entry"] = ds_entry
+
         fc.addSpacing(10)
         factors_lbl = self._mk_label(t("project.layer_factors"), bold=True)
 
@@ -2940,7 +3459,7 @@ class GeneratorTab(QWidget):
             fcol = QVBoxLayout()
             flbl = QLabel(t(label_key))
             flbl.setFont(font(9))
-            flbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+            flbl.setStyleSheet(_label_qss("text_secondary"))
             fcol.addWidget(flbl)
             fentry = QLineEdit(str(layer_data.get(key, default)))
             fentry.setFixedHeight(30)
@@ -2970,11 +3489,14 @@ class GeneratorTab(QWidget):
         factors_preset_row = self._build_preset_row(
             _PRESET_KIND_LAYER_FACTORS, _get_factor_values, _apply_factor_values
         )
+        card["factors_preset_row"] = factors_preset_row
+        for _fe in factor_entries.values():
+            _fe.textEdited.connect(lambda _t, r=factors_preset_row: r.forget_preset_name())
         fc.addWidget(factors_lbl)
         fc.addWidget(factors_preset_row)
         fc.addLayout(factors_grid)
 
-        em_widget = QWidget(); em_widget.setStyleSheet("background:transparent;")
+        em_widget = QWidget(frame); em_widget.setStyleSheet("background:transparent;")
         em_widget.setVisible(bool(layer_data.get("glowing", False)))
         em_col = QVBoxLayout(em_widget); em_col.setContentsMargins(0, 4, 0, 0); em_col.setSpacing(4)
         em_lbl = self._mk_label(t("project.emissive_map"), bold=True)
@@ -2989,7 +3511,7 @@ class GeneratorTab(QWidget):
         em_row.addWidget(em_browse)
         em_col.addLayout(em_row)
 
-        em_widget_2 = QWidget(); em_widget_2.setStyleSheet("background:transparent;")
+        em_widget_2 = QWidget(frame); em_widget_2.setStyleSheet("background:transparent;")
         em_widget_2.setVisible(is_var)
         em2_col = QVBoxLayout(em_widget_2); em2_col.setContentsMargins(0, 4, 0, 0); em2_col.setSpacing(4)
         em2_entry = QLineEdit(); em2_entry.setPlaceholderText(
@@ -3022,8 +3544,13 @@ class GeneratorTab(QWidget):
 
     def _browse_layer_file(self, card: Dict[str, Any], data_key: str,
                             entry: QLineEdit, kind: str):
+        if self._layer_add_in_progress:
+            print(f"[DEBUG] _browse_layer_file: ignored click during layer insertion ({data_key})")
+            return
         if kind == "dds":
             filt = "DDS files (*.dds);;All files (*.*)"
+        elif kind == "dds_png":
+            filt = "Texture files (*.dds *.png);;DDS files (*.dds);;PNG files (*.png);;All files (*.*)"
         else:
             filt = "PNG files (*.png);;All files (*.*)"
         path, _ = QFileDialog.getOpenFileName(self, t("project.dialog_select_layer_file"), "", filt)
@@ -3055,6 +3582,12 @@ class GeneratorTab(QWidget):
             ("opacity_map_path_2",   "op_entry_2"),
             ("normal_map_path",      "nm_entry"),
             ("normal_map_path_2",    "nm_entry_2"),
+            ("opacity_detail_map_path",     "odm_entry"),
+            ("opacity_detail_map_path_2",   "odm_entry_2"),
+            ("roughness_detail_map_path",   "rdm_entry"),
+            ("roughness_detail_map_path_2", "rdm_entry_2"),
+            ("metallic_detail_map_path",    "mdm_entry"),
+            ("metallic_detail_map_path_2",  "mdm_entry_2"),
             ("emissive_dds_path",    "em_entry"),
             ("emissive_dds_path_2",  "em_entry_2"),
         ]:
@@ -3067,6 +3600,20 @@ class GeneratorTab(QWidget):
         for key, fentry in card["factor_entries"].items():
             if key in layer_data:
                 fentry.setText(str(layer_data[key]))
+
+        stored_preset = layer_data.get("factors_preset", "")
+        if isinstance(stored_preset, str) and stored_preset.strip():
+            stored_source = layer_data.get("factors_preset_source", "")
+            card["factors_preset_row"].set_preset_name(
+                stored_preset, stored_source if isinstance(stored_source, str) else ""
+            )
+            print(f"[DEBUG] _load_layer_card_values: restored factors preset "
+                  f"{stored_source or '(legacy)'}/{stored_preset!r}")
+
+        scale = layer_data.get("detail_scale", "")
+        if isinstance(scale, (list, tuple)):
+            scale = ", ".join(str(v) for v in scale)
+        card["ds_entry"].setText(str(scale or ""))
         print(f"[DEBUG] _load_layer_card_values: applied {applied} file path(s) from stored layer data")
 
     def _collect_custom_layers(self) -> List[Dict[str, Any]]:
@@ -3076,6 +3623,7 @@ class GeneratorTab(QWidget):
             layer: Dict[str, Any] = {
                 "is_colorable": is_colorable,
                 "glowing": card["glow_toggle"].isChecked(),
+                "diffuse_map_use_uv": card["diffuse_uv_toggle"].isChecked(),
             }
             if is_colorable:
                 layer["data_map_path"]  = card.get("data_map_path", "")
@@ -3114,6 +3662,32 @@ class GeneratorTab(QWidget):
             if card["is_var"] and card.get("normal_map_path_2"):
                 layer["normal_map_path_2"] = card["normal_map_path_2"]
 
+            has_detail = False
+            for key in ("opacity_detail_map_path", "roughness_detail_map_path",
+                        "metallic_detail_map_path"):
+                if card.get(key):
+                    layer[key] = card[key]
+                    has_detail = True
+                if card["is_var"] and card.get(f"{key}_2"):
+                    layer[f"{key}_2"] = card[f"{key}_2"]
+
+            scale_txt = card["ds_entry"].text().strip()
+            if scale_txt:
+                layer["detail_scale"] = scale_txt
+                try:
+                    from core.file_ops import _parse_detail_scale
+                    if _parse_detail_scale(scale_txt) is None:
+                        self.show_notification(
+                            t("project.notification.invalid_detail_scale", value=scale_txt),
+                            "warning"
+                        )
+                except ImportError:
+                    print("[DEBUG] _collect_custom_layers: core.file_ops not importable — "
+                          "skipping detail scale pre-check")
+            elif has_detail:
+                print("[DEBUG] _collect_custom_layers: detail map set with no scale — "
+                      "file_ops will apply its default tiling")
+
             if layer["glowing"]:
                 layer["emissive_dds_path"] = card.get("emissive_dds_path", "")
                 if card["is_var"]:
@@ -3131,6 +3705,11 @@ class GeneratorTab(QWidget):
                     )
                     parsed = 0.0
                 layer[key] = int(parsed) if parsed == int(parsed) else parsed
+
+            preset_name = card["factors_preset_row"].preset_name()
+            if preset_name:
+                layer["factors_preset"]        = preset_name
+                layer["factors_preset_source"] = card["factors_preset_row"].preset_source()
 
             layers.append(layer)
         print(f"[DEBUG] _collect_custom_layers: collected {len(layers)} layer(s)")
@@ -3180,6 +3759,8 @@ class GeneratorTab(QWidget):
         if on:
             if not self.selected_car_for_skin:
                 print("[DEBUG] _toggle_material_properties: aborted — no car selected")
+                self._pending_material_preset = ""
+                self._pending_material_preset_source = ""
                 self.show_notification(t("project.notification.select_car_first"), "warning")
                 self._material_toggle.setChecked(False)
                 return
@@ -3190,6 +3771,8 @@ class GeneratorTab(QWidget):
             if not materials:
                 print(f"[DEBUG] _toggle_material_properties: aborted — no material structure for "
                       f"base={base!r} variant={variant_suffix!r}")
+                self._pending_material_preset = ""
+                self._pending_material_preset_source = ""
                 self.show_notification(
                     t("project.notification.no_material_properties"), "warning"
                 )
@@ -3206,6 +3789,7 @@ class GeneratorTab(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         self.material_properties_entries.clear()
+        self._material_preset_row = None
 
         hdr = self._mk_label(t("project.material_properties"), bold=True)
         self._mat_props_layout.addWidget(hdr)
@@ -3213,7 +3797,7 @@ class GeneratorTab(QWidget):
         info = QLabel(t("project.material_values_hint"))
         info.setFont(font(10))
         info.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+            _label_qss("text_secondary")
         )
         self._mat_props_layout.addWidget(info)
 
@@ -3223,6 +3807,14 @@ class GeneratorTab(QWidget):
             self._load_material_properties_into_ui,
         )
         self._mat_props_layout.addWidget(mat_preset_row)
+        self._material_preset_row = mat_preset_row
+        if self._pending_material_preset:
+            mat_preset_row.set_preset_name(
+                self._pending_material_preset, self._pending_material_preset_source
+            )
+            print(f"[DEBUG] _populate_material_properties_ui: restored material preset "
+                  f"{self._pending_material_preset_source or '(legacy)'}/"
+                  f"{self._pending_material_preset!r}")
 
         for mat_name, mat_info in materials.items():
             part  = mat_info["part_name"]
@@ -3231,7 +3823,7 @@ class GeneratorTab(QWidget):
             sect = QFrame()
             sect.setStyleSheet(
                 f"QFrame{{background:{COLORS.get('sidebar_bg', COLORS['frame_bg'])};"
-                "border-radius:8px;}}"
+                f"border:1px solid {COLORS['border']};border-radius:10px;}}"
             )
             sc = QVBoxLayout(sect)
             sc.setContentsMargins(10, 10, 10, 10)
@@ -3246,7 +3838,7 @@ class GeneratorTab(QWidget):
             tl = QLabel(f"({mat_name})")
             tl.setFont(font(10))
             tl.setStyleSheet(
-                f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+                _label_qss("text_secondary")
             )
             hdr_row.addWidget(tl)
             sc.addLayout(hdr_row)
@@ -3258,7 +3850,7 @@ class GeneratorTab(QWidget):
                     sl = QLabel(t("project.material_stage_n", n=stage_key.split('_')[1]))
                     sl.setFont(font(10, "bold"))
                     sl.setStyleSheet(
-                        f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+                        _label_qss("text_secondary")
                     )
                     sc.addWidget(sl)
 
@@ -3274,7 +3866,7 @@ class GeneratorTab(QWidget):
                     pcol = QVBoxLayout()
                     pl = QLabel(label_text)
                     pl.setFont(font(9))
-                    pl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+                    pl.setStyleSheet(_label_qss("text_secondary"))
                     pcol.addWidget(pl)
 
                     pe = QLineEdit()
@@ -3290,6 +3882,9 @@ class GeneratorTab(QWidget):
 
                     entry_key = f"{stage_key}_{prop_name}"
                     self.material_properties_entries[mat_name][entry_key] = pe
+                    pe.textEdited.connect(
+                        lambda _t, r=mat_preset_row: r.forget_preset_name()
+                    )
 
                     if col_count == 4:
                         sc.addLayout(props_grid)
@@ -3302,6 +3897,14 @@ class GeneratorTab(QWidget):
                     sc.addLayout(props_grid)
 
             self._mat_props_layout.addWidget(sect)
+
+    def _collect_material_preset_name(self) -> str:
+        row = self._material_preset_row
+        return row.preset_name() if row is not None else ""
+
+    def _collect_material_preset_source(self) -> str:
+        row = self._material_preset_row
+        return row.preset_source() if row is not None else ""
 
     def _collect_material_properties(self) -> Dict:
         result = {}
@@ -3339,6 +3942,19 @@ class GeneratorTab(QWidget):
     def _load_material_properties_into_ui(self, mat_props: Dict):
         applied = 0
         skipped_materials = 0
+        apply_to_all = mat_props.get("__all__")
+        if isinstance(apply_to_all, dict):
+            for entries in self.material_properties_entries.values():
+                for entry_key, widget in entries.items():
+                    prop_name = entry_key.split("_", 2)[-1]
+                    if prop_name not in apply_to_all:
+                        continue
+                    val = apply_to_all[prop_name]
+                    widget.setText("null" if val is None else str(val))
+                    applied += 1
+            print(f"[DEBUG] _load_material_properties_into_ui: applied built-in values to {applied} field(s)")
+            return
+
         for mat_name, stages in mat_props.items():
             if mat_name not in self.material_properties_entries:
                 skipped_materials += 1
@@ -4198,12 +4814,14 @@ class GeneratorTab(QWidget):
 
     def refresh_ui(self):
         print("[DEBUG] refresh_ui: re-applying locale strings after language/theme change")
-        self._proj_hdr_lbl.setText(t("project.project_overview"))
+        self._proj_hdr_lbl.setText(t("project.project_overview").upper())
         self._save_btn.setText(t("project.save_project"))
         self._load_btn.setText(t("project.load_project"))
+        self._save_as_btn.setText(t("project.save_project_as", default="Save project as..."))
         self._clear_btn.setText(t("project.clear_project"))
-        self._veh_lbl.setText(t("project.vehicles_in_project"))
+        self._veh_lbl.setText(t("project.vehicles_in_project").upper())
         self._project_search.setPlaceholderText(t("common.search_vehicle"))
+        self._apply_gen_sidebar_width()
         self._add_skin_label.setText(
             t("project.add_skins_header", default="Add Skins to Selected Car")
         )
@@ -4284,14 +4902,12 @@ class GeneratorTab(QWidget):
 
     def _mk_card(self) -> QFrame:
         f = QFrame()
+        f.setObjectName("genFormCard")
         f.setStyleSheet(f"""
-            QFrame {{
+            QFrame#genFormCard {{
                 background:{COLORS['card_bg']};
-                border-radius:12px;
+                border-radius:10px;
                 border:1px solid {COLORS['border']};
-            }}
-            QFrame:hover {{
-                border:1px solid {COLORS['accent']};
             }}
         """)
         return f
@@ -4320,7 +4936,7 @@ class GeneratorTab(QWidget):
                 padding:4px 12px;
             }}
             QPushButton:hover {{ background:{fgh}; }}
-            QPushButton:disabled {{ background:{COLORS['border']};color:{COLORS['text_secondary']}; }}
+            QPushButton:disabled {{ background:{COLORS['border']};color:{_muted()}; }}
         """)
         btn.clicked.connect(cmd)
         return btn
@@ -4328,7 +4944,7 @@ class GeneratorTab(QWidget):
     def _mk_label(self, text: str, bold: bool = False) -> QLabel:
         lbl = QLabel(text)
         lbl.setFont(font(12, "bold" if bold else "normal"))
-        lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        lbl.setStyleSheet(_label_qss())
         return lbl
 
     def _entry_style(self) -> str:
@@ -4342,6 +4958,11 @@ class GeneratorTab(QWidget):
             }}
             QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
             QLineEdit:read-only {{ background:{COLORS['card_bg']}; }}
+            QLineEdit:disabled {{
+                background:{COLORS['card_bg']};
+                color:{_muted()};
+                border-color:{COLORS['border']};
+            }}
         """
 
 
@@ -4355,7 +4976,7 @@ class GeneratorTab(QWidget):
 
         lbl = QLabel(t("project.preset"))
         lbl.setFont(font(9))
-        lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+        lbl.setStyleSheet(_label_qss("text_secondary"))
         row.addWidget(lbl)
 
         name_entry = QLineEdit()
@@ -4365,16 +4986,20 @@ class GeneratorTab(QWidget):
         name_entry.setPlaceholderText(t("project.preset_name_placeholder"))
         row.addWidget(name_entry, 1)
 
-        def _apply_loaded(name: str):
-            print(f"[DEBUG] _build_preset_row[{kind}]: loading preset {name!r}")
-            values = _load_preset(kind, name)
+        _state = {"name": "", "source": ""}
+
+        def _apply_loaded(name: str, source: str = _PRESET_SOURCE_USER):
+            print(f"[DEBUG] _build_preset_row[{kind}]: loading {source} preset {name!r}")
+            values = _load_preset(kind, name, source)
             if values is None:
-                print(f"[DEBUG] _build_preset_row[{kind}]: load failed for {name!r}")
+                print(f"[DEBUG] _build_preset_row[{kind}]: load failed for {source}/{name!r}")
                 self.show_notification(t("project.notification.preset_load_failed", name=name), "error")
                 return
             apply_values(values)
+            _state["name"] = name
+            _state["source"] = source
             name_entry.setText(name)
-            print(f"[DEBUG] _build_preset_row[{kind}]: loaded preset {name!r} with {len(values)} value(s)")
+            print(f"[DEBUG] _build_preset_row[{kind}]: loaded {source} preset {name!r} with {len(values)} value(s)")
             self.show_notification(t("project.notification.preset_loaded", name=name), "success")
 
         def _do_save():
@@ -4384,15 +5009,44 @@ class GeneratorTab(QWidget):
                 self.show_notification(t("project.notification.preset_name_required"), "warning")
                 return
             values = get_values()
+            collides = name in _BUILTIN_PRESETS.get(kind, {})
             if _save_preset(kind, name, values):
-                print(f"[DEBUG] _build_preset_row[{kind}]: saved preset {name!r} with {len(values)} value(s)")
-                self.show_notification(t("project.notification.preset_saved", name=name), "success")
+                _state["name"] = name
+                _state["source"] = _PRESET_SOURCE_USER
+                print(f"[DEBUG] _build_preset_row[{kind}]: saved user preset {name!r} with {len(values)} value(s)")
+                if collides:
+                    self.show_notification(
+                        t("project.notification.preset_saved_alongside_builtin", name=name), "success"
+                    )
+                else:
+                    self.show_notification(t("project.notification.preset_saved", name=name), "success")
             else:
                 print(f"[DEBUG] _build_preset_row[{kind}]: save FAILED for {name!r}")
                 self.show_notification(t("project.notification.preset_save_failed", name=name), "error")
 
         def _do_open_picker():
             self._open_preset_picker(kind, on_load=_apply_loaded)
+
+        def _get_name() -> str:
+            return _state["name"]
+
+        def _get_source() -> str:
+            return _state["source"]
+
+        def _set_name(name: str, source: str = ""):
+            name = (name or "").strip()
+            _state["name"] = name
+            _state["source"] = _resolve_preset_source(kind, name, source) if name else ""
+            name_entry.setText(name)
+
+        def _forget_name():
+            if _state["name"]:
+                print(f"[DEBUG] _build_preset_row[{kind}]: value hand-edited — "
+                      f"forgetting preset {_state['source']}/{_state['name']!r}")
+            _state["name"] = ""
+            _state["source"] = ""
+            name_entry.clear()
+
 
         load_btn = self._mk_btn(t("common.load"), _do_open_picker, "primary",
                                  width=64, height=30, font_size=10)
@@ -4410,11 +5064,18 @@ class GeneratorTab(QWidget):
         row.addWidget(save_btn)
         row.addWidget(load_btn)
 
+        row_widget.preset_name        = _get_name
+        row_widget.preset_source      = _get_source
+        row_widget.set_preset_name    = _set_name
+        row_widget.forget_preset_name = _forget_name
         return row_widget
 
-    def _open_preset_picker(self, kind: str, on_load: Callable[[str], None]):
-        names = _list_presets(kind)
-        print(f"[DEBUG] _open_preset_picker: kind={kind!r} showing {len(names)} preset(s)")
+    def _open_preset_picker(self, kind: str, on_load: Callable[[str, str], None]):
+        n_builtin = len(_list_presets(kind, _PRESET_SOURCE_BUILTIN))
+        n_user    = len(_list_presets(kind, _PRESET_SOURCE_USER))
+        print(f"[DEBUG] _open_preset_picker: kind={kind!r} builtin={n_builtin} user={n_user}")
+
+        _tab = {"source": _PRESET_SOURCE_USER if n_user else _PRESET_SOURCE_BUILTIN}
 
         dlg = QDialog(self.window())
         dlg.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
@@ -4429,13 +5090,78 @@ class GeneratorTab(QWidget):
         """)
 
         root = QVBoxLayout(dlg)
-        root.setContentsMargins(20, 18, 20, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(24, 24, 24, 24)
+        root.setSpacing(16)
 
         title_lbl = QLabel(t("project.preset_picker_title"))
         title_lbl.setFont(font(14, "bold"))
-        title_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        title_lbl.setStyleSheet(_label_qss())
         root.addWidget(title_lbl)
+        root.addWidget(self._sb_section_divider())
+
+        panel = QFrame()
+        panel.setObjectName("presetPanel")
+        panel.setStyleSheet(f"""
+            QFrame#presetPanel {{
+                background:{COLORS['card_bg']};
+                border:1px solid {COLORS['border']};
+                border-radius:10px;
+            }}
+        """)
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(10, 10, 10, 10)
+        panel_layout.setSpacing(8)
+
+        tab_row = QHBoxLayout()
+        tab_row.setContentsMargins(0, 0, 0, 0)
+        tab_row.setSpacing(6)
+
+        def _tab_qss(active: bool) -> str:
+            if active:
+                return f"""
+                    QPushButton {{
+                        background:{COLORS['accent']};color:{COLORS.get('accent_text', '#000')};
+                        border:1px solid {COLORS['accent']};border-radius:8px;
+                        padding:4px 12px;font-weight:bold;
+                    }}
+                """
+            return f"""
+                QPushButton {{
+                    background:transparent;color:{COLORS['text']};
+                    border:1px solid {COLORS['border']};border-radius:8px;
+                    padding:4px 12px;
+                }}
+                QPushButton:hover {{ background:{COLORS['card_hover']};border-color:{COLORS['accent']}; }}
+            """
+
+        tab_btns: Dict[str, QPushButton] = {}
+        for _src, _label_key in (
+            (_PRESET_SOURCE_BUILTIN, "project.preset_tab_builtin"),
+            (_PRESET_SOURCE_USER,    "project.preset_tab_yours"),
+        ):
+            _b = QPushButton()
+            _b.setCheckable(True)
+            _b.setFixedHeight(30)
+            _b.setFont(font(10))
+            _b.setCursor(Qt.PointingHandCursor)
+            tab_btns[_src] = _b
+            tab_row.addWidget(_b, 1)
+        panel_layout.addLayout(tab_row)
+
+        def _refresh_tab_buttons():
+            counts = {
+                _PRESET_SOURCE_BUILTIN: len(_list_presets(kind, _PRESET_SOURCE_BUILTIN)),
+                _PRESET_SOURCE_USER:    len(_list_presets(kind, _PRESET_SOURCE_USER)),
+            }
+            titles = {
+                _PRESET_SOURCE_BUILTIN: t("project.preset_tab_builtin"),
+                _PRESET_SOURCE_USER:    t("project.preset_tab_yours"),
+            }
+            for s, b in tab_btns.items():
+                b.setText(f"{titles[s]} ({counts[s]})")
+                is_active = (s == _tab["source"])
+                b.setChecked(is_active)
+                b.setStyleSheet(_tab_qss(is_active))
 
         search_entry = QLineEdit()
         search_entry.setPlaceholderText(t("common.search_preset"))
@@ -4450,29 +5176,27 @@ class GeneratorTab(QWidget):
                 border-radius:8px;
                 padding:4px 10px;
             }}
-            QLineEdit:focus {{ border-color:{COLORS['accent']}; }}
+            QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
         """)
-        root.addWidget(search_entry)
+        panel_layout.addWidget(search_entry)
 
         list_area = QScrollArea()
+        list_area.setObjectName("presetListFrame")
         list_area.setWidgetResizable(True)
         list_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        list_area.setFixedHeight(min(280, max(80, 52 * max(1, len(names)))))
-        list_area.setStyleSheet(f"""
-            QScrollArea{{background:transparent;border:none;}}
-            QScrollArea>QWidget>QWidget{{background:transparent;}}
+        list_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        list_area.setMinimumHeight(_PRESET_LIST_MIN_HEIGHT)
+        list_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        list_area.setStyleSheet("""
+            QScrollArea#presetListFrame{background:transparent;border:none;}
+            QScrollArea#presetListFrame>QWidget>QWidget{background:transparent;}
         """)
         list_inner = QWidget()
         list_inner.setStyleSheet("background:transparent;")
         list_layout = QVBoxLayout(list_inner)
         list_layout.setContentsMargins(0, 0, 0, 0)
-        list_layout.setSpacing(6)
-
-        empty_lbl = QLabel(t("project.no_presets_saved"))
-        empty_lbl.setFont(font(11))
-        empty_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
-        empty_lbl.setVisible(not names)
-        list_layout.addWidget(empty_lbl)
+        list_layout.setSpacing(8)
+        list_layout.setAlignment(Qt.AlignTop)
 
         def _rebuild_rows():
             while list_layout.count():
@@ -4480,22 +5204,34 @@ class GeneratorTab(QWidget):
                 if item.widget():
                     item.widget().deleteLater()
 
-            current_names = _list_presets(kind)
+            active_source = _tab["source"]
+            _refresh_tab_buttons()
+
+            current_names = _list_presets(kind, active_source)
             query = search_entry.text().strip().lower()
             if query:
                 current_names = [n for n in current_names if query in n.lower()]
 
             if not current_names:
-                empty = QLabel(t("project.no_presets_saved"))
+                if query:
+                    msg = t("project.no_presets_match")
+                elif active_source == _PRESET_SOURCE_USER:
+                    msg = t("project.no_presets_saved")
+                else:
+                    msg = t("project.no_builtin_presets")
+                empty = QLabel(msg)
                 empty.setFont(font(11))
-                empty.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;border:none;")
+                empty.setStyleSheet(_label_qss("text_secondary"))
+                empty.setWordWrap(True)
                 list_layout.addWidget(empty)
                 return
 
             for preset_name in current_names:
                 entry_row = QFrame()
+                entry_row.setFixedHeight(48)
                 entry_row.setStyleSheet(
-                    f"QFrame{{background:{COLORS.get('sidebar_bg', COLORS['card_bg'])};border-radius:8px;}}"
+                    f"QFrame{{background:{COLORS.get('sidebar_bg', COLORS['card_bg'])};"
+                    f"border:1px solid {COLORS['border']};border-radius:10px;}}"
                 )
                 er = QHBoxLayout(entry_row)
                 er.setContentsMargins(10, 6, 10, 6)
@@ -4503,19 +5239,19 @@ class GeneratorTab(QWidget):
 
                 name_lbl = QLabel(preset_name)
                 name_lbl.setFont(font(11))
-                name_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+                name_lbl.setStyleSheet(_label_qss())
                 er.addWidget(name_lbl, 1)
 
-                def _make_load(n=preset_name):
+                def _make_load(n=preset_name, s=active_source):
                     def _run():
-                        on_load(n)
+                        on_load(n, s)
                         dlg.accept()
                     return _run
 
-                def _make_delete(n=preset_name):
+                def _make_delete(n=preset_name, s=active_source):
                     def _run():
-                        print(f"[DEBUG] _open_preset_picker[{kind}]: deleting {n!r}")
-                        if _delete_preset(kind, n):
+                        print(f"[DEBUG] _open_preset_picker[{kind}]: deleting {s}/{n!r}")
+                        if _delete_preset(kind, n, s):
                             self.show_notification(
                                 t("project.notification.preset_deleted", name=n), "success"
                             )
@@ -4539,16 +5275,28 @@ class GeneratorTab(QWidget):
                 row_del_btn  = self._mk_btn(t("common.delete"), _make_delete(), "danger",
                                              width=70, height=28, font_size=10)
                 er.addWidget(row_load_btn)
-                er.addWidget(row_del_btn)
+                if active_source == _PRESET_SOURCE_USER:
+                    er.addWidget(row_del_btn)
 
                 list_layout.addWidget(entry_row)
 
         search_entry.textChanged.connect(lambda _txt: _rebuild_rows())
 
+        def _switch_tab(source: str):
+            if _tab["source"] == source:
+                tab_btns[source].setChecked(True)
+                return
+            _tab["source"] = source
+            _rebuild_rows()
+
+        for _s, _b in tab_btns.items():
+            _b.clicked.connect(lambda _checked=False, s=_s: _switch_tab(s))
+
         _rebuild_rows()
 
         list_area.setWidget(list_inner)
-        root.addWidget(list_area)
+        panel_layout.addWidget(list_area, 1)
+        root.addWidget(panel, 1)
 
         close_btn = self._mk_btn(t("common.close"), lambda: dlg.reject(), "secondary", height=34)
         close_btn.setStyleSheet(f"""

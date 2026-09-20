@@ -533,9 +533,15 @@ class SettingsTab(QWidget):
 
     def _on_view_changelog(self):
         print("[DEBUG] SettingsTab._on_view_changelog: opening changelog history")
+        from PySide6.QtWidgets import QToolTip
+        from PySide6.QtCore import QTimer
+        QToolTip.hideText()
+        QTimer.singleShot(50, self._open_changelog_browser)
+
+    def _open_changelog_browser(self):
         try:
             from gui.components.changelog_dialog import show_changelog_browser
-            show_changelog_browser(self)
+            show_changelog_browser(self.window())
         except Exception as e:
             print(f"[WARNING] show_changelog_browser unavailable: {e}")
             self.show_notification("error", f"Could not open changelog: {e}")
@@ -664,7 +670,7 @@ class SettingsTab(QWidget):
 
     def _on_texture_previews_toggled(self, checked: bool):
         print(f"[DEBUG] _on_texture_previews_toggled: previews enabled -> {checked}")
-        state.texture_previews_enabled = checked
+        state.set_texture_previews_enabled(checked)
 
 
     def _open_language_selector(self):

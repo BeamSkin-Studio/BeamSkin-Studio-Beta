@@ -1,4 +1,3 @@
-
 from typing import TypedDict, Literal
 
 
@@ -26,6 +25,27 @@ def separator() -> Entry:
 
 
 CHANGELOGS = [
+
+    {
+        "version": "0.9.50.Beta",
+        "date": "19-09-2026",
+        "entries": [
+            title("🚀 New Features"),
+            subtitle("Repeating patterns"),
+            item("Add repeating patterns via an \"opacity detail map\", \"roughness detail map\", and \"metallic detail map\"."),
+            subtitle("Secondary UV toggle"),
+            item("Fixes skins applying incorrectly due to `somethingMapUseUV` — toggle off to disable it for that skin."),
+            separator(),
+            title("⚙️ Improvements"),
+            subtitle("Material presets"),
+            item("The program now includes 4 material presets:\n1. Car Paint\n2. Glossy Decals\n3. Neon Satin\n4. Matte"),
+            subtitle("User interface"),
+            item("Improved the UI for a cleaner, more intuitive look."),
+            subtitle("Material template files"),
+            item("Standardized the material template values across all vehicle material files."),
+        ]
+    },
+
 
     {
         "version": "0.9.25.Beta",

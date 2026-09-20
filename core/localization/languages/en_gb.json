@@ -106,9 +106,9 @@
     "skins_header": "Skins",
     "add_skin": "➕ Add skin",
     "update_skin": "💾 Update skin",
-    "save_project": "💾 Save project",
-    "load_project": "📁 Load project",
-    "clear_project": " 🧹 Clear project",
+    "save_project": "💾 Save",
+    "load_project": "📁 Load",
+    "clear_project": " 🧹 Clear",
     "add_vehicle": "Add vehicle to project",
     "add_vehicle_to_project": "Add vehicle ",
     "vehicles_in_project": "Vehicles in project",
@@ -116,6 +116,8 @@
     "output_mode": "Output mode",
     "steam_path": "Mods Folder",
     "custom_location": "Custom location",
+    "zip_output": "ZIP",
+    "output_location": "Output Location",
     "skin_count": "skins",
     "skin": "skin",
     "skins": "skins",
@@ -134,6 +136,8 @@
     "retro_mask": "Retro Mask",
     "retro_mask_hint": "Opacity mask (PNG) marking which areas of the skin should retroreflect.",
     "glowing_skin": "Glowing Skin",
+    "use_secondary_uv": "Use Secondary UV",
+    "use_secondary_uv_hint": "Can fix a skin that's applied incorrectly on the vehicle. Try toggling it if your skin looks wrong.",
     "emissive_map": "Emissive Map",
     "base_Color_Map": "Base Colour Map",
     "color_Palette_Map": "Colour Palette Map",
@@ -190,6 +194,7 @@
       "load_error": "Error loading: {error}",
       "no_material_properties": "No editable material properties found for this vehicle.",
       "invalid_material_value": "Invalid value for {prop_name}: '{value}'",
+      "invalid_detail_scale": "Invalid detail scale '{value}' — use two numbers like 1500, 750. Default (1500, 750) was used.",
       "no_info_fields": "No editable info fields found for this vehicle.",
       "invalid_info_value": "'{field}' must be a number — ignoring '{value}'",
       "mod_generation_unavailable": "Mod generation function is unavailable.",
@@ -200,13 +205,23 @@
       "colormap_not_exist": "The selected Colour Palette Map file does not exist",
       "please_select_colormap": "Please select a Colour Palette Map file",
       "preset_saved": "Preset '{name}' saved.",
+      "preset_saved_alongside_builtin": "Saved as your own preset '{name}'. The built-in '{name}' is unchanged.",
       "preset_loaded": "Preset '{name}' loaded.",
       "preset_deleted": "Preset '{name}' deleted.",
       "preset_name_required": "Enter a name for the preset first.",
       "preset_not_found": "Preset '{name}' not found.",
       "preset_save_failed": "Failed to save preset '{name}'.",
       "preset_load_failed": "Failed to load preset '{name}'.",
-      "preset_delete_failed": "Failed to delete preset '{name}'."
+      "preset_delete_failed": "Failed to delete preset '{name}'.",
+      "layer_missing_dds": "Layer {n} is missing its base colour map (.dds) file.",
+      "layer_missing_dds_variant": "Layer {n} is missing its variant base colour map (.dds) file.",
+      "layer_missing_colorable": "Layer {n} is missing its data map or colour palette map.",
+      "layer_missing_colorable_variant": "Layer {n} is missing its variant data map or colour palette map.",
+      "layer_missing_emissive": "Layer {n} has Glowing enabled but is missing its emissive map.",
+      "invalid_layer_value": "Invalid value for {field}: '{value}'. Defaulting to 0.0.",
+      "layer_limit_reached": "You've reached the maximum number of layers for this skin.",
+      "overwrite_failed": "Could not remove existing mod: {error}",
+      "please_select_datamap": "Please select a data map before continuing."
     },
     "clear_project_window": {
       "clear_project_confirm_title": "Clear project?",
@@ -225,6 +240,7 @@
     "export_copying": "Copying template files...",
     "export_zipping": "Creating ZIP archive...",
     "unpacked_output": "Unpacked",
+    "select_output": "Select output folder…",
     "export_unpacking": "Writing mod folder…",
     "export_complete": "Export completed successfully!",
     "export_error": "Error: generation function unavailable",
@@ -238,7 +254,11 @@
     "preset": "Preset",
     "preset_name_placeholder": "Preset name…",
     "preset_picker_title": "Load Preset",
+    "preset_tab_builtin": "Built-in",
+    "preset_tab_yours": "Yours",
     "no_presets_saved": "No presets saved yet.",
+    "no_builtin_presets": "No built-in presets available.",
+    "no_presets_match": "No presets match your search.",
     "cancel_edit": "❌ Cancel",
     "no_cars_match": "No cars match '{query}'",
     "config_type_label": "Config Type",
@@ -268,22 +288,28 @@
     "dialog_select_layer_file": "Select Layer File",
     "layer_factors": "Layer Factors",
     "layer_n": "Layer {n}",
+    "detail_scale": "Detail Scale (X, Y)",
+    "detail_scale_placeholder": "e.g. 1500, 750",
+    "detail_scale_hint": "How many times the detail maps tile across the UV. Higher = smaller pattern. Leave empty to use 1500, 750.",
     "material_stage_n": "Stage {n}",
     "metallic_factor": "Metallic Factor",
     "metallic_map": "Metallic Map",
     "normal_map": "Normal Map",
     "opacity_map": "Opacity Map",
+    "opacity_detail_map": "Opacity Detail Map",
     "retroreflectivity": "Retroreflectivity",
     "roughness_factor": "Roughness Factor",
     "roughness_map": "Roughness Map",
-    "save_project_as": "💾 Save project as..."
+    "roughness_detail_map": "Roughness Detail Map",
+    "metallic_detail_map": "Metallic Detail Map",
+    "save_project_as": "💾 Save as..."
   },
   "howto": {
     "title": "Usage Guide",
     "page_title": "📚 How to Use BeamSkin Studio",
     "page_subtitle": "Complete guide for creating and managing vehicle skins for BeamNG.drive",
     "search_placeholder": "Search documentation...",
-    "view_all": "📖 View all",
+    "view_all": "View all",
     "search_results": "🔍 Search results for '{term}'",
     "no_results": "❌ No results found for '{term}'",
     "try_different": "Try different keywords or browse the chapters above.",
@@ -526,7 +552,18 @@
     "current_version": "Current version:",
     "skipped_cleared": "Skipped version cleared — updates will be shown again.",
     "skipped_version": "Skipped version: {skipped}",
-    "updates": "Updates"
+    "updates": "Updates",
+    "data_folder": "BeamSkin Studio Data Folder",
+    "data_folder_desc": "Where added vehicles, projects, and settings are stored. Changing this moves your existing data to the new location.",
+    "migrate_data_button": "Migrate My Data",
+    "data_browse_title": "Choose Data Folder",
+    "data_not_writable": "Folder is not writable",
+    "data_path_updated": "Data folder updated — existing data was moved.",
+    "data_migration_incomplete": "Folder changed, but some files may not have moved",
+    "confirm_on_save": "💾  Confirm Before Saving",
+    "view_changelog": "📜  Changelog History",
+    "legacy_migrate_desc": "You're currently using the old install-relative data folders next to the app. Migrate to move your vehicles, projects, and settings into a dedicated data folder.",
+    "legacy_migrate_not_found": "Legacy data could not be found anymore — nothing to migrate."
   },
   "about": {
     "about_section": "About",
@@ -795,7 +832,12 @@
     "paths_title": "Configure BeamNG.drive Paths",
     "paths_desc": "These paths are used to validate and install your skin mods.",
     "browse_beamng_title": "Select BeamNG.drive Installation Folder",
-    "browse_mods_title": "Select BeamNG Mods Folder"
+    "browse_mods_title": "Select BeamNG Mods Folder",
+    "data_folder": "BeamSkin Studio Data Folder",
+    "browse_data_title": "Choose Data Folder",
+    "data_valid": "✓ Folder is writable",
+    "data_invalid": "✗ Folder is not writable — reverted to default",
+    "data_folder_desc": "Where your added vehicles, projects, and settings are stored. The default location works for most people — only change this if you want your data on a different drive."
   },
   "language_selection": {
     "selection": "Language selection",
@@ -817,7 +859,7 @@
     "generation_error": "Mod generation failed: {error}"
   },
   "changelog": {
-    "title": "What's New",
+    "title": "What's New with {version}?",
     "translate": "Translate",
     "translating": "Translating…",
     "translated": "Translated",
@@ -826,7 +868,11 @@
     "fetching": "Fetching changelog",
     "error_title": "⚠️  Could Not Load Changelog",
     "error_body": "Unable to reach GitHub. Please check your internet connection and try again.",
-    "error_note": "You can still download the update — the changelog will appear automatically after installing."
+    "error_note": "You can still download the update — the changelog will appear automatically after installing.",
+    "newer": "Newer version",
+    "older": "Older version",
+    "version_label": "Version {version}",
+    "translate_failed": "Translation failed"
   },
   "dialog": {
     "cancel": "Cancel",
@@ -1027,7 +1073,10 @@
     "add_existing_dialog_title": "Add Existing Project Save(s)",
     "file_filter": "Project files (*.bsproject *.json);;All files (*.*)",
     "add_failed_banner": "⚠  Could not read {count} file(s): {names}{extra}",
-    "browse_dialog_title": "Open Project File"
+    "browse_dialog_title": "Open Project File",
+    "delete_confirm_title": "Delete Project?",
+    "sort_last_opened": "Recently opened",
+    "sort_last_saved": "Recently modified"
   },
   "mod_scanner": {
     "path_not_exist": "Path does not exist",
@@ -1036,5 +1085,15 @@
     "no_vehicles_dir": "No vehicles/ directory found in mod",
     "cannot_read_dir": "Could not read vehicles/ directory",
     "extract_failed": "Failed to extract ZIP: {error}"
+  },
+  "legacy_migration": {
+    "title": "Data From an Older Version Found",
+    "desc": "BeamSkin Studio now stores your data in a dedicated folder instead of next to the app. We found projects and vehicles from a previous install — choose where to keep them and we'll copy everything over. Your old files are left untouched.",
+    "found_at": "Found at:",
+    "stats": "{vehicles} added vehicle(s) · {projects} saved project(s) · ~{size} KB",
+    "dest_label": "Copy data to:",
+    "browse_title": "Choose Data Folder",
+    "skip": "Don't Migrate",
+    "migrate": "Migrate My Data"
   }
 }

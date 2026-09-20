@@ -5,7 +5,7 @@ import re
 import zipfile
 from typing import List, Tuple
 
-from PySide6.QtCore    import Qt, QTimer
+from PySide6.QtCore    import Qt, QTimer, QRectF
 from PySide6.QtGui     import QPixmap, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QLineEdit, QCheckBox,
@@ -45,19 +45,26 @@ except ImportError as _exc:
     def get_vehicles_dir():
         return os.path.join(_DATA_DIR, 'vehicles')
     def get_vehicle_previews_dir():
-        return os.path.join(_APP_DIR, 'gui', 'images', 'vehicles')
+        return os.path.join(_DATA_DIR, 'vehicle_previews')
     def get_settings_path():
         return os.path.join(_DATA_DIR, 'data', 'app_settings.json')
 
-_IMAGES_DIR = get_vehicle_previews_dir()
 _BUNDLED_IMAGES_DIR = os.path.join(get_bundle_path(), "gui", "images", "vehicles")
 
-_VEHICLES_DIR = get_vehicles_dir()
+
+def _images_dir() -> str:
+    return get_vehicle_previews_dir()
+
+
+def _vehicles_dir() -> str:
+    return get_vehicles_dir()
 
 CARD_IMG_H  = 160
 CARD_W      = 280
 CARD_SPACING = 12
 GLOW_PAD    = 7
+THUMB_W     = 96
+THUMB_H     = 54
 
 
 _UV_KEYWORDS = ("uv", "uvmap", "uv_map", "uv_layout", "uv1_layout")
@@ -96,7 +103,7 @@ def _get_local_uv_map_paths(carid: str) -> List[str]:
                         seen.add(full)
                         results.append(full)
 
-    images_dir = os.path.join(_IMAGES_DIR, carid)
+    images_dir = os.path.join(_images_dir(), carid)
     if os.path.isdir(images_dir):
         _scan_tree(images_dir)
 
@@ -104,11 +111,27 @@ def _get_local_uv_map_paths(carid: str) -> List[str]:
     if os.path.isdir(bundled_images_dir):
         _scan_tree(bundled_images_dir)
 
-    vehicles_dir = os.path.join(_VEHICLES_DIR, carid)
+    vehicles_dir = os.path.join(_vehicles_dir(), carid)
     if os.path.isdir(vehicles_dir):
         _scan_tree(vehicles_dir)
 
     return results
+
+
+def _get_default_image(carid: str) -> str | None:
+    for base in (_images_dir(), _BUNDLED_IMAGES_DIR):
+        vehicle_dir = os.path.join(base, carid)
+        if not os.path.isdir(vehicle_dir):
+            continue
+        candidates = [
+            fn for fn in sorted(os.listdir(vehicle_dir))
+            if fn.lower().endswith((".jpg", ".jpeg", ".png")) and not _is_uv_map_file(fn)
+        ]
+        if not candidates:
+            continue
+        preferred = next((f for f in candidates if os.path.splitext(f)[0].lower() == "default"), None)
+        return os.path.join(vehicle_dir, preferred or candidates[0])
+    return None
 
 
 def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
@@ -119,7 +142,7 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
         print(f"[WARNING] _get_variant_images: {type(_exc).__name__}: {_exc}")
         rebadge_suffixes = set()
 
-    vehicle_dir = os.path.join(_IMAGES_DIR, carid)
+    vehicle_dir = os.path.join(_images_dir(), carid)
     if not os.path.isdir(vehicle_dir):
         vehicle_dir = os.path.join(_BUNDLED_IMAGES_DIR, carid)
         if not os.path.isdir(vehicle_dir):
@@ -141,7 +164,7 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
 
 
 def _get_rebadge_images(carid: str, suffix: str) -> List[Tuple[str, str]]:
-    vehicle_dir = os.path.join(_IMAGES_DIR, carid)
+    vehicle_dir = os.path.join(_images_dir(), carid)
     if not os.path.isdir(vehicle_dir):
         vehicle_dir = os.path.join(_BUNDLED_IMAGES_DIR, carid)
         if not os.path.isdir(vehicle_dir):
@@ -306,72 +329,61 @@ def _lerp_color(c1: str, c2: str, t: float) -> QColor:
     )
 
 
+def section_header(text: str) -> QFrame:
+    header = QFrame()
+    header.setFixedHeight(28)
+    header.setStyleSheet("background:transparent;border:none;")
+    row = QHBoxLayout(header)
+    row.setContentsMargins(2, 0, 0, 0)
+    row.setSpacing(6)
+
+    marker = QFrame()
+    marker.setFixedSize(3, 14)
+    marker.setStyleSheet(
+        f"background:{COLORS['accent']};border:none;border-radius:1px;"
+    )
+    row.addWidget(marker)
+
+    label = QLabel(text.upper())
+    label.setFont(font(10, "bold"))
+    label.setStyleSheet(
+        f"color:{COLORS['text']};background:transparent;border:none;"
+    )
+    row.addWidget(label)
+    row.addStretch()
+    return header
+
+
+def panel_frame(radius: int = 10) -> QFrame:
+    panel = QFrame()
+    panel.setObjectName("panel")
+    panel.setStyleSheet(f"""
+        QFrame#panel {{
+            background:{COLORS['card_bg']};
+            border:1px solid {COLORS['border']};
+            border-radius:{radius}px;
+        }}
+    """)
+    return panel
+
+
 class AnimatedCard(QFrame):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self.setStyleSheet("AnimatedCard { background: transparent; border: none; }")
-        self._t = 0.0
-        self._hovered = False
-        self._tick = QTimer(self)
-        self._tick.setInterval(16)
-        self._tick.timeout.connect(self._step)
-
-    def _step(self):
-        target = 1.0 if self._hovered else 0.0
-        self._t += (target - self._t) * 0.20
-        self.update()
-        if abs(self._t - target) < 0.008:
-            self._t = target
-            self._tick.stop()
-            self.update()
-
-    def enterEvent(self, event):
-        super().enterEvent(event)
-        self._hovered = True
-        if not self._tick.isActive():
-            self._tick.start()
-
-    def leaveEvent(self, event):
-        super().leaveEvent(event)
-        self._hovered = False
-        if not self._tick.isActive():
-            self._tick.start()
 
     def paintEvent(self, _event):
-        t  = self._t
         w, h = self.width(), self.height()
-
-        grow  = int(t * 3)
-        inset = max(0, GLOW_PAD - grow)
+        inset = GLOW_PAD
         radius = 12
-
-        accent_rgb = _hex_to_rgb(COLORS["accent"])
-        ar, ag, ab = accent_rgb
 
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-
-        if t > 0.01:
-            num_layers = 7
-            for i in range(num_layers, 0, -1):
-                layer_inset = max(0, inset - i)
-                alpha = int(t * 28 * (i / num_layers))
-                p.setPen(Qt.NoPen)
-                p.setBrush(QColor(ar, ag, ab, alpha))
-                r = radius + (GLOW_PAD - layer_inset)
-                p.drawRoundedRect(layer_inset, layer_inset,
-                                  w - 2 * layer_inset, h - 2 * layer_inset,
-                                  r, r)
-
-        bg     = _lerp_color(COLORS["card_bg"], COLORS.get("card_hover", COLORS["card_bg"]), t)
-        border = _lerp_color(COLORS["border"],  COLORS["accent"], t)
-        bw = 1.0 + t * 0.6
-
-        p.setBrush(bg)
-        p.setPen(QPen(border, bw))
-        p.drawRoundedRect(inset, inset, w - 2 * inset, h - 2 * inset, radius, radius)
-
+        p.setBrush(QColor(COLORS["frame_bg"]))
+        p.setPen(QPen(QColor(COLORS["border"]), 1.0))
+        p.drawRoundedRect(QRectF(inset, inset, w - 2 * inset, h - 2 * inset),
+                          radius, radius)
         p.end()
 
 
@@ -383,7 +395,7 @@ class CarListTab(QWidget):
         self._items: List[Tuple[QWidget, str, str]] = []
         self._modern_row = 0
         self._modern_col = 0
-        self._modern_cols_current = 0   
+        self._modern_cols_current = 0
         self._view_mode: str = self._load_view_mode()
 
         self._setup_ui()
@@ -429,23 +441,33 @@ class CarListTab(QWidget):
 
     def _setup_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
+        root.setContentsMargins(14, 14, 14, 14)
         root.setSpacing(8)
+
+        outer = panel_frame(radius=10)
+        outer_col = QVBoxLayout(outer)
+        outer_col.setContentsMargins(10, 10, 10, 10)
+        outer_col.setSpacing(8)
+
+        outer_col.addWidget(section_header(t("car_list.title", default="Vehicle Library")))
 
         top_bar = QHBoxLayout()
         top_bar.setSpacing(8)
 
         self._search = QLineEdit()
-        self._search.setPlaceholderText(t("car_list.search_placeholder"))
+        self._search.setPlaceholderText(
+            "🔍  " + t("car_list.search_placeholder", default="Search vehicle...")
+        )
+        self._search.setClearButtonEnabled(True)
         self._search.setFixedHeight(36)
-        self._search.setFont(font(13))
+        self._search.setFont(font(12))
         self._search.setStyleSheet(f"""
             QLineEdit {{
-                background:{COLORS['card_bg']};
+                background:{COLORS['frame_bg']};
                 color:{COLORS['text']};
                 border:1px solid {COLORS['border']};
                 border-radius:8px;
-                padding:4px 12px;
+                padding:4px 10px;
             }}
             QLineEdit:focus {{
                 border-color:{COLORS.get('border_focus', COLORS['accent'])};
@@ -454,20 +476,33 @@ class CarListTab(QWidget):
         self._search.textChanged.connect(self._filter)
         top_bar.addWidget(self._search, 1)
 
-        self._btn_classic = QPushButton(t("car_list.view_classic"))
-        self._btn_modern  = QPushButton(t("car_list.view_modern"))
+        toggle_track = QFrame()
+        toggle_track.setObjectName("viewToggleTrack")
+        toggle_track.setFixedHeight(36)
+        toggle_track.setStyleSheet(f"""
+            QFrame#viewToggleTrack {{
+                background:{COLORS['frame_bg']};
+                border:1px solid {COLORS['border']};
+                border-radius:8px;
+            }}
+        """)
+        toggle_row = QHBoxLayout(toggle_track)
+        toggle_row.setContentsMargins(3, 3, 3, 3)
+        toggle_row.setSpacing(3)
+
+        self._btn_classic = QPushButton(t("car_list.view_classic", default="Classic"))
+        self._btn_modern  = QPushButton(t("car_list.view_modern", default="Modern"))
         for btn, mode in ((self._btn_classic, "classic"), (self._btn_modern, "modern")):
-            btn.setFixedSize(108, 36)
-            btn.setFont(font(12, "bold"))
+            btn.setFixedSize(88, 30)
+            btn.setFont(font(11, "bold"))
             btn.setCursor(Qt.PointingHandCursor)
+            toggle_row.addWidget(btn)
         self._btn_classic.clicked.connect(lambda: self._set_view("classic"))
         self._btn_modern.clicked.connect(lambda: self._set_view("modern"))
         self._update_toggle_style()
 
-        top_bar.addWidget(self._btn_classic)
-        top_bar.addWidget(self._btn_modern)
-
-        root.addLayout(top_bar)
+        top_bar.addWidget(toggle_track)
+        outer_col.addLayout(top_bar)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -477,7 +512,9 @@ class CarListTab(QWidget):
             "QScrollArea>QWidget>QWidget{background:transparent;}"
         )
         self._rebuild_inner()
-        root.addWidget(self._scroll, 1)
+        outer_col.addWidget(self._scroll, 1)
+
+        root.addWidget(outer, 1)
 
     def _rebuild_inner(self):
         outer = QWidget()
@@ -496,7 +533,7 @@ class CarListTab(QWidget):
             layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         else:
             layout = QVBoxLayout(content)
-            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setContentsMargins(0, 0, 4, 0)
             layout.setSpacing(6)
             layout.addStretch()
 
@@ -512,14 +549,14 @@ class CarListTab(QWidget):
 
     def _update_toggle_style(self):
         def _style(active: bool) -> str:
-            bg  = COLORS["accent"]       if active else COLORS["card_bg"]
+            bg  = COLORS["accent"]       if active else "transparent"
             bgh = COLORS["accent_hover"] if active else COLORS.get("card_hover", COLORS["card_bg"])
             tc  = COLORS["accent_text"]  if active else COLORS["text"]
             return f"""
                 QPushButton {{
                     background:{bg};color:{tc};
-                    border:1px solid {COLORS['border']};
-                    border-radius:8px;padding:4px 10px;
+                    border:none;
+                    border-radius:6px;
                 }}
                 QPushButton:hover {{ background:{bgh}; }}
             """
@@ -619,23 +656,42 @@ class CarListTab(QWidget):
         path = QPainterPath()
         path.moveTo(radius, 0)
         path.lineTo(w - radius, 0)
-        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)   
+        path.arcTo(w - radius * 2, 0, radius * 2, radius * 2, 90, -90)
         path.lineTo(w, h)
         path.lineTo(0, h)
         path.lineTo(0, radius)
-        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)                
+        path.arcTo(0, 0, radius * 2, radius * 2, 180, -90)
         path.closeSubpath()
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, cropped)
         painter.end()
         return result
 
+    @staticmethod
+    def _rounded_pixmap(src: QPixmap, w: int, h: int, radius: int = 8) -> QPixmap:
+        from PySide6.QtGui import QPainter, QPainterPath, QColor
+        scaled = src.scaled(w, h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        ox = max(0, (scaled.width()  - w) // 2)
+        oy = max(0, (scaled.height() - h) // 2)
+        cropped = scaled.copy(ox, oy, w, h)
+
+        result = QPixmap(w, h)
+        result.fill(QColor(0, 0, 0, 0))
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, w, h, radius, radius)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, cropped)
+        painter.end()
+        return result
+
     def _cols_for_width(self, viewport_width: int) -> int:
-        available = max(viewport_width - 8, CARD_W)   
+        available = max(viewport_width - 8, CARD_W)
         return max(1, available // (CARD_W + CARD_SPACING))
 
     def _card_width_for(self, viewport_width: int, cols: int) -> int:
-        margins = 8   
+        margins = 8
         spacing = CARD_SPACING * (cols - 1)
         return max(CARD_W, (viewport_width - margins - spacing) // cols) - 2
 
@@ -683,34 +739,48 @@ class CarListTab(QWidget):
                     variant_suffix: str = "") -> QFrame:
         card = QFrame()
         card.setObjectName("vehicle_card")
+        card.setFixedHeight(THUMB_H + 16)
         card.setStyleSheet(f"""
             #vehicle_card {{
-                background:{COLORS['card_bg']};
-                border-radius:12px;
+                background:{COLORS['frame_bg']};
+                border-radius:8px;
                 border:1px solid {COLORS['border']};
-            }}
-            #vehicle_card:hover {{
-                border:1px solid {COLORS['accent']};
-                background:{COLORS.get('card_hover', COLORS['card_bg'])};
             }}
         """)
 
         row = QHBoxLayout(card)
-        row.setContentsMargins(12, 10, 12, 10)
+        row.setContentsMargins(8, 8, 10, 8)
         row.setSpacing(10)
 
-        icon = QLabel("🚗")
-        icon.setFont(font(20))
-        icon.setStyleSheet("background:transparent;border:none;")
-        icon.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        row.addWidget(icon)
+        thumb = QLabel()
+        thumb.setFixedSize(THUMB_W, THUMB_H)
+        thumb.setAlignment(Qt.AlignCenter)
+        thumb.setStyleSheet(f"""
+            background:{COLORS['frame_bg']};
+            border:1px solid {COLORS['border']};
+            border-radius:7px;
+        """)
+        img_path = None
+        if variant_suffix:
+            imgs = _get_rebadge_images(carid, variant_suffix)
+            img_path = imgs[0][1] if imgs else None
+        if not img_path:
+            img_path = _get_default_image(carid)
+        if img_path and os.path.exists(img_path):
+            thumb.setPixmap(
+                self._rounded_pixmap(QPixmap(img_path), THUMB_W - 2, THUMB_H - 2, radius=6)
+            )
+        else:
+            thumb.setText("🚗")
+            thumb.setFont(font(18))
+        row.addWidget(thumb)
 
         text_col = QVBoxLayout()
         text_col.setSpacing(1)
         text_col.setContentsMargins(0, 0, 0, 0)
 
         name_lbl = QLabel(name)
-        name_lbl.setFont(font(14, "bold"))
+        name_lbl.setFont(font(13, "bold"))
         name_lbl.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
@@ -718,7 +788,7 @@ class CarListTab(QWidget):
 
         id_text = f"{carid} ({variant_suffix})" if variant_suffix else carid
         id_lbl = QLabel(id_text)
-        id_lbl.setFont(font(12))
+        id_lbl.setFont(font(11))
         id_lbl.setStyleSheet(
             f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
@@ -734,6 +804,7 @@ class CarListTab(QWidget):
                 t("car_list.get_uv_map"),
                 lambda _, c=carid: self._get_uv_map(c),
                 "primary",
+                compact=True,
             )
             btn_row.addWidget(uv_btn)
         else:
@@ -743,6 +814,7 @@ class CarListTab(QWidget):
                     t("car_list.get_uv_map"),
                     lambda _, c=carid: self._get_local_uv_map(c),
                     "primary",
+                    compact=True,
                 )
                 btn_row.addWidget(uv_btn)
 
@@ -750,6 +822,7 @@ class CarListTab(QWidget):
             t("car_list.copy_id"),
             lambda _, c=carid: self._copy_carid(c),
             "secondary",
+            compact=True,
         )
         btn_row.addWidget(copy_btn)
 
@@ -779,9 +852,9 @@ class CarListTab(QWidget):
         img_container.setFixedHeight(CARD_IMG_H)
         img_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         img_container.setStyleSheet(
-            f"QFrame {{ background:{COLORS.get('frame_bg', COLORS['card_bg'])};"
+            f"QFrame {{ background:{COLORS['frame_bg']};"
             f"border:none;"
-            f"border-top-left-radius:11px; border-top-right-radius:11px; }}"
+            f"border-top-left-radius:9px; border-top-right-radius:9px; }}"
         )
 
         img_lbl = QLabel(img_container)
@@ -794,7 +867,7 @@ class CarListTab(QWidget):
             first_label, first_path = variants[0]
             card.setProperty("img_path", first_path)
             img_lbl.setPixmap(
-                self._rounded_top_pixmap(QPixmap(first_path), inner_w, CARD_IMG_H, radius=11)
+                self._rounded_top_pixmap(QPixmap(first_path), inner_w, CARD_IMG_H, radius=9)
             )
         else:
             card.setProperty("img_path", "")
@@ -886,7 +959,7 @@ class CarListTab(QWidget):
                 iw = img_container.width() or inner_w
                 ih = img_container.height() or CARD_IMG_H
                 lbl.setPixmap(
-                    CarListTab._rounded_top_pixmap(QPixmap(v_path), iw, ih, radius=11)
+                    CarListTab._rounded_top_pixmap(QPixmap(v_path), iw, ih, radius=9)
                 )
                 for di, dw in enumerate(dws):
                     dw.setStyleSheet(
@@ -962,7 +1035,7 @@ class CarListTab(QWidget):
 
     def _mk_btn(self, text: str, cmd, style: str = "primary", compact: bool = False) -> QPushButton:
         btn = QPushButton(text)
-        btn.setFont(font(12, "bold"))
+        btn.setFont(font(11, "bold"))
         btn.setFixedHeight(32 if compact else 36)
         if not compact:
             btn.setMinimumWidth(100)
@@ -974,14 +1047,14 @@ class CarListTab(QWidget):
             tc  = COLORS["accent_text"]
             border = "none"
         else:
-            bg  = COLORS["frame_bg"]
-            bgh = COLORS["card_hover"]
+            bg  = COLORS["card_bg"]
+            bgh = COLORS.get("card_hover", COLORS["card_bg"])
             tc  = COLORS["text"]
             border = f"1px solid {COLORS['border']}"
         btn.setStyleSheet(f"""
             QPushButton {{
                 background:{bg};color:{tc};
-                border-radius:10px;border:{border};
+                border-radius:7px;border:{border};
                 padding:4px {"4px" if compact else "14px"};
             }}
             QPushButton:hover {{ background:{bgh}; }}
@@ -1045,9 +1118,11 @@ class CarListTab(QWidget):
                 self._list_layout.insertWidget(i, w)
 
     def refresh_ui(self):
-        self._search.setPlaceholderText(t("car_list.search_placeholder"))
-        self._btn_classic.setText(t("car_list.view_classic"))
-        self._btn_modern.setText(t("car_list.view_modern"))
+        self._search.setPlaceholderText(
+            "🔍  " + t("car_list.search_placeholder", default="Search vehicle...")
+        )
+        self._btn_classic.setText(t("car_list.view_classic", default="Classic"))
+        self._btn_modern.setText(t("car_list.view_modern", default="Modern"))
         self._items.clear()
         if hasattr(state, "carlist_items"):
             state.carlist_items.clear()

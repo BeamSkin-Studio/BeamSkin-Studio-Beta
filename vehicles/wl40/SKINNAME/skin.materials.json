@@ -20,7 +20,6 @@
         "metallicFactor": 1,
         "metallicMap": "/vehicles/wl40/wl40_body_m.data.png",
         "normalMap": "/vehicles/wl40/wl40_body_nm.normal.png",
-        "opacityMap": "/vehicles/wl40/wl40_body_c.data.png",
         "paletteMetallic": null,
         "roughnessMap": "/vehicles/wl40/wl40_body_paint_r.data.png"
       },
@@ -57,89 +56,7 @@
         "metallicFactor": 1,
         "metallicMap": "/vehicles/wl40/wl40_cab_m.data.png",
         "normalMap": "/vehicles/wl40/wl40_cab_nm.normal.png",
-        "opacityMap": "/vehicles/wl40/wl40_cab_c.data.png",
         "roughnessMap": "/vehicles/wl40/wl40_cab_r.data.png"
-      },
-      {
-        "metallicFactor": null
-      },
-      {
-        "metallicFactor": null
-      }
-    ],
-    "activeLayers": 2,
-    "dynamicCubemap": true,
-    "version": 1.5
-  },
-  "wl40_frame.skin.SKINNAME": {
-    "name": "wl40_frame.skin.SKINNAME",
-    "mapTo": "wl40_frame.skin.SKINNAME",
-    "class": "Material",
-    "Stages": [
-      {
-        "ambientOcclusionMap": "/vehicles/wl40/wl40_frame_ao.data.png",
-        "baseColorMap": "/vehicles/wl40/wl40_frame_paint_b.color.png",
-        "colorPaletteMap": "/vehicles/wl40/skin_twotone/wl40_twotone_frame_p.color.png",
-        "detailBaseColorMapStrength": 0.100000001,
-        "detailScale": [
-          20,
-          20
-        ],
-        "metallicFactor": 1,
-        "metallicMap": "/vehicles/wl40/wl40_frame_paint_m.data.png",
-        "normalMap": "/vehicles/wl40/wl40_frame_nm.normal.png",
-        "paletteMetallic": false,
-        "roughnessMap": "/vehicles/wl40/wl40_frame_paint_r.data.png"
-      },
-      {
-        "ambientOcclusionMap": "/vehicles/wl40/wl40_frame_ao.data.png",
-        "baseColorMap": "/vehicles/wl40/wl40_frame_b.color.png",
-        "detailBaseColorMapStrength": null,
-        "detailScale": null,
-        "metallicFactor": 1,
-        "metallicMap": "/vehicles/wl40/wl40_frame_m.data.png",
-        "normalMap": "/vehicles/wl40/wl40_frame_nm.normal.png",
-        "opacityMap": "/vehicles/wl40/wl40_frame_c.data.png",
-        "paletteMetallic": null,
-        "roughnessMap": "/vehicles/wl40/wl40_frame_r.data.png"
-      },
-      {
-        "detailBaseColorMapStrength": null,
-        "detailScale": null,
-        "metallicFactor": null,
-        "paletteMetallic": null
-      },
-      {
-        "detailBaseColorMapStrength": null,
-        "detailScale": null,
-        "metallicFactor": null,
-        "paletteMetallic": null
-      }
-    ],
-    "activeLayers": 2,
-    "dynamicCubemap": true,
-    "version": 1.5
-  },
-  "wl40_rim.skin.SKINNAME": {
-    "name": "wl40_rim.skin.SKINNAME",
-    "mapTo": "wl40_rim.skin.SKINNAME",
-    "class": "Material",
-    "Stages": [
-      {
-        "ambientOcclusionMap": "/vehicles/wl40/wl40_rim_ao.data.png",
-        "baseColorMap": "/vehicles/wl40/wl40_rim_paint_b.color.png",
-        "colorPaletteMap": "/vehicles/wl40/skin_twotone/wl40_twotone_rim_p.color.png",
-        "metallicFactor": 1,
-        "normalMap": "/vehicles/wl40/wl40_rim_nm.normal.png",
-        "roughnessMap": "/vehicles/wl40/wl40_rim_paint_r.data.png"
-      },
-      {
-        "baseColorMap": "/vehicles/wl40/wl40_rim_b.color.png",
-        "metallicFactor": null,
-        "metallicMap": "/vehicles/wl40/wl40_rim_m.data.png",
-        "normalMap": "/vehicles/wl40/wl40_rim_nm.normal.png",
-        "opacityMap": "/vehicles/wl40/wl40_rim_c.data.png",
-        "roughnessMap": "/vehicles/wl40/wl40_rim_r.data.png"
       },
       {
         "metallicFactor": null
