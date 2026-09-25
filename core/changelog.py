@@ -27,6 +27,23 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.9.55.Beta",
+        "date": "26-09-2026",
+        "entries": [
+            title("⚙️ Improvements"),
+            subtitle("Remove selected files"),
+            item("The selected files can now be easily removed with an X button"),
+            subtitle("Adding configs"),
+            item("Made a small improvement to the config stuff, it will now check if the paint design in the config file is correct to the skin you are adding it too. if it is incorrect it will make it correct by editing the config file."),
+            separator(),
+            title("🐛 Bug Fixes"),
+            subtitle("Gavril T Series \"No Texture\" issue"),
+            item("Fixed an issue causing Gavril T Series skins to give \"No Texture\""),
+        ]
+    },
+
+
+    {
         "version": "0.9.50.Beta",
         "date": "19-09-2026",
         "entries": [

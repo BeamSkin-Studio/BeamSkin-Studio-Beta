@@ -20,7 +20,7 @@
       {
         "roughnessFactor": 0.15,
         "ambientOcclusionMap": "/vehicles/us_semi/cabover_main_ao.data.png",
-        "baseColorMap": "/vehicles/us_semi/skinname/cabover_skin_skinname.dds",
+        "baseColorMap": "/vehicles/us_semi/skinname/us_semi_skin_skinname.dds",
         "clearCoatFactor": 1,
         "clearCoatMap": "/vehicles/us_semi/cabover_main_c.data.png",
         "clearCoatRoughnessFactor": 0.05,
@@ -62,7 +62,7 @@
       },
       {
         "ambientOcclusionMap": "/vehicles/us_semi/longnose_main_ao.data.png",
-        "baseColorMap": "/vehicles/us_semi/skinname/conventional_skin_skinname.dds",
+        "baseColorMap": "/vehicles/us_semi/skinname/us_semi_skin_skinname.dds",
         "clearCoatFactor": 1,
         "clearCoatMap": "/vehicles/us_semi/longnose_main_cc.data.png",
         "clearCoatRoughnessFactor": 0.05,
@@ -70,45 +70,6 @@
         "metallicFactor": 0,
         "normalMap": "/vehicles/us_semi/longnose_main_nm.normal.png",
         "opacityMap": "/vehicles/us_semi/longnose_main_c.data.png",
-		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
-        "detailNormalMapStrength": 0.20,
-        "detailScale": [
-          128,
-          64
-        ],
-        "normalDetailMapUseUV": 1
-      }
-    ],
-    "activeLayers": 2,
-    "dynamicCubemap": true,
-    "materialTag0": "beamng",
-    "materialTag1": "vehicle",
-    "version": 1.5
-  },
-  "us_semi_cargobox.skin_us_semi_cargobox.skinname": {
-    "name": "us_semi_cargobox.skin_us_semi_cargobox.skinname",
-    "mapTo": "us_semi_cargobox.skin_us_semi_cargobox.skinname",
-    "class": "material",
-    "persistentId": "",
-    "Stages": [
-      {
-        "ambientOcclusionMap": "vehicles/common/us_semi_cargobox/cargobox_ao.data.png",
-        "baseColorMap": "vehicles/common/us_semi_cargobox/cargobox_b.color.png",
-        "metallicFactor": 0,
-        "metallicMap": "vehicles/common/us_semi_cargobox/cargobox_m.data.png",
-        "normalMap": "vehicles/common/us_semi_cargobox/cargobox_nm.normal.png",
-        "roughnessFactor": 0.15,
-        "roughnessMap": "vehicles/common/us_semi_cargobox/cargobox_r.data.png",
-        "useAnisotropic": true
-      },
-      {
-        "ambientOcclusionMap": "/vehicles/common/us_semi_cargobox/cargobox_ao.data.png",
-        "baseColorMap": "/vehicles/us_semi/skinname/cargobox_skin_skinname.dds",
-        "diffuseMapUseUV": 1,
-        "metallicFactor": 0,
-        "normalMap": "vehicles/common/us_semi_cargobox/cargobox_nm.normal.png",
-        "opacityMap": "vehicles/common/us_semi_cargobox/cargobox_c.data.png",
-        "roughnessFactor": 0.15,
 		"detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
         "detailNormalMapStrength": 0.20,
         "detailScale": [

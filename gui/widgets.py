@@ -524,7 +524,6 @@ class VehicleCard(QFrame):
         name_lbl.setStyleSheet(
             f"color:{COLORS['text']};background:transparent;border:none;"
         )
-        name_lbl.setToolTip(display_name)
         _fm = QFontMetrics(name_lbl.font())
         name_lbl.setText(_fm.elidedText(display_name, Qt.ElideRight, 220))
         row.addWidget(name_lbl, 1)

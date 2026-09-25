@@ -1768,10 +1768,11 @@ class GeneratorTab(QWidget):
             cd = skin["config_data"]
             for text in [f"{t('project.config_type_label')}: {cd.get('config_type','')}",
                          f"{t('project.config_name_label')}: {cd.get('config_name','')}"]:
-                l = QLabel(text)
+                l = ElidedLabel(text)
                 l.setFont(font(10))
                 sub_c = COLORS["accent_text"] if is_editing else COLORS["text_secondary"]
                 l.setStyleSheet(f"color:{sub_c};background:transparent;border:none;")
+                l.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
                 info_col.addWidget(l)
 
         row.addLayout(info_col, 1)
@@ -3012,6 +3013,7 @@ class GeneratorTab(QWidget):
             "roughness_detail_map_path": "", "roughness_detail_map_path_2": "",
             "metallic_detail_map_path": "", "metallic_detail_map_path_2": "",
             "detail_scale": "",
+            "detail_scale_2": "",
             "factors_preset": "",
             "factors_preset_source": "",
             "retroreflectivity": 0.0,
@@ -3135,6 +3137,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "dds_path", dds_entry, "dds"),
                                    "primary", width=90, height=32, font_size=10)
         dds_row.addWidget(dds_browse)
+        dds_row.addWidget(self._mk_clear_btn(card, "dds_path", dds_entry))
         dds_col.addLayout(dds_row)
 
         dds_widget_2 = QWidget(frame); dds_widget_2.setStyleSheet("background:transparent;")
@@ -3152,6 +3155,7 @@ class GeneratorTab(QWidget):
                                      lambda: self._browse_layer_file(card, "dds_path_2", dds_entry_2, "dds"),
                                      "primary", width=90, height=32, font_size=10)
         dds_row_2.addWidget(dds_browse_2)
+        dds_row_2.addWidget(self._mk_clear_btn(card, "dds_path_2", dds_entry_2))
         dds2_col.addLayout(dds_row_2)
         dds_col.addWidget(dds_widget_2)
 
@@ -3165,6 +3169,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "roughness_map_path", rm_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         rm_row.addWidget(rm_browse)
+        rm_row.addWidget(self._mk_clear_btn(card, "roughness_map_path", rm_entry))
         dds_col.addLayout(rm_row)
 
         rm_widget_2 = QWidget(frame); rm_widget_2.setStyleSheet("background:transparent;")
@@ -3180,6 +3185,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "roughness_map_path_2", rm2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         rm2_row.addWidget(rm2_browse)
+        rm2_row.addWidget(self._mk_clear_btn(card, "roughness_map_path_2", rm2_entry))
         rm2_col.addLayout(rm2_row)
         dds_col.addWidget(rm_widget_2)
 
@@ -3193,6 +3199,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "metallic_map_path", mm_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         mm_row.addWidget(mm_browse)
+        mm_row.addWidget(self._mk_clear_btn(card, "metallic_map_path", mm_entry))
         dds_col.addLayout(mm_row)
 
         mm_widget_2 = QWidget(frame); mm_widget_2.setStyleSheet("background:transparent;")
@@ -3208,6 +3215,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "metallic_map_path_2", mm2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         mm2_row.addWidget(mm2_browse)
+        mm2_row.addWidget(self._mk_clear_btn(card, "metallic_map_path_2", mm2_entry))
         mm2_col.addLayout(mm2_row)
         dds_col.addWidget(mm_widget_2)
 
@@ -3232,6 +3240,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "data_map_path", dm_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         dm_row.addWidget(dm_browse)
+        dm_row.addWidget(self._mk_clear_btn(card, "data_map_path", dm_entry))
         clrw_col.addLayout(dm_row)
 
         pm_lbl = self._mk_label(t("project.color_Palette_Map"), bold=True)
@@ -3244,6 +3253,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "color_map_path", pm_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         pm_row.addWidget(pm_browse)
+        pm_row.addWidget(self._mk_clear_btn(card, "color_map_path", pm_entry))
         clrw_col.addLayout(pm_row)
 
         rm_clr_lbl = self._mk_label(t("project.roughness_map"), bold=True)
@@ -3256,6 +3266,7 @@ class GeneratorTab(QWidget):
                                       lambda: self._browse_layer_file(card, "roughness_map_path_clr", rm_clr_entry, "png"),
                                       "primary", width=90, height=32, font_size=10)
         rm_clr_row.addWidget(rm_clr_browse)
+        rm_clr_row.addWidget(self._mk_clear_btn(card, "roughness_map_path_clr", rm_clr_entry))
         clrw_col.addLayout(rm_clr_row)
 
         mm_clr_lbl = self._mk_label(t("project.metallic_map"), bold=True)
@@ -3268,6 +3279,7 @@ class GeneratorTab(QWidget):
                                       lambda: self._browse_layer_file(card, "metallic_map_path_clr", mm_clr_entry, "png"),
                                       "primary", width=90, height=32, font_size=10)
         mm_clr_row.addWidget(mm_clr_browse)
+        mm_clr_row.addWidget(self._mk_clear_btn(card, "metallic_map_path_clr", mm_clr_entry))
         clrw_col.addLayout(mm_clr_row)
 
         clr_widget_2 = QWidget(frame); clr_widget_2.setStyleSheet("background:transparent;")
@@ -3286,6 +3298,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "data_map_path_2", dm2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         dm2_row.addWidget(dm2_browse)
+        dm2_row.addWidget(self._mk_clear_btn(card, "data_map_path_2", dm2_entry))
         clr2_col.addLayout(dm2_row)
 
         pm2_entry = QLineEdit(); pm2_entry.setPlaceholderText(t("common.nofile_selected"))
@@ -3296,6 +3309,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "color_map_path_2", pm2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         pm2_row.addWidget(pm2_browse)
+        pm2_row.addWidget(self._mk_clear_btn(card, "color_map_path_2", pm2_entry))
         clr2_col.addLayout(pm2_row)
 
         rm2_clr_entry = QLineEdit(); rm2_clr_entry.setPlaceholderText(t("common.nofile_selected"))
@@ -3306,6 +3320,7 @@ class GeneratorTab(QWidget):
                                        lambda: self._browse_layer_file(card, "roughness_map_path_clr_2", rm2_clr_entry, "png"),
                                        "primary", width=90, height=32, font_size=10)
         rm2_clr_row.addWidget(rm2_clr_browse)
+        rm2_clr_row.addWidget(self._mk_clear_btn(card, "roughness_map_path_clr_2", rm2_clr_entry))
         clr2_col.addLayout(rm2_clr_row)
 
         mm2_clr_entry = QLineEdit(); mm2_clr_entry.setPlaceholderText(t("common.nofile_selected"))
@@ -3316,6 +3331,7 @@ class GeneratorTab(QWidget):
                                        lambda: self._browse_layer_file(card, "metallic_map_path_clr_2", mm2_clr_entry, "png"),
                                        "primary", width=90, height=32, font_size=10)
         mm2_clr_row.addWidget(mm2_clr_browse)
+        mm2_clr_row.addWidget(self._mk_clear_btn(card, "metallic_map_path_clr_2", mm2_clr_entry))
         clr2_col.addLayout(mm2_clr_row)
 
         clrw_col.addWidget(clr_widget_2)
@@ -3339,6 +3355,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "opacity_map_path", op_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         op_row.addWidget(op_browse)
+        op_row.addWidget(self._mk_clear_btn(card, "opacity_map_path", op_entry))
         fc.addLayout(op_row)
         card["op_entry"] = op_entry
 
@@ -3355,6 +3372,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "opacity_map_path_2", op2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         op2_row.addWidget(op2_browse)
+        op2_row.addWidget(self._mk_clear_btn(card, "opacity_map_path_2", op2_entry))
         op2_col.addLayout(op2_row)
         fc.addWidget(op_widget_2)
         card.update(op_entry_2=op2_entry, op_widget_2=op_widget_2)
@@ -3369,6 +3387,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "normal_map_path", nm_entry, "png"),
                                   "primary", width=90, height=32, font_size=10)
         nm_row.addWidget(nm_browse)
+        nm_row.addWidget(self._mk_clear_btn(card, "normal_map_path", nm_entry))
         fc.addLayout(nm_row)
         card["nm_entry"] = nm_entry
 
@@ -3385,6 +3404,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "normal_map_path_2", nm2_entry, "png"),
                                    "primary", width=90, height=32, font_size=10)
         nm2_row.addWidget(nm2_browse)
+        nm2_row.addWidget(self._mk_clear_btn(card, "normal_map_path_2", nm2_entry))
         nm2_col.addLayout(nm2_row)
         fc.addWidget(nm_widget_2)
         card.update(nm_entry_2=nm2_entry, nm_widget_2=nm_widget_2)
@@ -3401,6 +3421,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, data_key, entry, "dds_png"),
                                    "primary", width=90, height=32, font_size=10)
             row.addWidget(browse)
+            row.addWidget(self._mk_clear_btn(card, data_key, entry))
             fc.addLayout(row)
 
             widget_2 = QWidget(frame); widget_2.setStyleSheet("background:transparent;")
@@ -3416,6 +3437,7 @@ class GeneratorTab(QWidget):
                                      lambda: self._browse_layer_file(card, data_key_2, entry_2, "dds_png"),
                                      "primary", width=90, height=32, font_size=10)
             row_2.addWidget(browse_2)
+            row_2.addWidget(self._mk_clear_btn(card, data_key_2, entry_2))
             col_2.addLayout(row_2)
             fc.addWidget(widget_2)
             card[entry_attr] = entry
@@ -3443,6 +3465,30 @@ class GeneratorTab(QWidget):
         ds_col.addWidget(ds_entry)
         fc.addLayout(ds_col)
         card["ds_entry"] = ds_entry
+
+        ds_widget_2 = QWidget(frame); ds_widget_2.setStyleSheet("background:transparent;")
+        ds_widget_2.setVisible(is_var)
+        ds_col_2 = QVBoxLayout(ds_widget_2); ds_col_2.setContentsMargins(0, 4, 0, 0); ds_col_2.setSpacing(4)
+        try:
+            ds_lbl_2_text = t("project.detail_scale_variant_named", variant=v_suffix.capitalize())
+            if ds_lbl_2_text == "project.detail_scale_variant_named":
+                raise KeyError
+        except Exception:
+            ds_lbl_2_text = f'{t("project.detail_scale")} ({v_suffix.capitalize()})' if is_var else t("project.detail_scale")
+        ds_lbl_2 = QLabel(ds_lbl_2_text)
+        ds_lbl_2.setFont(font(9))
+        ds_lbl_2.setStyleSheet(_label_qss("text_secondary"))
+        ds_col_2.addWidget(ds_lbl_2)
+        ds_entry_2 = QLineEdit(str(layer_data.get("detail_scale_2", "") or ""))
+        ds_entry_2.setPlaceholderText(t("project.detail_scale_placeholder"))
+        ds_entry_2.setToolTip(t("project.detail_scale_hint"))
+        ds_entry_2.setFixedHeight(30)
+        ds_entry_2.setFont(font(11))
+        ds_entry_2.setStyleSheet(self._entry_style())
+        ds_col_2.addWidget(ds_entry_2)
+        fc.addWidget(ds_widget_2)
+        card["ds_entry_2"] = ds_entry_2
+        card["ds_widget_2"] = ds_widget_2
 
         fc.addSpacing(10)
         factors_lbl = self._mk_label(t("project.layer_factors"), bold=True)
@@ -3509,6 +3555,7 @@ class GeneratorTab(QWidget):
                                   lambda: self._browse_layer_file(card, "emissive_dds_path", em_entry, "dds"),
                                   "primary", width=90, height=32, font_size=10)
         em_row.addWidget(em_browse)
+        em_row.addWidget(self._mk_clear_btn(card, "emissive_dds_path", em_entry))
         em_col.addLayout(em_row)
 
         em_widget_2 = QWidget(frame); em_widget_2.setStyleSheet("background:transparent;")
@@ -3524,6 +3571,7 @@ class GeneratorTab(QWidget):
                                    lambda: self._browse_layer_file(card, "emissive_dds_path_2", em2_entry, "dds"),
                                    "primary", width=90, height=32, font_size=10)
         em2_row.addWidget(em2_browse)
+        em2_row.addWidget(self._mk_clear_btn(card, "emissive_dds_path_2", em2_entry))
         em2_col.addLayout(em2_row)
         em_col.addWidget(em_widget_2)
         fc.addWidget(em_widget)
@@ -3541,6 +3589,17 @@ class GeneratorTab(QWidget):
         print(f"[DEBUG] _toggle_layer_colorable: layer card colorable={on}")
         card["dds_widget"].setVisible(not on)
         card["clr_widget"].setVisible(on)
+
+    def _clear_layer_file(self, card: Dict[str, Any], data_key: str, entry: QLineEdit):
+        if self._layer_add_in_progress:
+            return
+        print(f"[DEBUG] _clear_layer_file: cleared {data_key}")
+        card[data_key] = ""
+        entry.clear()
+
+    def _mk_clear_btn(self, card: Dict[str, Any], data_key: str, entry: QLineEdit) -> QPushButton:
+        return self._mk_btn("\u2715", lambda: self._clear_layer_file(card, data_key, entry),
+                             "danger", width=32, height=32, font_size=10)
 
     def _browse_layer_file(self, card: Dict[str, Any], data_key: str,
                             entry: QLineEdit, kind: str):
@@ -3613,7 +3672,13 @@ class GeneratorTab(QWidget):
         scale = layer_data.get("detail_scale", "")
         if isinstance(scale, (list, tuple)):
             scale = ", ".join(str(v) for v in scale)
-        card["ds_entry"].setText(str(scale or ""))
+        card["ds_entry"].setText(str(scale) if scale else "")
+
+        scale_2 = layer_data.get("detail_scale_2", "")
+        if isinstance(scale_2, (list, tuple)):
+            scale_2 = ", ".join(str(v) for v in scale_2)
+        if "ds_entry_2" in card:
+            card["ds_entry_2"].setText(str(scale_2) if scale_2 else "")
         print(f"[DEBUG] _load_layer_card_values: applied {applied} file path(s) from stored layer data")
 
     def _collect_custom_layers(self) -> List[Dict[str, Any]]:
@@ -3671,22 +3736,27 @@ class GeneratorTab(QWidget):
                 if card["is_var"] and card.get(f"{key}_2"):
                     layer[f"{key}_2"] = card[f"{key}_2"]
 
-            scale_txt = card["ds_entry"].text().strip()
-            if scale_txt:
-                layer["detail_scale"] = scale_txt
-                try:
-                    from core.file_ops import _parse_detail_scale
-                    if _parse_detail_scale(scale_txt) is None:
-                        self.show_notification(
-                            t("project.notification.invalid_detail_scale", value=scale_txt),
-                            "warning"
-                        )
-                except ImportError:
-                    print("[DEBUG] _collect_custom_layers: core.file_ops not importable — "
-                          "skipping detail scale pre-check")
-            elif has_detail:
-                print("[DEBUG] _collect_custom_layers: detail map set with no scale — "
-                      "file_ops will apply its default tiling")
+            def _collect_scale(entry_key, layer_key, notice_label):
+                scale_txt = card[entry_key].text().strip()
+                if scale_txt:
+                    layer[layer_key] = scale_txt
+                    try:
+                        from core.file_ops import _parse_detail_scale
+                        if _parse_detail_scale(scale_txt) is None:
+                            self.show_notification(
+                                t("project.notification.invalid_detail_scale", value=scale_txt),
+                                "warning"
+                            )
+                    except ImportError:
+                        print("[DEBUG] _collect_custom_layers: core.file_ops not importable — "
+                              "skipping detail scale pre-check")
+                elif has_detail:
+                    print(f"[DEBUG] _collect_custom_layers: {notice_label} detail map set with no "
+                          "scale — file_ops will apply its default tiling (1,1)")
+
+            _collect_scale("ds_entry", "detail_scale", "car body")
+            if card["is_var"] and "ds_entry_2" in card:
+                _collect_scale("ds_entry_2", "detail_scale_2", "variant body")
 
             if layer["glowing"]:
                 layer["emissive_dds_path"] = card.get("emissive_dds_path", "")

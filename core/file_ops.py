@@ -294,6 +294,31 @@ def update_info_json_fields(json_path, config_type, config_name, extra_fields=No
         return False
 
 
+def _fix_pc_paint_design(pc_path, base_carid, skin_name):
+    expected = f"{base_carid}_skin_{skin_name}"
+    try:
+        with open(pc_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        pattern = r'("paint_design"\s*:\s*")[^"]*(")'
+        match = re.search(pattern, content)
+        if not match:
+            print(f"[WARNING]   'paint_design' key not found in {os.path.basename(pc_path)}")
+            return
+
+        current = content[match.end(1):match.start(2)]
+        if current == expected:
+            print(f"[DEBUG]   ✓ paint_design already correct: {expected}")
+            return
+
+        content = re.sub(pattern, rf'\g<1>{expected}\g<2>', content)
+        with open(pc_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"[DEBUG]   ✓ Fixed paint_design: {current!r} -> {expected!r}")
+    except Exception as e:
+        print(f"[ERROR] _fix_pc_paint_design: {e}")
+
+
 def process_skin_config_data(skin_data, base_carid, skin_name, temp_mod_root, template_path):
     if "config_data" not in skin_data:
         print(f"[DEBUG] process_skin_config_data: no config_data for {skin_name!r}, skipping")
@@ -322,8 +347,10 @@ def process_skin_config_data(skin_data, base_carid, skin_name, temp_mod_root, te
         os.makedirs(vehicle_root, exist_ok=True)
 
         if pc_path:
-            shutil.copy2(pc_path,  os.path.join(vehicle_root, f"{skin_name}.pc"))
+            dest_pc_path = os.path.join(vehicle_root, f"{skin_name}.pc")
+            shutil.copy2(pc_path, dest_pc_path)
             print("[DEBUG]   ✓ Copied .pc")
+            _fix_pc_paint_design(dest_pc_path, base_carid, skin_name)
         if jpg_path:
             shutil.copy2(jpg_path, os.path.join(vehicle_root, f"{skin_name}.jpg"))
             print("[DEBUG]   ✓ Copied .jpg")
@@ -959,7 +986,7 @@ def _parse_detail_scale(value):
 def _build_layer_stage(layer: dict, base_color_ref, opacity_ref, emissive_ref,
                         roughness_ref=None, metallic_ref=None, normal_ref=None,
                         opacity_detail_ref=None, roughness_detail_ref=None,
-                        metallic_detail_ref=None) -> dict:
+                        metallic_detail_ref=None, detail_scale_key="detail_scale") -> dict:
     is_colorable = bool(layer.get("is_colorable"))
     print(f"[DEBUG] _build_layer_stage: is_colorable={is_colorable} "
           f"has_opacity={bool(opacity_ref)} has_normal={bool(normal_ref)} "
@@ -1020,10 +1047,10 @@ def _build_layer_stage(layer: dict, base_color_ref, opacity_ref, emissive_ref,
     if opacity_detail_ref or roughness_detail_ref or metallic_detail_ref:
         if use_secondary_uv:
             stage["detailMapUseUV"] = 1
-        scale = _parse_detail_scale(layer.get("detail_scale"))
+        scale = _parse_detail_scale(layer.get(detail_scale_key))
         if scale is None:
             scale = list(_DEFAULT_DETAIL_SCALE)
-            print(f"[DEBUG] _build_layer_stage: no valid detail_scale, using default {scale}")
+            print(f"[DEBUG] _build_layer_stage: no valid {detail_scale_key}, using default {scale}")
         stage["detailScale"] = scale
 
     if layer.get("glowing") and emissive_ref:
@@ -1173,7 +1200,8 @@ def _inject_custom_layers(skin_data, base_carid, skin_folder, dest_skin_folder,
                 stage = _build_layer_stage(layer, base_ref, opacity_ref, emissive_ref,
                                             roughness_ref, metallic_ref, normal_ref,
                                             opacity_detail_ref, roughness_detail_ref,
-                                            metallic_detail_ref)
+                                            metallic_detail_ref,
+                                            detail_scale_key="detail_scale_2" if use_variant else "detail_scale")
                 stages.append(stage)
                 modified = True
                 print(f"[DEBUG]   ✓ custom layer {idx} ({label}) appended to "
