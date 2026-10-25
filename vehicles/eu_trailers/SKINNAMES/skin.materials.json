@@ -1,0 +1,33 @@
+{
+  "eu_trailer.skin_box_S.skinname": {
+    "name": "eu_trailer.skin_box_S.skinname",
+    "mapTo": "eu_trailer.skin_box_S.skinname",
+    "class": "Material",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/vehicles/common/eu_truck/eu_truck_flatbed_ao.data.png",
+        "baseColorMap": "/vehicles/common/eu_truck/eu_truck_flatbed_b.color.png",
+        "metallicMap": "/vehicles/common/eu_truck/eu_truck_flatbed_m.data.png",
+        "metallicFactor": 0,
+        "roughnessFactor": 0.15,
+        "normalMap": "/vehicles/common/eu_truck/eu_truck_flatbed_nm.normal.png",
+        "roughnessMap": "/vehicles/common/eu_truck/eu_truck_flatbed_r.data.png"
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/common/eu_truck/eu_truck_flatbed_ao.data.png",
+        "baseColorMap": "/vehicles/eu_trailers/SKINNAME/eu_trailers_skin_SKINNAME.dds",
+        "diffuseMapUseUV": 1,
+        "clearCoatFactor": 1,
+        "clearCoatRoughnessFactor": 0.05,
+        "metallicFactor": 0,
+        "roughnessFactor": 0.15,
+        "normalMap": "/vehicles/common/eu_truck/eu_truck_flatbed_nm.normal.png",
+        "opacityMap": "/vehicles/common/eu_truck/eu_truck_flatbed_o.data.png"
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "subSurfaceIntensity": 0,
+    "version": 1.5
+  }
+}

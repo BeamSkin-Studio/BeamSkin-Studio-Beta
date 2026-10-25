@@ -1,9 +1,10 @@
 from __future__ import annotations
-import os, json, threading
+import os, json, re, threading, tempfile, zipfile
 from typing import Dict, List, Optional, Any, Callable
 
 from PySide6.QtCore    import Qt, QTimer, Signal
-from PySide6.QtGui     import QPixmap, QKeySequence, QShortcut, QFontMetrics
+from PySide6.QtCore    import QPointF, QSize
+from PySide6.QtGui     import QPixmap, QKeySequence, QShortcut, QFontMetrics, QIcon, QPainter, QPen, QColor
 from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QLineEdit, QComboBox, QProgressBar, QScrollArea, QVBoxLayout, QHBoxLayout, QFileDialog, QDialog, QCheckBox, QGraphicsOpacityEffect, QSizePolicy
 
 from gui.theme   import COLORS, font
@@ -107,6 +108,12 @@ try:
 except ImportError as _pb_imp_exc:
     print(f"[DEBUG] generator: ProjectBrowserDialog not available: {_pb_imp_exc} — will fall back to file dialog")
     ProjectBrowserDialog = None
+
+try:
+    from gui.components.model_preview_panel import ModelPreviewWindow as _ModelPreviewWindow
+except Exception as _mp_exc:
+    print(f"[DEBUG] generator: 3D preview unavailable: {type(_mp_exc).__name__}: {_mp_exc}")
+    _ModelPreviewWindow = None
 
 
 _PRESET_KIND_LAYER_FACTORS      = "layer_factors"
@@ -315,11 +322,12 @@ def _delete_preset(kind: str, name: str,
 print("[DEBUG] Loading class: GeneratorTab")
 
 
-def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200) -> Optional[QPixmap]:
+def _load_pixmap_robust(path: str, max_w: int = 400, max_h: int = 200,
+                        uncapped: bool = False) -> Optional[QPixmap]:
     print(f"[DEBUG] _load_pixmap_robust: loading {path!r} (max={max_w}x{max_h})")
 
-    _PREVIEW_CAP_W = 2560
-    _PREVIEW_CAP_H = 1440
+    _PREVIEW_CAP_W = 16384 if uncapped else 2560
+    _PREVIEW_CAP_H = 16384 if uncapped else 1440
 
     ext = os.path.splitext(path)[1].lower()
 
@@ -511,8 +519,48 @@ def _get_entry_text(entry) -> str:
     return entry.text() if hasattr(entry, "text") else ""
 
 
+def _variant_label(carid: str, suffix: str) -> str:
+    try:
+        from core.config import get_variant_label
+    except ImportError:
+        return suffix.capitalize() if suffix else ""
+    return get_variant_label(carid, suffix, suffix.capitalize() if suffix else "")
+
+
 def _make_project_key(carid: str, variant_suffix: str) -> str:
     return f"{carid}__{variant_suffix}" if variant_suffix else carid
+
+
+def _make_cube_icon(color: str, size: int = 48) -> QIcon:
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(QColor(color))
+    pen.setWidthF(size / 16)
+    pen.setJoinStyle(Qt.RoundJoin)
+    pen.setCapStyle(Qt.RoundCap)
+    p.setPen(pen)
+    k = size / 48.0
+    pts = [(24, 5), (40, 14.5), (40, 33.5), (24, 43), (8, 33.5), (8, 14.5)]
+    pts = [QPointF(x * k, y * k) for x, y in pts]
+    for i in range(6):
+        p.drawLine(pts[i], pts[(i + 1) % 6])
+    c = QPointF(24 * k, 24 * k)
+    for i in (1, 3, 5):
+        p.drawLine(c, pts[i])
+    p.end()
+    return QIcon(pix)
+
+
+def _preview_texture_image(path: str, full_res: bool = False):
+    if full_res:
+        pix = _load_pixmap_robust(path, 16384, 16384, uncapped=True)
+    else:
+        pix = _load_pixmap_robust(path, 2048, 2048)
+    if pix is None or pix.isNull():
+        return None
+    return pix.toImage()
 
 
 def _split_project_key(key: str):
@@ -592,6 +640,11 @@ class GeneratorTab(QWidget):
         self._pending_generate_button = None
         print("[DEBUG] GeneratorTab.__init__: done, UI ready")
 
+
+    def _selected_variant_label(self) -> str:
+        info = self.project_data["cars"].get(self.selected_car_for_skin, {})
+        base = info.get("base_carid", self.selected_car_for_skin)
+        return _variant_label(base, info.get("variant_suffix", ""))
 
     def _selected_variant_suffix(self) -> str:
         if not self.selected_car_for_skin:
@@ -972,7 +1025,17 @@ class GeneratorTab(QWidget):
             _label_qss()
         )
         self._add_skin_label.setVisible(False)
-        self._right_col.addWidget(self._add_skin_label)
+        _skin_head = QHBoxLayout()
+        _skin_head.setContentsMargins(0, 0, 0, 0)
+        _skin_head.addWidget(self._add_skin_label)
+        _skin_head.addStretch()
+        self._right_col.addLayout(_skin_head)
+
+        self._preview3d_btn = None
+        self._preview3d_win = None
+        self._preview3d_sig = None
+        if _ModelPreviewWindow is not None:
+            self._build_preview3d_button(_skin_head)
 
         self._variant_banner = QLabel("")
         self._variant_banner.setFont(font(12))
@@ -1618,16 +1681,19 @@ class GeneratorTab(QWidget):
             def is_rebadge_suffix(_c, _s):
                 return False
         is_rebadge = bool(variant_suffix) and is_rebadge_suffix(base, variant_suffix)
-        show_variant_row = bool(variant_suffix) and not is_rebadge
+        variant_label = _variant_label(base, variant_suffix)
+        show_variant_row = bool(variant_label) and not is_rebadge
 
         if is_rebadge:
             base_name = car_info.get("display_name") or name
         else:
             base_name = name
             if variant_suffix:
-                suffix_marker = f" ({variant_suffix.capitalize()})"
-                if base_name.endswith(suffix_marker):
-                    base_name = base_name[: -len(suffix_marker)]
+                for _lbl in (variant_label, variant_suffix.capitalize()):
+                    suffix_marker = f" ({_lbl})"
+                    if base_name.endswith(suffix_marker):
+                        base_name = base_name[: -len(suffix_marker)]
+                        break
 
         display_text  = base_name
         skin_word     = t("project.skin") if skin_count == 1 else t("project.skins")
@@ -1672,7 +1738,7 @@ class GeneratorTab(QWidget):
         btn_lbl_col.addWidget(main_lbl)
 
         if show_variant_row:
-            suffix_display = variant_suffix.capitalize()
+            suffix_display = variant_label
             sub_lbl = QLabel(t("project.variant_type",
                                default=f"Type: {suffix_display}",
                                suffix=suffix_display))
@@ -1926,7 +1992,7 @@ class GeneratorTab(QWidget):
         self._clr_body2_section.setVisible(is_var and is_clr)
 
         if is_var:
-            self._clr_body2_lbl.setText(t("project.variant_body_named", variant=v_suffix.capitalize()))
+            self._clr_body2_lbl.setText(t("project.variant_body_named", variant=self._selected_variant_label()))
 
         if not is_var:
             self._dds_preview_2.setVisible(False)
@@ -2582,7 +2648,7 @@ class GeneratorTab(QWidget):
 
     def browse_dds_2(self):
         v_suffix = self._selected_variant_suffix()
-        title = t("project.dialog_select_dds_variant", variant=v_suffix.capitalize())
+        title = t("project.dialog_select_dds_variant", variant=self._selected_variant_label())
         path, _ = QFileDialog.getOpenFileName(
             self, title, "", "DDS files (*.dds);;All files (*.*)"
         )
@@ -2672,7 +2738,7 @@ class GeneratorTab(QWidget):
 
     def _browse_data_map_2(self):
         v_suffix = self._selected_variant_suffix()
-        title = t("project.dialog_select_base_color_map_v", variant=v_suffix.capitalize())
+        title = t("project.dialog_select_base_color_map_v", variant=self._selected_variant_label())
         path, _ = QFileDialog.getOpenFileName(
             self, title, "", "PNG files (*.png);;All files (*.*)"
         )
@@ -2686,7 +2752,7 @@ class GeneratorTab(QWidget):
 
     def _browse_color_map_2(self):
         v_suffix = self._selected_variant_suffix()
-        title = t("project.dialog_select_color_palette_v", variant=v_suffix.capitalize())
+        title = t("project.dialog_select_color_palette_v", variant=self._selected_variant_label())
         path, _ = QFileDialog.getOpenFileName(
             self, title, "", "PNG files (*.png);;All files (*.*)"
         )
@@ -3143,7 +3209,7 @@ class GeneratorTab(QWidget):
         dds_widget_2 = QWidget(frame); dds_widget_2.setStyleSheet("background:transparent;")
         dds_widget_2.setVisible(is_var)
         dds2_col = QVBoxLayout(dds_widget_2); dds2_col.setContentsMargins(0, 4, 0, 0); dds2_col.setSpacing(4)
-        dds2_lbl = QLabel(t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else "")
+        dds2_lbl = QLabel(t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else "")
         dds2_lbl.setFont(font(10, "bold"))
         dds2_lbl.setStyleSheet(f"color:{COLORS['accent']};background:transparent;border:none;")
         dds2_col.addWidget(dds2_lbl)
@@ -3176,7 +3242,7 @@ class GeneratorTab(QWidget):
         rm_widget_2.setVisible(is_var)
         rm2_col = QVBoxLayout(rm_widget_2); rm2_col.setContentsMargins(0, 4, 0, 0); rm2_col.setSpacing(4)
         rm2_entry = QLineEdit(); rm2_entry.setPlaceholderText(
-            t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
         )
         rm2_entry.setReadOnly(True); rm2_entry.setFixedHeight(32); rm2_entry.setFont(font(11))
         rm2_entry.setStyleSheet(self._entry_style())
@@ -3206,7 +3272,7 @@ class GeneratorTab(QWidget):
         mm_widget_2.setVisible(is_var)
         mm2_col = QVBoxLayout(mm_widget_2); mm2_col.setContentsMargins(0, 4, 0, 0); mm2_col.setSpacing(4)
         mm2_entry = QLineEdit(); mm2_entry.setPlaceholderText(
-            t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
         )
         mm2_entry.setReadOnly(True); mm2_entry.setFixedHeight(32); mm2_entry.setFont(font(11))
         mm2_entry.setStyleSheet(self._entry_style())
@@ -3285,7 +3351,7 @@ class GeneratorTab(QWidget):
         clr_widget_2 = QWidget(frame); clr_widget_2.setStyleSheet("background:transparent;")
         clr_widget_2.setVisible(is_var)
         clr2_col = QVBoxLayout(clr_widget_2); clr2_col.setContentsMargins(0, 6, 0, 0); clr2_col.setSpacing(4)
-        clr2_lbl = QLabel(t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else "")
+        clr2_lbl = QLabel(t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else "")
         clr2_lbl.setFont(font(10, "bold"))
         clr2_lbl.setStyleSheet(f"color:{COLORS['accent']};background:transparent;border:none;")
         clr2_col.addWidget(clr2_lbl)
@@ -3363,7 +3429,7 @@ class GeneratorTab(QWidget):
         op_widget_2.setVisible(is_var)
         op2_col = QVBoxLayout(op_widget_2); op2_col.setContentsMargins(0, 4, 0, 0); op2_col.setSpacing(4)
         op2_entry = QLineEdit(); op2_entry.setPlaceholderText(
-            t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
         )
         op2_entry.setReadOnly(True); op2_entry.setFixedHeight(32); op2_entry.setFont(font(11))
         op2_entry.setStyleSheet(self._entry_style())
@@ -3395,7 +3461,7 @@ class GeneratorTab(QWidget):
         nm_widget_2.setVisible(is_var)
         nm2_col = QVBoxLayout(nm_widget_2); nm2_col.setContentsMargins(0, 4, 0, 0); nm2_col.setSpacing(4)
         nm2_entry = QLineEdit(); nm2_entry.setPlaceholderText(
-            t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
         )
         nm2_entry.setReadOnly(True); nm2_entry.setFixedHeight(32); nm2_entry.setFont(font(11))
         nm2_entry.setStyleSheet(self._entry_style())
@@ -3428,7 +3494,7 @@ class GeneratorTab(QWidget):
             widget_2.setVisible(is_var)
             col_2 = QVBoxLayout(widget_2); col_2.setContentsMargins(0, 4, 0, 0); col_2.setSpacing(4)
             entry_2 = QLineEdit(); entry_2.setPlaceholderText(
-                t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+                t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
             )
             entry_2.setReadOnly(True); entry_2.setFixedHeight(32); entry_2.setFont(font(11))
             entry_2.setStyleSheet(self._entry_style())
@@ -3470,11 +3536,11 @@ class GeneratorTab(QWidget):
         ds_widget_2.setVisible(is_var)
         ds_col_2 = QVBoxLayout(ds_widget_2); ds_col_2.setContentsMargins(0, 4, 0, 0); ds_col_2.setSpacing(4)
         try:
-            ds_lbl_2_text = t("project.detail_scale_variant_named", variant=v_suffix.capitalize())
+            ds_lbl_2_text = t("project.detail_scale_variant_named", variant=self._selected_variant_label())
             if ds_lbl_2_text == "project.detail_scale_variant_named":
                 raise KeyError
         except Exception:
-            ds_lbl_2_text = f'{t("project.detail_scale")} ({v_suffix.capitalize()})' if is_var else t("project.detail_scale")
+            ds_lbl_2_text = f'{t("project.detail_scale")} ({self._selected_variant_label()})' if is_var else t("project.detail_scale")
         ds_lbl_2 = QLabel(ds_lbl_2_text)
         ds_lbl_2.setFont(font(9))
         ds_lbl_2.setStyleSheet(_label_qss("text_secondary"))
@@ -3562,7 +3628,7 @@ class GeneratorTab(QWidget):
         em_widget_2.setVisible(is_var)
         em2_col = QVBoxLayout(em_widget_2); em2_col.setContentsMargins(0, 4, 0, 0); em2_col.setSpacing(4)
         em2_entry = QLineEdit(); em2_entry.setPlaceholderText(
-            t("project.variant_body_named", variant=v_suffix.capitalize()) if is_var else t("common.nofile_selected")
+            t("project.variant_body_named", variant=self._selected_variant_label()) if is_var else t("common.nofile_selected")
         )
         em2_entry.setReadOnly(True); em2_entry.setFixedHeight(32); em2_entry.setFont(font(11))
         em2_entry.setStyleSheet(self._entry_style())
@@ -4189,16 +4255,26 @@ class GeneratorTab(QWidget):
             print("[DEBUG] _mark_dirty: project_data changed, now dirty")
         self._project_dirty = True
 
-    def _confirm_discard_if_dirty(self, message_key: str, title_key: str) -> bool:
-        if not self._project_dirty:
-            return True
+    def _project_is_empty(self) -> bool:
+        if self.project_data.get("cars"):
+            return False
+
+        mod_name = str(self.project_data.get("mod_name", "") or "").strip()
+        author = str(self.project_data.get("author", "") or "").strip()
+        if self.mod_name_entry_sidebar is not None:
+            mod_name = mod_name or self.mod_name_entry_sidebar.text().strip()
+        if self.author_entry_sidebar is not None:
+            author = author or self.author_entry_sidebar.text().strip()
+        return not mod_name and not author
+
+    def _make_discard_confirmation(self, message_key: str, title_key: str):
         try:
             from gui.confirmation_dialog import DangerConfirmationDialog
         except ImportError:
             print("[DEBUG] _confirm_discard_if_dirty: gui.confirmation_dialog not found — using gui.components.confirmation_dialog")
             from gui.components.confirmation_dialog import DangerConfirmationDialog
 
-        dlg = DangerConfirmationDialog(
+        return DangerConfirmationDialog(
             self.window(),
             t(title_key, default="Unsaved Changes"),
             t(message_key, default=(
@@ -4210,6 +4286,11 @@ class GeneratorTab(QWidget):
             cancel_text=t("project.unsaved.cancel", default="Cancel"),
             icon="⚠️",
         )
+
+    def _confirm_discard_if_dirty(self, message_key: str, title_key: str) -> bool:
+        if not self._project_dirty or self._project_is_empty():
+            return True
+        dlg = self._make_discard_confirmation(message_key, title_key)
         result = bool(dlg.show_and_get())
         print(f"[DEBUG] _confirm_discard_if_dirty: user {'confirmed discard' if result else 'cancelled'}")
         return result
@@ -4429,26 +4510,48 @@ class GeneratorTab(QWidget):
         return result["proceed"]
 
     def load_project(self):
-        if not self._confirm_discard_if_dirty(
-            "project.unsaved.load_message",
-            "project.unsaved.load_title",
-        ):
-            print("[DEBUG] load_project: cancelled by user due to unsaved changes")
+        if self._project_dirty and not self._project_is_empty():
+            dlg = self._make_discard_confirmation(
+                "project.unsaved.load_message",
+                "project.unsaved.load_title",
+            )
+            self._load_discard_dialog = dlg
+
+            def _on_discard_confirmation_finished(result: int):
+                self._load_discard_dialog = None
+                if result == QDialog.Accepted:
+                    self._open_project_browser()
+                else:
+                    print("[DEBUG] load_project: cancelled by user due to unsaved changes")
+
+            dlg.finished.connect(_on_discard_confirmation_finished)
+            dlg.open()
             return
 
+        self._open_project_browser()
+
+    def _open_project_browser(self):
         path: Optional[str] = None
 
         if ProjectBrowserDialog is not None:
             print("[DEBUG] load_project: opening ProjectBrowserDialog")
-            dlg    = ProjectBrowserDialog(self.window())
-            result = dlg.exec()
-            print(f"[DEBUG] load_project: dialog result={result} selected_path={dlg.selected_path!r}")
+            dlg = ProjectBrowserDialog(self.window())
+            self._project_browser_dialog = dlg
 
-            if not result:
-                print("[DEBUG] load_project: dialog cancelled — returning early")
-                return
+            def _on_project_browser_finished(result: int):
+                self._project_browser_dialog = None
+                print(
+                    f"[DEBUG] load_project: dialog result={result} "
+                    f"selected_path={dlg.selected_path!r}"
+                )
+                if result:
+                    self._load_project_from_path(dlg.selected_path)
+                else:
+                    print("[DEBUG] load_project: dialog cancelled — returning early")
 
-            path = dlg.selected_path
+            dlg.finished.connect(_on_project_browser_finished)
+            dlg.open()
+            return
         else:
             print("[DEBUG] load_project: ProjectBrowserDialog unavailable — using raw QFileDialog")
             from core.settings import get_projects_dir
@@ -4459,6 +4562,13 @@ class GeneratorTab(QWidget):
 
         if not path:
             print("[DEBUG] load_project: no path selected — returning early")
+            return
+
+        self._load_project_from_path(path)
+
+    def _load_project_from_path(self, path: Optional[str]):
+        if not path:
+            print("[DEBUG] _load_project_from_path: no path selected — returning early")
             return
 
         self._current_project_path = path
@@ -4969,6 +5079,321 @@ class GeneratorTab(QWidget):
         self.car_id_list = self._build_car_id_list()
         self.refresh_project_display()
 
+
+    def _build_preview3d_button(self, head: QHBoxLayout):
+        btn = QPushButton("  3D Preview")
+        btn.setIcon(_make_cube_icon(COLORS["accent_text"]))
+        btn.setIconSize(QSize(20, 20))
+        btn.setFont(font(12, "bold"))
+        btn.setFixedHeight(34)
+        btn.setMinimumWidth(130)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip("Open the 3D preview of this car with your skin")
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background:{COLORS['accent']};
+                color:{COLORS['accent_text']};
+                border:none;
+                border-radius:8px;
+                padding:0 14px;
+            }}
+            QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
+        """)
+        btn.setVisible(False)
+        btn.clicked.connect(self._open_preview3d)
+        head.addWidget(btn)
+        self._preview3d_btn = btn
+
+        self._preview3d_timer = QTimer(self)
+        self._preview3d_timer.setInterval(300)
+        self._preview3d_timer.timeout.connect(self._preview3d_tick)
+        self._preview3d_timer.start()
+
+    def _open_preview3d(self):
+        if self._preview3d_win is None:
+            self._preview3d_win = _ModelPreviewWindow(_preview_texture_image)
+        self._preview3d_sig = None
+        win = self._preview3d_win
+        win.show()
+        win.setWindowState(win.windowState() & ~Qt.WindowMinimized)
+        win.raise_()
+        win.activateWindow()
+        self._preview3d_tick()
+
+    def _preview3d_car_id(self) -> str:
+        key = self.selected_car_for_skin
+        if not key:
+            return ""
+        info = self.project_data.get("cars", {}).get(key, {})
+        return info.get("base_carid", "") or _split_project_key(key)[0]
+
+    def _preview3d_roots(self) -> List[str]:
+        roots: List[str] = []
+        try:
+            from core.settings import get_vehicles_dir, get_bundle_path
+            vd = get_vehicles_dir()
+            if vd:
+                roots.append(os.path.dirname(os.path.normpath(vd)))
+            bp = get_bundle_path()
+            if bp:
+                roots.append(bp)
+        except Exception:
+            pass
+        try:
+            from core.settings import get_beamng_install_path
+            ip = get_beamng_install_path()
+            if ip:
+                roots += [ip, os.path.join(ip, "content")]
+        except Exception:
+            pass
+        out: List[str] = []
+        for r in roots:
+            if r and r not in out and os.path.isdir(r):
+                out.append(r)
+        return out
+
+    def _preview3d_resolve(self, value: str) -> Optional[str]:
+        if not value or not isinstance(value, str):
+            return None
+        if os.path.isfile(value):
+            return value
+        cache = self.__dict__.setdefault("_preview3d_resolve_cache", {})
+        if value in cache and (cache[value] is None or os.path.isfile(cache[value])):
+            return cache[value]
+        rel = value.replace("\\", "/").lstrip("/")
+        found: Optional[str] = None
+        roots = self._preview3d_roots()
+        for r in roots:
+            p = os.path.join(r, *rel.split("/"))
+            if os.path.isfile(p):
+                found = p
+                break
+        if found is None:
+            parts = rel.split("/")
+            if len(parts) >= 3 and parts[0].lower() == "vehicles":
+                car = parts[1]
+                for r in roots:
+                    for zp in (os.path.join(r, "vehicles", car + ".zip"),
+                               os.path.join(r, "content", "vehicles", car + ".zip")):
+                        if not os.path.isfile(zp):
+                            continue
+                        try:
+                            with zipfile.ZipFile(zp) as zf:
+                                want = rel.lower()
+                                member = next((n for n in zf.namelist()
+                                               if n.replace("\\", "/").lstrip("/").lower() == want), None)
+                                if member is None:
+                                    continue
+                                out_dir = os.path.join(tempfile.gettempdir(), "beamskin_preview_game", car)
+                                os.makedirs(out_dir, exist_ok=True)
+                                dest = os.path.join(out_dir, os.path.basename(rel))
+                                with zf.open(member) as src, open(dest, "wb") as dst:
+                                    dst.write(src.read())
+                                found = dest
+                                break
+                        except (OSError, zipfile.BadZipFile) as exc:
+                            print(f"[DEBUG] _preview3d_resolve: {zp!r}: {exc}")
+                    if found:
+                        break
+        cache[value] = found
+        return found
+
+    def _preview3d_colorable_opacity(self) -> str:
+        car = self._preview3d_car_id()
+        if not car:
+            return ""
+        cache = self.__dict__.setdefault("_preview3d_opacity_cache", {})
+        if car in cache and cache[car]:
+            return cache[car]
+        candidates: List[str] = []
+        try:
+            from core.settings import get_vehicles_dir, get_bundle_path
+            vroots = [get_vehicles_dir(), os.path.join(get_bundle_path(), "vehicles")]
+        except Exception:
+            vroots = []
+        dirs: List[str] = []
+        for vr in vroots:
+            cd = os.path.join(vr or "", car)
+            if os.path.isdir(cd):
+                dirs.append(cd)
+                try:
+                    dirs += [os.path.join(cd, d) for d in os.listdir(cd)
+                             if os.path.isdir(os.path.join(cd, d))]
+                except OSError:
+                    pass
+        for d in dirs:
+            for fn in ("skin.materials.json", "materials.json"):
+                fp = os.path.join(d, fn)
+                if not os.path.isfile(fp):
+                    continue
+                try:
+                    with open(fp, encoding="utf-8") as f:
+                        data = json.loads(re.sub(r",(\s*[}\]])", r"\1", f.read()))
+                except Exception:
+                    continue
+                for mat in data.values():
+                    if not isinstance(mat, dict):
+                        continue
+                    for st in mat.get("Stages", []) or []:
+                        if isinstance(st, dict) and isinstance(st.get("opacityMap"), str) \
+                                and st.get("colorPaletteMap"):
+                            candidates.append(st["opacityMap"])
+        candidates.append(f"/vehicles/{car}/{car}_main_alt_c.data.png")
+        for value in candidates:
+            if self._preview3d_resolve(value):
+                cache[car] = value
+                return value
+        return ""
+
+    def _preview3d_stage(self) -> Optional[Dict[str, Any]]:
+        import re
+
+        def card_stage(card, variant: bool = False) -> Optional[Dict[str, Any]]:
+            colorable = card["colorable_toggle"].isChecked()
+            suffix = "_2" if variant else ""
+            base = card.get(("data_map_path" if colorable else "dds_path") + suffix, "")
+            if not base:
+                return None
+            stage: Dict[str, Any] = {"baseColorMap": base}
+            if colorable:
+                palette = card.get("color_map_path" + suffix, "")
+                if not palette:
+                    return None
+                stage["colorPaletteMap"] = palette
+            for key, src in (("opacityMap", "opacity_map_path"),
+                             ("opacityDetailMap", "opacity_detail_map_path"),
+                             ("roughnessDetailMap", "roughness_detail_map_path"),
+                             ("metallicDetailMap", "metallic_detail_map_path")):
+                value = card.get(src + suffix, "") or (card.get(src, "") if variant else "")
+                if value:
+                    stage[key] = value
+            if colorable and "opacityMap" not in stage:
+                opacity = self._preview3d_colorable_opacity()
+                if opacity:
+                    stage["opacityMap"] = opacity
+            stage["diffuseMapUseUV"] = 1 if card["diffuse_uv_toggle"].isChecked() else 0
+            scale_txt = card.get("ds_entry_2", card["ds_entry"]).text().strip() if variant \
+                else card["ds_entry"].text().strip()
+            if not scale_txt and variant:
+                scale_txt = card["ds_entry"].text().strip()
+            if scale_txt:
+                nums = [float(v) for v in re.split(r"[,;\sx]+", scale_txt) if v]
+                if len(nums) >= 2:
+                    stage["detailScale"] = [nums[0], nums[1]]
+                elif len(nums) == 1:
+                    stage["detailScale"] = [nums[0], nums[0]]
+            for src, key in (("metallic_factor", "metallicFactor"),
+                             ("roughness_factor", "roughnessFactor"),
+                             ("clear_coat_factor", "clearCoatFactor"),
+                             ("clear_coat_roughness_factor", "clearCoatRoughnessFactor"),
+                             ("retroreflectivity", "retroreflectivity")):
+                entry = card["factor_entries"].get(src)
+                if entry is not None and entry.text().strip():
+                    stage[key] = float(entry.text().strip())
+            return stage
+
+        cards = list(getattr(self, "_custom_layer_cards", None) or [])
+        for top_i in range(len(cards) - 1, -1, -1):
+            try:
+                top = card_stage(cards[top_i])
+                variant_top = card_stage(cards[top_i], variant=True)
+            except (ValueError, KeyError, RuntimeError, AttributeError):
+                continue
+            if top is None:
+                continue
+            under: List[Dict[str, Any]] = []
+            variant_under: List[Dict[str, Any]] = []
+            try:
+                base_dds = getattr(self, "_dds_path", "")
+                if base_dds and not self._colorable_toggle.isChecked():
+                    under.append({"baseColorMap": base_dds, "_alphaOpacity": True})
+                variant_dds = getattr(self, "_dds_path_2", "")
+                if variant_dds and not self._colorable_toggle.isChecked():
+                    variant_under.append({"baseColorMap": variant_dds, "_alphaOpacity": True})
+            except RuntimeError:
+                pass
+            for card in cards[:top_i]:
+                try:
+                    low = card_stage(card)
+                    variant_low = card_stage(card, variant=True)
+                except (ValueError, KeyError, RuntimeError, AttributeError):
+                    continue
+                if low and "colorPaletteMap" not in low \
+                        and low.get("diffuseMapUseUV") == top.get("diffuseMapUseUV"):
+                    under.append(low)
+                if variant_low and "colorPaletteMap" not in variant_low \
+                        and variant_low.get("diffuseMapUseUV") == top.get("diffuseMapUseUV"):
+                    variant_under.append(variant_low)
+            if under and "colorPaletteMap" not in top:
+                top["_under"] = under
+            if variant_top is not None:
+                if variant_under and "colorPaletteMap" not in variant_top:
+                    variant_top["_under"] = variant_under
+                top["_variant"] = variant_top
+            return top
+        try:
+            if (self._colorable_toggle.isChecked() and self._data_map_path
+                    and self._color_map_path):
+                stage = {"baseColorMap": self._data_map_path,
+                         "colorPaletteMap": self._color_map_path}
+                opacity = self._preview3d_colorable_opacity()
+                if opacity:
+                    stage["opacityMap"] = opacity
+                variant_stage = {}
+                if self._data_map_path_2 and self._color_map_path_2:
+                    variant_stage = {
+                        "baseColorMap": self._data_map_path_2,
+                        "colorPaletteMap": self._color_map_path_2,
+                    }
+                    if opacity:
+                        variant_stage["opacityMap"] = opacity
+                    stage["_variant"] = variant_stage
+                return stage
+        except RuntimeError:
+            pass
+        return None
+
+    def _preview3d_tick(self):
+        btn = self._preview3d_btn
+        if btn is None:
+            return
+        want = not self._skin_card.isHidden()
+        if btn.isHidden() == want:
+            btn.setVisible(want)
+        win = self._preview3d_win
+        if win is None or not win.isVisible():
+            return
+
+        key = self.selected_car_for_skin
+        carid = ""
+        variant = ""
+        if key:
+            info = self.project_data.get("cars", {}).get(key, {})
+            carid = info.get("base_carid", "") or _split_project_key(key)[0]
+            variant = info.get("variant_suffix", "") or ""
+        textures = [
+            ("DDS", getattr(self, "_dds_path", "")),
+            ("DDS (variant)", getattr(self, "_dds_path_2", "")),
+            ("Color map", getattr(self, "_color_map_path", "")),
+            ("Color map (variant)", getattr(self, "_color_map_path_2", "")),
+            ("Data map", getattr(self, "_data_map_path", "")),
+            ("Data map (variant)", getattr(self, "_data_map_path_2", "")),
+        ]
+        stage = self._preview3d_stage()
+        sig = (carid, variant, tuple(path for _, path in textures),
+               repr(sorted(stage.items())) if stage else "")
+        if sig == self._preview3d_sig:
+            return
+        previous = self._preview3d_sig
+        self._preview3d_sig = sig
+        panel = win.panel
+        if previous is None:
+            panel.set_car(carid or None, force=True, variant=variant)
+        elif previous[0] != carid or previous[1] != variant:
+            panel.set_car(carid or None, force=True, variant=variant)
+        panel.set_material_stage(stage, self._preview3d_resolve)
+        panel.set_textures(textures)
+        win.setWindowTitle(f"3D Preview - {carid}" if carid else "3D Preview")
 
     def _mk_card(self) -> QFrame:
         f = QFrame()

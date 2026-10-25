@@ -42,6 +42,12 @@ _REQUIRED = [
     ("requests",  "requests"),
 ]
 
+_OPTIONAL = [
+    ("wgpu",      "wgpu"),
+]
+_ALL_PACKAGES = _REQUIRED + _OPTIONAL
+_OPTIONAL_NAMES = {p for p, _ in _OPTIONAL}
+
 
 class _InstallSignals(QObject):
     progress = Signal(str, float)
@@ -56,7 +62,7 @@ class _InstallWorker(QThread):
     def run(self):
         try:
             missing = []
-            for pkg_name, import_name in _REQUIRED:
+            for pkg_name, import_name in _ALL_PACKAGES:
                 try:
                     __import__(import_name)
                 except ImportError:
@@ -80,7 +86,7 @@ class _InstallWorker(QThread):
             )
             step += 1
 
-            for pkg_name, _ in [(p, n) for p, n in _REQUIRED if p in missing]:
+            for pkg_name, _ in [(p, n) for p, n in _ALL_PACKAGES if p in missing]:
                 self.signals.progress.emit(f"Installing {pkg_name}…",
                                            step / total)
                 result = subprocess.run(
@@ -90,6 +96,11 @@ class _InstallWorker(QThread):
                     creationflags=(subprocess.CREATE_NO_WINDOW
                                    if sys.platform == "win32" else 0),
                 )
+                if result.returncode != 0 and pkg_name in _OPTIONAL_NAMES:
+                    print(f"[LAUNCHER] Optional package {pkg_name} failed to "
+                          f"install — continuing without it")
+                    step += 1
+                    continue
                 if result.returncode != 0:
                     raise RuntimeError(
                         f"pip install {pkg_name} failed:\n"

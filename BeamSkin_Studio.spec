@@ -23,6 +23,8 @@ spec_root = os.path.abspath(SPECPATH)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 datas = []
+_pyside6_bins = []
+_pyside6_hiddens = []
 
 # ── Project assets ─────────────────────────────────────────────────────────── #
 datas += [
@@ -31,9 +33,11 @@ datas += [
     ('gui/images',                          'gui/images'),
     ('vehicles',                            'vehicles'),
     ('data',                                'data'),
+    ('beamskin_studio_exporter_mod',        'beamskin_studio_exporter_mod'),
     # Language files — critical for the localisation system
     ('core/localization/languages',         'core/localization/languages'),
 ]
+datas = [d for d in datas if os.path.exists(d[0])]
 
 # ── PySide6 Qt plugins (required for fonts, image formats, platform) ─────── #
 try:
@@ -42,9 +46,17 @@ try:
     datas    += _pyside6_datas
     print(f"[SPEC] PySide6 collected: {len(_pyside6_datas)} data entries")
 except Exception as _e:
-    _pyside6_bins    = []
-    _pyside6_hiddens = []
     print(f"[SPEC] WARNING: Could not auto-collect PySide6: {_e}")
+
+# ── wgpu (optional 3D preview backend, needs its native library) ─────────── #
+try:
+    import wgpu
+    _w_datas, _w_bins, _w_hiddens = collect_all('wgpu')
+    datas += _w_datas
+    _pyside6_bins = list(_pyside6_bins) + _w_bins
+    _pyside6_hiddens = list(_pyside6_hiddens) + _w_hiddens + ['cffi']
+except ImportError:
+    pass
 
 # ── certifi (SSL certificates used by requests) ────────────────────────────── #
 try:
@@ -202,7 +214,6 @@ a = Analysis(
         'tkinter',
         # Heavy scientific libs not needed
         'matplotlib',
-        'numpy',
         'pandas',
         'scipy',
         # Dev / test tools

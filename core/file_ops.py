@@ -17,6 +17,28 @@ from core.colorable_ops import (
 )
 
 try:
+    from core.config import is_variant_material, material_match_prefix
+except ImportError as _exc:
+    print(f"[WARNING] config helpers unavailable ({_exc}), using fallback")
+    def is_variant_material(base_carid, variant_suffix, mat_key):
+        return bool(variant_suffix) and mat_key.lower().startswith(
+            f"{variant_suffix.strip().lower()}.skin.")
+    def material_match_prefix(template_name):
+        return (template_name.split(".skin.")[0] + ".skin."
+                if ".skin." in template_name else f"{template_name}.skin.")
+
+_core_is_variant_material = is_variant_material
+
+
+def is_variant_material(base_carid, variant_suffix, mat_key):
+    if _core_is_variant_material(base_carid, variant_suffix, mat_key):
+        return True
+    if not variant_suffix:
+        return False
+    return bool(re.search(rf'\.skin_{re.escape(variant_suffix.strip())}', mat_key, re.IGNORECASE))
+
+
+try:
     from core.settings import get_vehicles_dir
 except ImportError as _exc:
     print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
@@ -424,10 +446,9 @@ def process_material_properties(skin_data, base_carid, skin_id, dest_skin_folder
 
             modified = False
             for template_name, stages in material_props.items():
-                prefix  = (template_name.split(".skin.")[0]
-                           if ".skin." in template_name else template_name)
+                lead    = material_match_prefix(template_name)
                 actual  = next(
-                    (k for k in mat_data if k.startswith(f"{prefix}.skin.")), None
+                    (k for k in mat_data if k.startswith(lead)), None
                 )
                 if not actual or "Stages" not in mat_data[actual]:
                     continue
@@ -468,7 +489,7 @@ def process_material_properties(skin_data, base_carid, skin_id, dest_skin_folder
 
 
 def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author,
-                        dds_prefix=None, carid=None):
+                        dds_prefix=None, carid=None, key_infix=""):
     if carid is None:
         carid = dds_prefix
 
@@ -489,9 +510,10 @@ def process_jbeam_files(folder_path, dds_identifier, skin_display_name, author,
             content = re.sub(r'("authors"\s*:\s*")[^"]*(")', rf'\g<1>{author}\g<2>', content)
             content = re.sub(r'("name"\s*:\s*")[^"]*(")', rf'\g<1>{skin_display_name}\g<2>', content)
             if dds_prefix:
+                infix_opt = rf'((?:{re.escape(key_infix)}_)?)' if key_infix else '()'
                 content = re.sub(
-                    rf'"({re.escape(dds_prefix)}_skin_)\w*"',
-                    rf'"\g<1>{dds_identifier}"',
+                    rf'"({re.escape(dds_prefix)}_skin_){infix_opt}\w*"',
+                    lambda m: f'"{m.group(1)}{m.group(2)}{dds_identifier}"',
                     content,
                     flags=re.IGNORECASE,
                 )
@@ -609,7 +631,7 @@ def process_json_files_variant_dds(
                     if len(stages) < 2 or not isinstance(stages[1], dict):
                         continue
 
-                    is_var   = mat_key.lower().startswith(var_prefix.lower())
+                    is_var   = is_variant_material(vehicle_id, variant_suffix, mat_key)
                     dds_path = var_dds_path if is_var else car_dds_path
                     label    = "variant body" if is_var else "car body"
 
@@ -670,7 +692,8 @@ def _generate_variant_dds_skin(
     print(f"[DEBUG] Copied car-body DDS  : {car_fn}")
     print(f"[DEBUG] Copied variant-body DDS: {var_fn}")
 
-    process_jbeam_files(dest_skin_folder, dds_identifier, skin["name"], author, dds_prefix=base_carid)
+    process_jbeam_files(dest_skin_folder, dds_identifier, skin["name"], author,
+                        dds_prefix=base_carid, key_infix=variant_suffix.lower())
 
     process_json_files_variant_dds(
         dest_skin_folder, base_carid, skin_folder,
@@ -1178,7 +1201,7 @@ def _inject_custom_layers(skin_data, base_carid, skin_folder, dest_skin_folder,
             if not isinstance(stages, list) or not stages:
                 continue
 
-            is_var_body = mat_key.lower().startswith(var_prefix.lower())
+            is_var_body = is_variant_material(base_carid, variant_suffix, mat_key)
             use_variant = is_var_body and is_variant
             body_key = "variant" if use_variant else "body"
             label     = "variant body" if use_variant else "body"
@@ -1557,6 +1580,7 @@ def generate_multi_skin_mod(project_data, output_path=None, progress_callback=No
                         process_jbeam_files(
                             dest_skin_folder, dds_identifier, skin_name, author,
                             dds_prefix=dds_prefix, carid=base_carid,
+                            key_infix=(variant_suffix.lower() if is_variant and not is_rebadge else ""),
                         )
                         process_json_files(
                             dest_skin_folder, base_carid, skin_folder,

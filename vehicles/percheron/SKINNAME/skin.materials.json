@@ -1,0 +1,71 @@
+{
+  "percheron_body.skin.skinname": {
+    "name": "percheron_body.skin.skinname",
+    "mapTo": "percheron_body.skin.skinname",
+    "class": "Material",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/vehicles/percheron/percheron_body_ao.data.png",
+        "baseColorMap": "/vehicles/percheron/percheron_body_b.color.png",
+        "detailNormalMapStrength": 0.07,
+        "metallicFactor": 0,
+        "metallicMap": "/vehicles/percheron/percheron_body_m.data.png",
+        "normalMap": "/vehicles/percheron/percheron_body_nm.normal.png",
+        "roughnessMap": "/vehicles/percheron/percheron_body_r.data.png",
+        "roughnessFactor": 0.15
+      },
+      {
+        "ambientOcclusionMap": "/vehicles/percheron/percheron_body_ao.data.png",
+        "baseColorMap": "/vehicles/percheron/skinname/percheron_skin_skinname.dds",
+        "clearCoatFactor": 1,
+        "clearCoatMap": "/vehicles/percheron/percheron_body_clear_coat.data.png",
+        "clearCoatRoughnessFactor": 0.05,
+        "diffuseMapUseUV": 1,
+        "metallicFactor": 0,
+        "normalMap": "/vehicles/percheron/percheron_body_nm.normal.png",
+        "opacityMap": "/vehicles/percheron/percheron_body_c.data.png",
+        "roughnessFactor": 0.15
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  },
+  "percheron_body_paint.skin.skinname": {
+    "name": "percheron_body_paint.skin.skinname",
+    "mapTo": "percheron_body_paint.skin.skinname",
+    "class": "Material",
+    "Stages": [
+      {
+        "detailNormalMapStrength": 0.07,
+        "metallicFactor": 0,
+        "roughnessFactor": 0.15,
+        "normalMap": "/vehicles/percheron/percheron_body_paint_nm.normal.png"
+      },
+      {
+        "baseColorMap": "/vehicles/percheron/skinname/percheron_skin_skinname.dds",
+        "clearCoatFactor": 1,
+        "clearCoatMap": "/vehicles/percheron/percheron_body_paint_clear_coat.data.png",
+        "clearCoatRoughnessFactor": 0.05,
+        "diffuseMapUseUV": 1,
+        "detailNormalMap": "/vehicles/common/orange_peel_n.normal.png",
+        "detailNormalMapStrength": 0.3,
+        "detailScale": [
+          128,
+          64
+        ],
+        "normalDetailMapUseUV": 1,
+        "metallicFactor": 0,
+        "normalMap": "/vehicles/percheron/percheron_body_paint_nm.normal.png",
+        "roughnessFactor": 0.15
+      }
+    ],
+    "activeLayers": 2,
+    "dynamicCubemap": true,
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "version": 1.5
+  }
+}

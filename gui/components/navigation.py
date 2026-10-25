@@ -42,6 +42,13 @@ def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
         def is_rebadge_suffix(_c, _s):
             return False
 
+    try:
+        from core.config import get_variant_label
+    except ImportError as _exc:
+        print(f"[WARNING] _get_vehicle_variants: {type(_exc).__name__}: {_exc}")
+        def get_variant_label(_c, _s, default):
+            return default
+
     bundled_dir = os.path.join(get_bundle_path(), "vehicles", carid)
     local_dir   = os.path.join(get_vehicles_dir(), carid)
     vehicles_dir = bundled_dir if os.path.isdir(bundled_dir) else local_dir
@@ -55,12 +62,12 @@ def _get_vehicle_variants(carid: str) -> List[Tuple[str, str]]:
             continue
         dl = entry.lower()
         if dl == "skinname":
-            variants.append(("", "Normal"))
+            variants.append(("", get_variant_label(carid, "", "Normal")))
         elif dl.startswith("skinname"):
             suffix = dl[len("skinname"):]
             if is_rebadge_suffix(carid, suffix):
                 continue
-            variants.append((suffix, suffix.capitalize()))
+            variants.append((suffix, get_variant_label(carid, suffix, suffix.capitalize())))
 
     if not variants:
         return [("", "Normal")]
@@ -337,6 +344,7 @@ class Topbar(QFrame):
             (t("menu.generator"),    "generator"),
             (t("menu.HowToTab"),     "howto"),
             (t("menu.carlist"),      "carlist"),
+            (t("menu.uv_exporter", default="UV Exporter"), "uv_exporter"),
             (t("menu.add_vehicles"), "add_vehicles"),
             (t("menu.settings"),     "settings"),
             (t("menu.about"),        "about"),
@@ -1009,11 +1017,6 @@ class Sidebar(QFrame):
             os.path.join(get_vehicle_previews_dir(), carid, img_name),
             os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid, img_name),
         ]
-        if variant_suffix:
-            candidates += [
-                os.path.join(get_vehicle_previews_dir(), carid, "default.jpg"),
-                os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid, "default.jpg"),
-            ]
 
         img_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
 
@@ -1144,38 +1147,42 @@ class Sidebar(QFrame):
 
 
     def refresh_ui(self, populate_callback: Optional[Callable] = None):
-        if populate_callback:
-            self._populate_callback = populate_callback
+        self.setUpdatesEnabled(False)
         try:
-            self._mod_name_text = self.get_mod_name()
-            self._author_text   = self.get_author()
-        except Exception as _exc:
-            print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
-        try:
-            self.unpacked = self._unpacked_toggle.isChecked()
-        except Exception as _exc:
-            print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
+            if populate_callback:
+                self._populate_callback = populate_callback
+            try:
+                self._mod_name_text = self.get_mod_name()
+                self._author_text   = self.get_author()
+            except Exception as _exc:
+                print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
+            try:
+                self.unpacked = self._unpacked_toggle.isChecked()
+            except Exception as _exc:
+                print(f"[WARNING] refresh_ui: {type(_exc).__name__}: {_exc}")
 
-        old = self.layout()
-        if old is not None:
-            while old.count():
-                item = old.takeAt(0)
-                w = item.widget()
-                if w:
-                    w.hide()
-                    w.setParent(None)
-                    w.deleteLater()
-            _tmp = QWidget()
-            _tmp.setAttribute(Qt.WA_DontShowOnScreen, True)
-            _tmp.setLayout(old)
-            _tmp.deleteLater()
+            old = self.layout()
+            if old is not None:
+                while old.count():
+                    item = old.takeAt(0)
+                    w = item.widget()
+                    if w:
+                        w.hide()
+                        w.setParent(None)
+                        w.deleteLater()
+                _tmp = QWidget()
+                _tmp.setAttribute(Qt.WA_DontShowOnScreen, True)
+                _tmp.setLayout(old)
+                _tmp.deleteLater()
 
-        self._vehicle_cards       = []
-        self._variant_expanders   = {}
-        self._build()
-        self._apply_content_width()
-        if self._populate_callback:
-            self.populate_vehicles(self._populate_callback)
+            self._vehicle_cards       = []
+            self._variant_expanders   = {}
+            self._build()
+            self._apply_content_width()
+            if self._populate_callback:
+                self.populate_vehicles(self._populate_callback)
+        finally:
+            self.setUpdatesEnabled(True)
 
 
 def _radio_qss() -> str:

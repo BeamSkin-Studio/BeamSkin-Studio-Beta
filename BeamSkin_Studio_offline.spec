@@ -19,21 +19,34 @@ datas = [
     (os.path.join("gui", "images"),                        os.path.join("gui", "images")),
     (os.path.join("core", "localization", "languages"),    os.path.join("core", "localization", "languages")),
     (os.path.join("vehicles"),                              "vehicles"),
+    ("beamskin_studio_exporter_mod",                        "beamskin_studio_exporter_mod"),
     ("version.txt",                                         "."),
     ("LICENSE",                                              "."),
 ]
 
 datas = [d for d in datas if os.path.exists(d[0])]
 
+binaries = []
+extra_hidden = ["PySide6.QtOpenGL", "PySide6.QtOpenGLWidgets"]
+try:
+    import wgpu
+    from PyInstaller.utils.hooks import collect_all
+    _w_datas, _w_bins, _w_hiddens = collect_all("wgpu")
+    datas += _w_datas
+    binaries += _w_bins
+    extra_hidden += _w_hiddens + ["cffi"]
+except ImportError:
+    pass
+
 a = Analysis(
     ["main.py"],
     pathex=[PROJECT_ROOT],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=[
         "PySide6.QtSvg",
         "PySide6.QtNetwork",
-    ],
+    ] + extra_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=["pyi_rth_beamskin.py"],

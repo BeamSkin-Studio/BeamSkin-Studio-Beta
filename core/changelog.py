@@ -27,6 +27,33 @@ def separator() -> Entry:
 CHANGELOGS = [
 
     {
+        "version": "0.10.0.Beta",
+        "date": "25-10-2026",
+        "entries": [
+            title("🚀 New Features"),
+            subtitle("3D Model Preview"),
+            item("Preview any vehicle in a live 3D viewport before you paint it\nToggle individual body parts, save and load part presets, and see your skin applied to the model\nLoad BeamNG parts to show exactly the parts a spawned vehicle uses, using the new BeamNG exporter mod (install and update it from the new \"Exporter mod setup…\" button)"),
+            subtitle("UV Exporter"),
+            item("Generate UV paint templates straight from a vehicle's 3D model, now built into BeamSkin Studio\nAuto-select exterior body parts, search and filter mesh groups, and color-code by material or group\nLoad BeamNG parts to select only the exterior parts of your exact vehicle setup"),
+            separator(),
+            title("⚙️ Improvements"),
+            subtitle("Expanded UI Refresh"),
+            item("The improved UI now covers much more of the app, so dialogs, popups and tools share the same look\nThe exporter mod dialog explains what the mod is, shows its install status and walks you through exporting\nThe exporter mod dialog and its setup buttons are fully translated into every supported language"),
+            subtitle("Vehicle Images"),
+            item("Updated all vehicle preview images to match the new models from the 0.40 update"),
+            separator(),
+            title("🚗 New Vehicles!"),
+            subtitle("Added Vehicles:"),
+            item("Added the Cherrier Percheron truck, with Normal and Box body variants"),
+            item("Added the FPU Box Trailer, with 3-Axle Semi and 2-Axle Drawbar variants"),
+            separator(),
+            title("📝 Notes"),
+            note("The 3D preview and UV exporter can read BeamNG's live parts through the BeamSkin Studio exporter mod. You only need it for \"Load BeamNG parts\"; everything else works without it."),
+        ]
+    },
+
+
+    {
         "version": "0.9.55.Beta",
         "date": "26-09-2026",
         "entries": [

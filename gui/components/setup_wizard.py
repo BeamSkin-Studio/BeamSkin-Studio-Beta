@@ -4,24 +4,25 @@ import sys
 import platform
 from typing import Callable
 
-from PySide6.QtCore    import Qt, Signal
+from PySide6.QtCore    import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QWidget, QLineEdit, QFileDialog, QApplication,
-    QStackedWidget,
+    QVBoxLayout, QHBoxLayout, QLabel, QFrame, QWidget, QLineEdit,
+    QFileDialog, QApplication, QStackedWidget,
 )
 from PySide6.QtGui import QPixmap
 
-from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import AnimButton, GhostButton, HSeparator
-from gui.icon_helper import set_window_icon
+from gui.theme import COLORS, font
+from gui.components.dialog_kit import (
+    DialogShell, LanguageRow, StatusLabel, make_panel, make_scroll,
+    body_label, primary_button, outline_button, input_qss, lbl_qss, divider,
+)
 
 try:
     from core.localization import t, set_language, get_available_languages
 except ImportError as _exc:
-    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    print(f"[DEBUG] setup_wizard.py: import failed ({_exc}), using fallback")
     def t(key, **kw):
-        return key
+        return kw.get("default", key)
     def set_language(lang):
         return True
     def get_available_languages():
@@ -30,7 +31,7 @@ except ImportError as _exc:
 try:
     from core.settings import get_bundle_path, get_data_dir, set_data_dir
 except ImportError as _exc:
-    print(f"[DEBUG] _pipe_tmp.py: import failed ({_exc}), using fallback")
+    print(f"[DEBUG] setup_wizard.py: import failed ({_exc}), using fallback")
     def get_bundle_path():
         return os.getcwd()
     def get_data_dir():
@@ -38,87 +39,20 @@ except ImportError as _exc:
     def set_data_dir(new_dir, migrate=True):
         return True
 
-
-class _LangRow(QFrame):
-    selected = Signal(str)
-
-    def __init__(self, code: str, info: dict, is_selected: bool, parent=None):
-        super().__init__(parent)
-        self.code = code
-        self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(60)
-        self._apply(is_selected)
-
-        row = QHBoxLayout(self)
-        row.setContentsMargins(14, 8, 14, 8)
-        row.setSpacing(12)
-
-        flag = QLabel(info.get("flag", "🌐"))
-        flag.setFont(font(24))
-        flag.setStyleSheet("background:transparent;border:none;")
-        row.addWidget(flag)
-
-        names = QVBoxLayout()
-        names.setSpacing(1)
-        native = QLabel(info.get("native", info.get("name", code)))
-        native.setFont(font(14, "bold"))
-        tc = COLORS["accent_text"] if is_selected else COLORS["text"]
-        native.setStyleSheet(f"color:{tc};background:transparent;border:none;")
-        names.addWidget(native)
-
-        if info.get("native") and info.get("native") != info.get("name"):
-            eng = QLabel(info.get("name", ""))
-            eng.setFont(font(11))
-            tc2 = COLORS["accent_text"] if is_selected else COLORS["text_secondary"]
-            eng.setStyleSheet(f"color:{tc2};background:transparent;border:none;")
-            names.addWidget(eng)
-
-        row.addLayout(names, 1)
-
-        if is_selected:
-            chk = QLabel("✓")
-            chk.setFont(font(18, "bold"))
-            chk.setStyleSheet(
-                f"color:{COLORS['accent_text']};background:transparent;border:none;"
-            )
-            row.addWidget(chk)
-
-    def _apply(self, active: bool):
-        if active:
-            self.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['accent']};
-                    border-radius: 10px;
-                    border: none;
-                }}
-            """)
-        else:
-            self.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLORS['card_bg']};
-                    border-radius: 10px;
-                    border: 1px solid {COLORS['border']};
-                }}
-                QFrame:hover {{
-                    background-color: {COLORS['card_hover']};
-                    border-color: {COLORS['accent']};
-                }}
-            """)
-
-    def mousePressEvent(self, _event):
-        self.selected.emit(self.code)
+_LangRow = LanguageRow
 
 
-class SetupWizard(QDialog):
+class SetupWizard(DialogShell):
     def __init__(self, parent: QWidget, colors: dict,
                  on_complete: Callable[[dict], None]):
-        super().__init__(parent, Qt.FramelessWindowHint | Qt.Dialog)
-        set_window_icon(self)
-        self.setModal(True)
-        self.setFixedSize(860, 760)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setStyleSheet("background:transparent;")
-
+        super().__init__(
+            parent,
+            t("setup_wizard.title", default="Welcome to BeamSkin Studio"),
+            780, 720,
+            subtitle="1 / 2",
+            escape_closes=False,
+            body_margins=(0, 0, 0, 0),
+        )
         self.colors      = colors
         self.on_complete = on_complete
         self.paths       = {
@@ -126,140 +60,69 @@ class SetupWizard(QDialog):
             "mods_folder":    "",
             "data_folder":    get_data_dir(),
         }
-        self._selected_lang = "en"
+        self._selected_lang  = "en"
         self._setup_finished = False
 
-        if parent:
-            pg = parent.frameGeometry()
-            self.move(pg.x() + (pg.width() - 860) // 2,
-                      pg.y() + (pg.height() - 760) // 2)
-        else:
-            sg = QApplication.primaryScreen().geometry()
-            self.move((sg.width() - 860) // 2, (sg.height() - 760) // 2)
-
-        self._build()
-        fade_in(self._card, 220)
-
-
-    def _build(self):
-        self._card = QFrame(self)
-        self._card.setObjectName("wizardCard")
-        self._card.setGeometry(0, 0, 860, 760)
-        self._card.setStyleSheet(f"""
-            #wizardCard {{
-                background-color: {COLORS['frame_bg']};
-                border-radius: 20px;
-                border: 1px solid {COLORS['border']};
-            }}
-        """)
-        drop_shadow(self._card, 36, (0, 10))
-
-        root = QVBoxLayout(self._card)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
-
         self._stack = QStackedWidget()
-        root.addWidget(self._stack, 1)
-
+        self._stack.setStyleSheet("background:transparent;")
         self._page_lang  = self._build_language_page()
         self._page_paths = self._build_paths_page()
         self._stack.addWidget(self._page_lang)
         self._stack.addWidget(self._page_paths)
         self._stack.setCurrentIndex(0)
+        self.body.addWidget(self._stack, 1)
 
-
-    def _build_language_page(self) -> QWidget:
+    def _page_shell(self):
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         col = QVBoxLayout(page)
-        col.setContentsMargins(36, 28, 36, 28)
-        col.setSpacing(16)
+        col.setContentsMargins(26, 20, 26, 22)
+        col.setSpacing(14)
+        return page, col
 
-        hdr = QVBoxLayout()
-        hdr.setSpacing(6)
+    def _build_language_page(self) -> QWidget:
+        page, col = self._page_shell()
 
+        hdr = QHBoxLayout()
+        hdr.setSpacing(14)
         logo_path = os.path.join(get_bundle_path(), "gui", "Icons", "BeamSkin_Studio_White.png")
         if os.path.exists(logo_path):
             logo_lbl = QLabel()
-            px = QPixmap(logo_path).scaled(
-                80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            logo_lbl.setPixmap(px)
-            logo_lbl.setAlignment(Qt.AlignCenter)
+            logo_lbl.setPixmap(QPixmap(logo_path).scaled(
+                56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             logo_lbl.setStyleSheet("background:transparent;border:none;")
             hdr.addWidget(logo_lbl)
-        else:
-            globe = QLabel("🌍")
-            globe.setFont(font(48))
-            globe.setAlignment(Qt.AlignCenter)
-            globe.setStyleSheet("background:transparent;border:none;")
-            hdr.addWidget(globe)
-
-        title = QLabel(t("setup_wizard.title"))
-        title.setFont(font(22, "bold"))
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
-        hdr.addWidget(title)
-        self._welcome_title = title
-
-        sub = QLabel(t("language_selection.selection"))
-        sub.setFont(font(13))
-        sub.setAlignment(Qt.AlignCenter)
-        sub.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
-        )
-        hdr.addWidget(sub)
-        self._welcome_sub = sub
+        txt = QVBoxLayout()
+        txt.setSpacing(2)
+        self._welcome_title = QLabel(t("setup_wizard.title"))
+        self._welcome_title.setFont(font(18, "bold"))
+        self._welcome_title.setStyleSheet(lbl_qss())
+        txt.addWidget(self._welcome_title)
+        self._welcome_sub = body_label(t("language_selection.selection"), size=12)
+        txt.addWidget(self._welcome_sub)
+        hdr.addLayout(txt, 1)
         col.addLayout(hdr)
 
         self._lang_search = QLineEdit()
-        self._lang_search.setPlaceholderText(
-            "🔍  " + t("language_selection.search")
-        )
+        self._lang_search.setPlaceholderText("🔍  " + t("language_selection.search"))
         self._lang_search.setMinimumHeight(38)
-        self._lang_search.setFont(font(13))
-        self._lang_search.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:1px solid {COLORS['border']};
-                border-radius:8px;
-                padding:6px 12px;
-                font-size:13px;
-            }}
-            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
-        """)
+        self._lang_search.setFont(font(12))
+        self._lang_search.setClearButtonEnabled(True)
+        self._lang_search.setStyleSheet(input_qss())
         self._lang_search.textChanged.connect(self._filter_languages)
         col.addWidget(self._lang_search)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{ background:transparent; border:none; }}
-            QScrollArea > QWidget > QWidget {{ background:transparent; }}
-        """)
         self._lang_list_widget = QWidget()
-        self._lang_list_widget.setStyleSheet("background:transparent;")
         self._lang_list_layout = QVBoxLayout(self._lang_list_widget)
-        self._lang_list_layout.setContentsMargins(2, 2, 2, 2)
-        self._lang_list_layout.setSpacing(5)
-        scroll.setWidget(self._lang_list_widget)
-        col.addWidget(scroll, 1)
-
+        self._lang_list_layout.setContentsMargins(0, 0, 4, 0)
+        self._lang_list_layout.setSpacing(6)
+        col.addWidget(make_scroll(self._lang_list_widget), 1)
         self._populate_languages("")
 
-        col.addWidget(HSeparator())
-        next_btn = AnimButton(
-            t("language_selection.continue"),
-            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
-            font_size=14, bold=True, padding="12px 32px",
-        )
-        next_btn.setMinimumHeight(46)
-        next_btn.clicked.connect(self._go_to_paths)
-        col.addWidget(next_btn)
-        self._next_btn = next_btn
-
+        col.addWidget(divider())
+        self._next_btn = primary_button(t("language_selection.continue"), height=44, font_size=14)
+        self._next_btn.clicked.connect(self._go_to_paths)
+        col.addWidget(self._next_btn)
         return page
 
     def _populate_languages(self, query: str):
@@ -268,19 +131,15 @@ class SetupWizard(QDialog):
             if item.widget():
                 item.widget().deleteLater()
 
-        langs = get_available_languages()
         q = query.strip().lower()
-        for code, info in sorted(langs.items(),
-                                  key=lambda x: x[1].get("name", x[0])):
-            if q and not any(
-                q in s.lower()
-                for s in (info.get("native", ""), info.get("name", ""), code)
-            ):
+        for code, info in sorted(get_available_languages().items(),
+                                 key=lambda x: x[1].get("name", x[0])):
+            if q and not any(q in s.lower()
+                             for s in (info.get("native", ""), info.get("name", ""), code)):
                 continue
-            row = _LangRow(code, info, code == self._selected_lang)
+            row = LanguageRow(code, info, code == self._selected_lang)
             row.selected.connect(self._on_lang_selected)
             self._lang_list_layout.addWidget(row)
-
         self._lang_list_layout.addStretch()
 
     def _filter_languages(self, text: str):
@@ -294,11 +153,10 @@ class SetupWizard(QDialog):
         self._refresh_texts()
 
     def _refresh_texts(self):
+        self.set_title(t("setup_wizard.title"))
         self._welcome_title.setText(t("setup_wizard.title"))
         self._welcome_sub.setText(t("language_selection.selection"))
-        self._lang_search.setPlaceholderText(
-            "🔍  " + t("language_selection.search")
-        )
+        self._lang_search.setPlaceholderText("🔍  " + t("language_selection.search"))
         self._next_btn.setText(t("language_selection.continue"))
 
         self._paths_title_lbl.setText(t("setup_wizard.paths_title"))
@@ -306,16 +164,12 @@ class SetupWizard(QDialog):
         self._back_btn.setText("←  " + t("common.back"))
         self._finish_btn.setText("✓  " + t("common.finish"))
 
-        self._beamng_hdr_lbl.setText(
-            f"{self._beamng_number}.  " + t("setup_wizard.beamng_install")
-        )
+        self._beamng_hdr_lbl.setText(t("setup_wizard.beamng_install"))
         self._beamng_desc_lbl.setText(t("setup_wizard.beamng_description"))
         self._beamng_entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
         self._beamng_browse_btn.setText(t("common.browse"))
 
-        self._mods_hdr_lbl.setText(
-            f"{self._mods_number}.  " + t("setup_wizard.mods_folder")
-        )
+        self._mods_hdr_lbl.setText(t("setup_wizard.mods_folder"))
         self._mods_desc_lbl.setText(t("setup_wizard.mods_description"))
         self._mods_entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
         self._mods_browse_btn.setText(t("common.browse"))
@@ -328,66 +182,39 @@ class SetupWizard(QDialog):
             save_settings()
         except Exception as _exc:
             print(f"[WARNING] _go_to_paths: {type(_exc).__name__}: {_exc}")
-        self._stack.setCurrentIndex(1)
+        self._goto(1)
         self._refresh_texts()
 
+    def _goto(self, index: int):
+        self._stack.setCurrentIndex(index)
+        self.set_subtitle(f"{index + 1} / 2")
 
     def _build_paths_page(self) -> QWidget:
-        page = QWidget()
-        page.setStyleSheet("background:transparent;")
-        col = QVBoxLayout(page)
-        col.setContentsMargins(36, 28, 36, 28)
-        col.setSpacing(16)
+        page, col = self._page_shell()
 
-        hdr_lbl = QLabel(t("setup_wizard.paths_title"))
-        hdr_lbl.setFont(font(20, "bold"))
-        hdr_lbl.setAlignment(Qt.AlignCenter)
-        hdr_lbl.setStyleSheet(
-            f"color:{COLORS['text']};background:transparent;border:none;"
-        )
-        col.addWidget(hdr_lbl)
-        self._paths_title_lbl = hdr_lbl
+        self._paths_title_lbl = QLabel(t("setup_wizard.paths_title"))
+        self._paths_title_lbl.setFont(font(18, "bold"))
+        self._paths_title_lbl.setStyleSheet(lbl_qss())
+        col.addWidget(self._paths_title_lbl)
 
-        sub_lbl = QLabel(t("setup_wizard.paths_desc"))
-        sub_lbl.setFont(font(13))
-        sub_lbl.setAlignment(Qt.AlignCenter)
-        sub_lbl.setWordWrap(True)
-        sub_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
-        )
-        col.addWidget(sub_lbl)
-        self._paths_sub_lbl = sub_lbl
-        col.addWidget(HSeparator())
+        self._paths_sub_lbl = body_label(t("setup_wizard.paths_desc"), size=12)
+        col.addWidget(self._paths_sub_lbl)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{ background:transparent; border:none; }}
-            QScrollArea > QWidget > QWidget {{ background:transparent; }}
-        """)
         inner = QWidget()
-        inner.setStyleSheet("background:transparent;")
         inner_col = QVBoxLayout(inner)
-        inner_col.setContentsMargins(0, 0, 0, 0)
-        inner_col.setSpacing(14)
+        inner_col.setContentsMargins(0, 0, 4, 0)
+        inner_col.setSpacing(12)
 
         inner_col.addWidget(self._path_section(
-            number="1",
-            title=t("setup_wizard.beamng_install"),
+            number="1", title=t("setup_wizard.beamng_install"),
             desc=t("setup_wizard.beamng_description"),
-            attr="beamng",
-            browse_cb=self._browse_beamng,
+            attr="beamng", browse_cb=self._browse_beamng,
         ))
-
         inner_col.addWidget(self._path_section(
-            number="2",
-            title=t("setup_wizard.mods_folder"),
+            number="2", title=t("setup_wizard.mods_folder"),
             desc=t("setup_wizard.mods_description"),
-            attr="mods",
-            browse_cb=self._browse_mods,
+            attr="mods", browse_cb=self._browse_mods,
         ))
-
         data_section = self._path_section(
             number="3",
             title=t("setup_wizard.data_folder", default="BeamSkin Studio Data Folder"),
@@ -397,111 +224,71 @@ class SetupWizard(QDialog):
                         "The default location works for most people — only change this "
                         "if you want your data on a different drive.",
             ),
-            attr="data",
-            browse_cb=self._browse_data,
+            attr="data", browse_cb=self._browse_data,
         )
         self._data_entry.setReadOnly(False)
         self._data_entry.setText(self.paths["data_folder"])
         inner_col.addWidget(data_section)
-
         inner_col.addStretch()
-        scroll.setWidget(inner)
-        col.addWidget(scroll, 1)
+        col.addWidget(make_scroll(inner), 1)
 
-        col.addWidget(HSeparator())
+        col.addWidget(divider())
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(12)
+        btn_row.setSpacing(10)
 
-        back_btn = GhostButton(
-            "←  " + t("common.back"),
-            font_size=13,
-        )
-        back_btn.setMinimumHeight(44)
-        back_btn.clicked.connect(lambda: self._stack.setCurrentIndex(0))
-        btn_row.addWidget(back_btn, 1)
-        self._back_btn = back_btn
+        self._back_btn = outline_button("←  " + t("common.back"), height=44)
+        self._back_btn.clicked.connect(lambda: self._goto(0))
+        btn_row.addWidget(self._back_btn, 1)
 
-        finish_btn = AnimButton(
-            "✓  " + t("common.finish"),
-            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
-            font_size=13, bold=True, padding="12px 32px",
-        )
-        finish_btn.setMinimumHeight(44)
-        finish_btn.setEnabled(False)
-        finish_btn.clicked.connect(self._on_finish)
-        btn_row.addWidget(finish_btn, 1)
-        self._finish_btn = finish_btn
+        self._finish_btn = primary_button("✓  " + t("common.finish"), height=44, font_size=14)
+        self._finish_btn.setEnabled(False)
+        self._finish_btn.clicked.connect(self._on_finish)
+        btn_row.addWidget(self._finish_btn, 2)
         col.addLayout(btn_row)
-
         return page
 
-    def _path_section(
-        self,
-        number: str,
-        title: str,
-        desc: str,
-        attr: str,
-        browse_cb: Callable,
-    ) -> QFrame:
-        card = QFrame()
-        card.setObjectName("pathSectionCard")
-        card.setStyleSheet(f"""
-            #pathSectionCard {{
-                background-color: {COLORS['card_bg']};
-                border-radius: 12px;
-                border: 1px solid {COLORS['border']};
+    def _path_section(self, number: str, title: str, desc: str, attr: str,
+                      browse_cb: Callable) -> QFrame:
+        card, inner = make_panel(f"pathSection_{attr}", margins=(16, 14, 16, 14), spacing=8)
+
+        top = QHBoxLayout()
+        top.setSpacing(10)
+        step = QLabel(number)
+        step.setFixedSize(22, 22)
+        step.setAlignment(Qt.AlignCenter)
+        step.setFont(font(10, "bold"))
+        step.setStyleSheet(f"""
+            QLabel {{
+                background:{COLORS['accent']}; color:{COLORS['accent_text']};
+                border:none; border-radius:6px;
             }}
         """)
-        inner = QVBoxLayout(card)
-        inner.setContentsMargins(20, 16, 20, 16)
-        inner.setSpacing(8)
+        top.addWidget(step)
+        hdr = QLabel(title)
+        hdr.setFont(font(13, "bold"))
+        hdr.setStyleSheet(lbl_qss())
+        top.addWidget(hdr, 1)
+        inner.addLayout(top)
 
-        hdr = QLabel(f"{number}.  {title}")
-        hdr.setFont(font(14, "bold"))
-        hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
-        inner.addWidget(hdr)
-
-        d_lbl = QLabel(desc)
-        d_lbl.setFont(font(12))
-        d_lbl.setWordWrap(True)
-        d_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
-        )
+        d_lbl = body_label(desc, size=11)
         inner.addWidget(d_lbl)
 
         entry_row = QHBoxLayout()
         entry_row.setSpacing(8)
-
         entry = QLineEdit()
         entry.setReadOnly(True)
         entry.setMinimumHeight(36)
         entry.setFont(font(12))
         entry.setPlaceholderText(t("setup_wizard.no_path_selected"))
-        entry.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:1px solid {COLORS['border']};
-                border-radius:7px;
-                padding:4px 10px;
-                font-size:12px;
-            }}
-        """)
+        entry.setStyleSheet(input_qss())
         entry_row.addWidget(entry, 1)
 
-        browse_btn = AnimButton(
-            t("common.browse"),
-            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
-            font_size=12, bold=True, padding="6px 14px",
-        )
-        browse_btn.setFixedHeight(36)
+        browse_btn = outline_button(t("common.browse"), height=36, font_size=12)
         browse_btn.clicked.connect(browse_cb)
         entry_row.addWidget(browse_btn)
         inner.addLayout(entry_row)
 
-        status = QLabel("")
-        status.setFont(font(11))
-        status.setStyleSheet("background:transparent;border:none;")
+        status = StatusLabel()
         inner.addWidget(status)
 
         setattr(self, f"_{attr}_entry",      entry)
@@ -511,7 +298,6 @@ class SetupWizard(QDialog):
         setattr(self, f"_{attr}_browse_btn", browse_btn)
         setattr(self, f"_{attr}_number",     number)
         return card
-
 
     def _browse_beamng(self):
         init = self.paths.get("beamng_install") or ""
@@ -642,11 +428,6 @@ class SetupWizard(QDialog):
         self._setup_finished = True
         self.on_complete(self.paths)
         self.accept()
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            return
-        super().keyPressEvent(event)
 
     def closeEvent(self, event):
         if self._setup_finished:

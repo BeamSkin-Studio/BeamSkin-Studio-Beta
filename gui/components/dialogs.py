@@ -2,14 +2,15 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from PySide6.QtCore    import Qt, QTimer
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QFrame, QWidget, QCheckBox,
-    QPushButton, QScrollArea,
-)
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QLabel, QWidget
 
 from gui.theme   import COLORS, font
 from gui.widgets import Toast
-from gui.icon_helper import set_window_icon
+from gui.components.dialog_kit import (
+    DialogShell, make_panel, make_scroll, make_checkbox, primary_button,
+    lbl_qss,
+)
 
 try:
     from core.localization import t
@@ -88,60 +89,18 @@ def show_wip_warning(parent: QWidget) -> None:
     if not first_launch:
         return
 
-    dlg = QDialog(parent)
-    dlg.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
-    dlg.setModal(True)
-    dlg.setFixedWidth(560)
-    dlg.setStyleSheet(f"""
-        QDialog {{
-            background: {COLORS['frame_bg']};
-            border: 1px solid {COLORS['border']};
-            border-radius: 14px;
-        }}
-    """)
+    dlg = DialogShell(
+        parent,
+        t("wip.wip_warning_title", default="Work-In-Progress Software"),
+        560, icon="⚠️",
+        accent=COLORS.get("warning", COLORS["accent"]),
+        escape_closes=False,
+    )
 
-    root = QVBoxLayout(dlg)
-    root.setContentsMargins(24, 24, 24, 24)
-    root.setSpacing(16)
-
-    icon_lbl = QLabel("⚠️")
-    icon_lbl.setFont(font(42))
-    icon_lbl.setAlignment(Qt.AlignCenter)
-    icon_lbl.setStyleSheet("background: transparent; border: none;")
-    root.addWidget(icon_lbl)
-
-    title_text = t("wip.wip_warning_title", default="Work-In-Progress Software")
-    title_lbl = QLabel(title_text)
-    title_lbl.setFont(font(18, "bold"))
-    title_lbl.setAlignment(Qt.AlignCenter)
-    title_lbl.setStyleSheet(f"color: {COLORS['text']}; background: transparent; border: none;")
-    root.addWidget(title_lbl)
-
-    card = QFrame()
-    card.setStyleSheet(f"""
-        QFrame {{
-            background: {COLORS['card_bg']};
-            border-radius: 12px;
-            border: 1px solid {COLORS['border']};
-        }}
-    """)
-    card_lay = QVBoxLayout(card)
-    card_lay.setContentsMargins(20, 16, 20, 16)
-
-    scroll = QScrollArea()
-    scroll.setWidget(card)
-    scroll.setWidgetResizable(True)
-    scroll.setFixedHeight(300)
-    scroll.setStyleSheet("""
-        QScrollArea { border: none; background: transparent; }
-        QScrollBar:vertical {
-            background: transparent; width: 6px; margin: 0;
-        }
-        QScrollBar::handle:vertical {
-            background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 20px;
-        }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-    """)
+    panel, p_lay = make_panel("wipPanel", margins=(0, 0, 0, 0), spacing=0)
+    inner = QWidget()
+    inner_lay = QVBoxLayout(inner)
+    inner_lay.setContentsMargins(18, 14, 18, 14)
 
     msg_text = t("wip.wip_warning_message", default=(
         "Welcome to BeamSkin Studio!\n"
@@ -159,58 +118,19 @@ def show_wip_warning(parent: QWidget) -> None:
         "to enhance BeamSkin Studio."
     ))
     msg_lbl = QLabel(msg_text)
-    msg_lbl.setFont(font(13))
+    msg_lbl.setFont(font(12))
     msg_lbl.setWordWrap(True)
     msg_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-    msg_lbl.setStyleSheet(
-        f"color: {COLORS['text']}; background: transparent; border: none; line-height: 1.5;"
-    )
-    card_lay.addWidget(msg_lbl)
-    root.addWidget(scroll)
+    msg_lbl.setStyleSheet(lbl_qss())
+    inner_lay.addWidget(msg_lbl)
 
-    chk_text = t("wip.wip_dont_show", default="Don't show this message again")
-    chk = QCheckBox(chk_text)
-    chk.setFont(font(12))
-    chk.setStyleSheet(f"""
-        QCheckBox {{
-            color: {COLORS['text_secondary']};
-            background: transparent;
-            spacing: 8px;
-        }}
-        QCheckBox::indicator {{
-            width: 16px; height: 16px;
-            border: 1px solid {COLORS['border']};
-            border-radius: 4px;
-            background: {COLORS['frame_bg']};
-        }}
-        QCheckBox::indicator:checked {{
-            background: {COLORS['accent']};
-            border-color: {COLORS['accent']};
-        }}
-    """)
-    root.addWidget(chk, alignment=Qt.AlignCenter)
+    scroll = make_scroll(inner)
+    scroll.setFixedHeight(280)
+    p_lay.addWidget(scroll)
+    dlg.body.addWidget(panel)
 
-    ok_btn = QPushButton(t("wip.wip_understand", default="I Understand"))
-    ok_btn.setFont(font(13, "bold"))
-    ok_btn.setFixedHeight(44)
-    ok_btn.setFixedWidth(200)
-    ok_btn.setCursor(Qt.PointingHandCursor)
-    ok_btn.setStyleSheet(f"""
-        QPushButton {{
-            background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 {COLORS['accent']},
-                stop:1 {COLORS.get('accent_hover', COLORS['accent'])});
-            color: white;
-            border: none;
-            border-radius: 10px;
-        }}
-        QPushButton:hover {{
-            background: {COLORS.get('accent_hover', COLORS['accent'])};
-        }}
-        QPushButton:pressed {{
-            background: {COLORS.get('accent_dim', COLORS['accent'])};
-        }}
-    """)
+    chk = make_checkbox(t("wip.wip_dont_show", default="Don't show this message again"))
+    dlg.body.addWidget(chk, alignment=Qt.AlignCenter)
 
     def _on_ok():
         if chk.isChecked():
@@ -223,18 +143,10 @@ def show_wip_warning(parent: QWidget) -> None:
                 print(f"[DEBUG] show_wip_warning: could not save first_launch setting: {e}")
         dlg.accept()
 
+    ok_btn = primary_button(t("wip.wip_understand", default="I Understand"), height=42, font_size=14)
     ok_btn.clicked.connect(_on_ok)
-    root.addWidget(ok_btn, alignment=Qt.AlignCenter)
-
-    dlg.keyPressEvent = lambda e: None
-
-    dlg.adjustSize()
-    set_window_icon(dlg)
-
-    if parent and parent.isVisible():
-        pg = parent.geometry()
-        x = pg.x() + (pg.width()  - dlg.width())  // 2
-        y = pg.y() + (pg.height() - dlg.height()) // 2
-        dlg.move(x, y)
+    dlg.footer.addWidget(ok_btn, 1)
+    dlg.add_footer()
+    ok_btn.setFocus()
 
     dlg.exec()

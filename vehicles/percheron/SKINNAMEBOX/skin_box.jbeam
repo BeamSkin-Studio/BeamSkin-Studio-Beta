@@ -1,0 +1,20 @@
+{
+"percheron_skin_skinname": {
+    "information":{
+        "authors":"Your Name Here",
+        "name":"Your Skin Name",
+        "value":0
+    },
+    "slotType" : "paint_design",
+    "globalSkin" : "skinname"
+  },
+"percheron_skin_box_skinname": {
+    "information":{
+        "authors":"Your Name Here",
+        "name":"Your Skin Name",
+        "value":0
+    },
+    "slotType" : "skin_boxTruck",
+    "skinName" : "skinname"
+  },
+}

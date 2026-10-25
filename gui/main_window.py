@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import traceback
 from typing import Dict, Optional
 
 from PySide6.QtCore import Qt, QTimer
@@ -24,8 +25,14 @@ except ImportError as _exc:
         return None
 
 
+def _short_reason(exc: BaseException) -> str:
+    tb = traceback.extract_tb(exc.__traceback__)
+    where = f" ({os.path.basename(tb[-1].filename)}, line {tb[-1].lineno})" if tb else ""
+    return f"{type(exc).__name__}: {exc}{where}"
+
+
 class OnlineUnavailableTab(QWidget):
-    def __init__(self, parent=None, **_):
+    def __init__(self, parent=None, error: str = "", **_):
         super().__init__(parent)
         self.setStyleSheet(f"background:{COLORS['app_bg']};")
         col = QVBoxLayout(self)
@@ -52,6 +59,19 @@ class OnlineUnavailableTab(QWidget):
         sub.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
         col.addWidget(sub)
 
+        if error:
+            col.addSpacing(10)
+            reason = QLabel(f"{t('online.load_error', default='Could not load the Online tab')}:\n{error}")
+            reason.setFont(font(11))
+            reason.setAlignment(Qt.AlignCenter)
+            reason.setWordWrap(True)
+            reason.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            reason.setMaximumWidth(760)
+            reason.setStyleSheet(
+                f"color:{COLORS.get('error', '#ff4444')};background:transparent;"
+            )
+            col.addWidget(reason, alignment=Qt.AlignCenter)
+
     def refresh_ui(self):
         pass
 
@@ -60,6 +80,7 @@ class BeamSkinStudioApp(QMainWindow):
     def __init__(self):
         super().__init__()
         QApplication.instance().setStyleSheet(APP_QSS)
+        self._apply_language_early()
 
         self.setWindowTitle("BeamSkin Studio")
         set_window_icon(self)
@@ -115,9 +136,10 @@ class BeamSkinStudioApp(QMainWindow):
         from gui.tabs.generator    import GeneratorTab
         from gui.tabs.howto        import HowToTab
         from gui.tabs.car_list     import CarListTab
-        from gui.tabs.add_vehicles import AddVehiclesTab
-        from gui.tabs.settings     import SettingsTab
+        from gui.tabs.add_vehicles_tab import AddVehiclesTab
+        from gui.tabs.settings_tab     import SettingsTab
         from gui.tabs.about        import AboutTab
+        from gui.tabs.uv_exporter  import UVExporterTab
 
         try:
             from gui.tabs.online_tab import OnlineTab as _OnlineTab
@@ -125,14 +147,16 @@ class BeamSkinStudioApp(QMainWindow):
             _online_kwargs = {"notification_callback": self.show_notification}
         except Exception as e:
             print(f"[WARN] Could not import OnlineTab: {e}")
+            traceback.print_exc()
             _online_cls    = OnlineUnavailableTab
-            _online_kwargs = {}
+            _online_kwargs = {"error": _short_reason(e)}
 
         tab_classes = {
             "generator":    (GeneratorTab,   {"preview_manager": self.preview_manager,
                                                "notification_callback": self.show_notification}),
             "howto":        (HowToTab,       {}),
             "carlist":      (CarListTab,     {}),
+            "uv_exporter":  (UVExporterTab,  {}),
             "add_vehicles": (AddVehiclesTab, {"notification_callback": self.show_notification,
                                                "refresh_vehicle_list_callback": self._refresh_vehicle_list}),
             "settings":     (SettingsTab,    {"notification_callback": self.show_notification}),
@@ -143,16 +167,17 @@ class BeamSkinStudioApp(QMainWindow):
         for name, (cls, kwargs) in tab_classes.items():
             try:
                 tab = cls(self, **kwargs)
-            except TypeError:
+            except TypeError as first_exc:
                 try:
                     tab = cls(self)
                 except Exception as e:
-                    print(f"[ERROR] Could not create tab '{name}': {e}")
-                    tab = OnlineUnavailableTab(self)
+                    print(f"[ERROR] Could not create tab '{name}': {first_exc!r}")
+                    traceback.print_exc()
+                    tab = OnlineUnavailableTab(self, error=_short_reason(first_exc))
             except Exception as e:
                 print(f"[ERROR] Could not create tab '{name}': {e}")
-                import traceback; traceback.print_exc()
-                tab = OnlineUnavailableTab(self)
+                traceback.print_exc()
+                tab = OnlineUnavailableTab(self, error=_short_reason(e))
 
             self.tabs[name] = tab
             self._stack.addWidget(tab)
@@ -254,17 +279,15 @@ class BeamSkinStudioApp(QMainWindow):
 
 
     def _post_init(self):
-        QTimer.singleShot(150, self._apply_startup_language)
+        pass
 
-    def _apply_startup_language(self):
+    def _apply_language_early(self):
         try:
             from core.localization import set_language
             from core.settings import app_settings
-            lang = app_settings.get("language", "en_US")
-            set_language(lang)
-            self._refresh_all_tabs()
+            set_language(app_settings.get("language", "en_US"))
         except Exception as e:
-            print(f"[ERROR] _apply_startup_language: {e}")
+            print(f"[ERROR] _apply_language_early: {e}")
 
     def _refresh_all_tabs(self):
         print("[DEBUG] _refresh_all_tabs: refreshing all tab UIs")

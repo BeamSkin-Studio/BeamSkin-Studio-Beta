@@ -120,6 +120,8 @@ if __name__ == "__main__":
     from PySide6.QtCore import Qt, QTimer
 
     app = QApplication(sys.argv)
+    app.setApplicationName("BeamSkin Studio")
+    app.setApplicationDisplayName("BeamSkin Studio")
     app.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

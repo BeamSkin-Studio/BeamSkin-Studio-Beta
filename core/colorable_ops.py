@@ -5,6 +5,17 @@ import json
 import re
 
 
+try:
+    from core.config import is_variant_material, material_match_prefix
+except ImportError as _exc:
+    print(f"[WARNING] config helpers unavailable ({_exc}), using fallback")
+    def is_variant_material(base_carid, variant_suffix, mat_key):
+        return bool(variant_suffix) and mat_key.lower().startswith(
+            f"{variant_suffix.strip().lower()}.skin.")
+    def material_match_prefix(template_name):
+        return (template_name.split(".skin.")[0] + ".skin."
+                if ".skin." in template_name else f"{template_name}.skin.")
+
 _copied_file_cache: dict[str, dict[str, str]] = {}
 
 
@@ -281,7 +292,7 @@ def _process_json_files_variant(
                     if not isinstance(stages, list):
                         continue
 
-                    is_var   = mat_key.lower().startswith(var_prefix.lower())
+                    is_var   = is_variant_material(vehicle_id, variant_suffix, mat_key)
                     d_path   = var_data_path    if is_var else car_data_path
                     p_path   = var_palette_path if is_var else car_palette_path
                     label    = "variant body" if is_var else "car body"
@@ -346,9 +357,8 @@ def _process_material_properties(folder_path, material_props, skin_id):
 
             modified = False
             for template_name, stages in material_props.items():
-                prefix = (template_name.split(".skin.")[0]
-                          if ".skin." in template_name else template_name)
-                actual = next((k for k in mat_data if k.startswith(f"{prefix}.skin.")), None)
+                lead   = material_match_prefix(template_name)
+                actual = next((k for k in mat_data if k.startswith(lead)), None)
                 if not actual or "Stages" not in mat_data[actual]:
                     continue
                 for stage_str, props in stages.items():

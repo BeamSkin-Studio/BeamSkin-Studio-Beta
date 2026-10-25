@@ -1,0 +1,11 @@
+{
+"eu_trailers_skin_skinname": {
+    "information":{
+        "authors":"Your Name Here",
+        "name":"Your Skin Name",
+        "value":0
+    },
+    "slotType" : "skin_box",
+    "skinName" : "skinname"
+  },
+}

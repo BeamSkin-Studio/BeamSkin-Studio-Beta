@@ -28,6 +28,28 @@ except ImportError as _exc:
         return os.getcwd()
 
 
+_IMG_EXTS = (".jpg", ".jpeg", ".png")
+
+
+def _find_variant_image(carid: str, variant_suffix: str) -> Optional[str]:
+    if not variant_suffix:
+        return None
+    suf = variant_suffix.strip().lower()
+    wanted = {suf, f"default_{suf}", f"default{suf}"}
+    dirs = (
+        os.path.join(get_vehicle_previews_dir(), carid),
+        os.path.join(get_bundle_path(), "gui", "images", "vehicles", carid),
+    )
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for fn in sorted(os.listdir(d)):
+            stem, ext = os.path.splitext(fn)
+            if ext.lower() in _IMG_EXTS and stem.lower() in wanted:
+                return os.path.join(d, fn)
+    return None
+
+
 class HoverPreviewManager:
     def __init__(self, app_widget: QWidget, preview_overlay: QFrame):
         self.app             = app_widget
@@ -38,8 +60,12 @@ class HoverPreviewManager:
 
 
     def show_hover_preview(self, carid: str, image_path: Optional[str] = None,
-                            display_name: Optional[str] = None) -> None:
-        print(f"[DEBUG] show_hover_preview: carid={carid!r} path={image_path!r} display_name={display_name!r}")
+                            display_name: Optional[str] = None,
+                            variant_suffix: str = "") -> None:
+        print(f"[DEBUG] show_hover_preview: carid={carid!r} path={image_path!r} "
+              f"display_name={display_name!r} variant_suffix={variant_suffix!r}")
+        if (not image_path or not os.path.exists(image_path)) and variant_suffix:
+            image_path = _find_variant_image(carid, variant_suffix)
         if not image_path or not os.path.exists(image_path):
             image_path = os.path.join(get_vehicle_previews_dir(), carid, "default.jpg")
         if not os.path.exists(image_path):
@@ -112,7 +138,7 @@ class HoverPreviewManager:
                 if len(self._preview_cache) > 32:
                     self._preview_cache.pop(next(iter(self._preview_cache)))
 
-            self.overlay.setFixedHeight(px.height() + 16 + 6 + header_height)
+        self.overlay.setFixedHeight(px.height() + 16 + 6 + header_height)
 
         img_lbl = QLabel()
         img_lbl.setPixmap(px)
@@ -177,7 +203,8 @@ class HoverPreviewManager:
             if self._current_key == key:
                 img  = get_image_path() if callable(get_image_path) else None
                 name = get_display_name() if callable(get_display_name) else None
-                self.show_hover_preview(carid, img, display_name=name)
+                self.show_hover_preview(carid, img, display_name=name,
+                                        variant_suffix=variant_suffix)
 
         self._timer = QTimer(self.app)
         self._timer.setSingleShot(True)

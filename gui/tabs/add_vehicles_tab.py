@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import os
@@ -6,14 +5,14 @@ import shutil
 from typing import Optional, List
 
 from PySide6.QtCore    import Qt, Signal, QTimer, QThread
+from PySide6.QtGui     import QFontMetrics
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QLineEdit, QCheckBox,
-    QVBoxLayout, QHBoxLayout, QScrollArea, QTabWidget,
-    QFileDialog,
+    QVBoxLayout, QHBoxLayout, QScrollArea, QStackedWidget,
+    QFileDialog, QGraphicsOpacityEffect,
 )
 
-from gui.theme   import COLORS, font, drop_shadow, fade_in
-from gui.widgets import GhostButton
+from gui.theme   import COLORS, font, fade_in
 from gui.state   import state
 
 try:
@@ -53,6 +52,12 @@ except Exception as _e:
     print(f"[ERROR] add_vehicles tab: mod_scanner import failed: "
           f"{type(_e).__name__}: {_e}")
     traceback.print_exc()
+
+try:
+    from core.uv_exporter import mod_locations as _mod_locations
+except Exception as _e:
+    print(f"[WARNING] add_vehicles tab: mod_locations unavailable ({type(_e).__name__}: {_e})")
+    _mod_locations = None
 
 try:
     from core.settings import (
@@ -99,74 +104,254 @@ def _copy_uv_maps_to_images(carid: str, uv_map_paths: list) -> None:
             print(f"[WARNING] _copy_uv_maps_to_images: could not copy {src}: {e}")
 
 
-def _mk_action_btn(text: str, color_key: str = "accent") -> QPushButton:
+def _muted() -> str:
+    return COLORS.get("text_muted", COLORS["text_secondary"])
+
+
+def _lbl_qss(color_key: str = "text") -> str:
+    return (
+        f"QLabel {{ color:{COLORS[color_key]}; background:transparent; border:none; }}"
+        f"QLabel:disabled {{ color:{_muted()}; }}"
+    )
+
+
+def _panel_qss(name: str, radius: int = 10) -> str:
+    return f"""
+        QFrame#{name} {{
+            background:{COLORS['card_bg']};
+            border:1px solid {COLORS['border']};
+            border-radius:{radius}px;
+        }}
+    """
+
+
+def _mk_panel(name: str = "avPanel") -> QFrame:
+    f = QFrame()
+    f.setObjectName(name)
+    f.setStyleSheet(_panel_qss(name))
+    return f
+
+
+def _entry_qss(font_px: int = 12, bg_key: str = "frame_bg") -> str:
+    return f"""
+        QLineEdit {{
+            background:{COLORS[bg_key]};
+            color:{COLORS['text']};
+            border:1px solid {COLORS['border']};
+            border-radius:8px;
+            padding:4px 10px;
+            font-size:{font_px}px;
+            selection-background-color:{COLORS['accent']};
+        }}
+        QLineEdit:focus {{ border-color:{COLORS.get('border_focus', COLORS['accent'])}; }}
+        QLineEdit:read-only {{ color:{COLORS['text_secondary']}; }}
+        QLineEdit:disabled {{
+            background:{COLORS['card_bg']};
+            color:{_muted()};
+        }}
+    """
+
+
+def _section_header(text: str):
+    header = QFrame()
+    header.setFixedHeight(30)
+    header.setStyleSheet("background:transparent;border:none;")
+    row = QHBoxLayout(header)
+    row.setContentsMargins(6, 0, 6, 0)
+    row.setSpacing(6)
+
+    marker = QFrame()
+    marker.setFixedSize(3, 14)
+    marker.setStyleSheet(
+        f"background:{COLORS['accent']};border:none;border-radius:1px;"
+    )
+    row.addWidget(marker)
+
+    label = QLabel(text.upper())
+    label.setFont(font(10, "bold"))
+    label.setStyleSheet(_lbl_qss())
+    row.addWidget(label)
+    row.addStretch()
+    return header, label, row
+
+
+def _divider() -> QFrame:
+    d = QFrame()
+    d.setFixedHeight(1)
+    d.setStyleSheet(f"background:{COLORS['border']};border:none;")
+    return d
+
+
+def _mk_action_btn(text: str, color_key: str = "accent",
+                   height: int = 36, font_size: int = 12) -> QPushButton:
     btn = QPushButton(text)
-    btn.setFont(font(12, "bold"))
-    btn.setFixedHeight(36)
+    btn.setFont(font(font_size, "bold"))
+    btn.setFixedHeight(height)
     btn.setCursor(Qt.PointingHandCursor)
-    bg   = COLORS[color_key]
+    bg   = COLORS.get(color_key, COLORS["accent"])
     bg_h = COLORS.get(f"{color_key}_hover", bg)
-    bg_d = COLORS.get(f"{color_key}_dim",   bg)
-    tc   = COLORS.get("accent_text", "#ffffff")
+    tc   = COLORS["accent_text"] if color_key == "accent" else "white"
     btn.setStyleSheet(f"""
         QPushButton {{
             background:{bg}; color:{tc};
-            border:none; border-radius:8px; padding:4px 16px;
+            border:none; border-radius:8px; padding:4px 14px;
         }}
-        QPushButton:hover   {{ background:{bg_h}; }}
-        QPushButton:pressed {{ background:{bg_d}; }}
+        QPushButton:hover {{ background:{bg_h}; }}
         QPushButton:disabled {{
             background:{COLORS['border']};
-            color:{COLORS['text_muted']};
+            color:{_muted()};
         }}
     """)
     return btn
 
 
+def _mk_outline_btn(text: str, height: int = 34, font_size: int = 11) -> QPushButton:
+    btn = QPushButton(text)
+    btn.setFont(font(font_size, "bold"))
+    btn.setFixedHeight(height)
+    btn.setCursor(Qt.PointingHandCursor)
+    btn.setStyleSheet(f"""
+        QPushButton {{
+            background:transparent; color:{COLORS['text']};
+            border:1px solid {COLORS['border']};
+            border-radius:8px; padding:4px 12px;
+        }}
+        QPushButton:hover {{
+            background:{COLORS['card_hover']};
+            border-color:{COLORS['accent']};
+        }}
+        QPushButton:disabled {{
+            color:{_muted()};
+            border-color:{COLORS['border']};
+        }}
+    """)
+    return btn
+
+
+def _chip(text: str, kind: str = "muted") -> QLabel:
+    palette = {
+        "ok":     (COLORS.get("success", "#4ade80"), COLORS.get("success_dim", "#166534")),
+        "bad":    (COLORS.get("error",   "#f87171"), COLORS.get("error_dim",   "#7f1d1d")),
+        "warn":   (COLORS.get("warning", "#facc15"), COLORS.get("warning_dim", COLORS["border"])),
+        "accent": (COLORS["accent"], COLORS.get("accent_dim", COLORS["frame_bg"])),
+        "muted":  (_muted(), COLORS["border"]),
+    }
+    fg, bg = palette[kind]
+    lbl = QLabel(text)
+    lbl.setFont(font(10, "bold"))
+    lbl.setAlignment(Qt.AlignCenter)
+    lbl.setStyleSheet(
+        f"QLabel {{ color:{fg}; background:{bg}; border:none;"
+        f" border-radius:4px; padding:1px 7px; }}"
+    )
+    return lbl
+
+
+def _restyle_chip(lbl: QLabel, kind: str) -> None:
+    fresh = _chip(lbl.text(), kind)
+    lbl.setStyleSheet(fresh.styleSheet())
+    fresh.deleteLater()
+
+
+def _checkbox_qss() -> str:
+    return f"""
+        QCheckBox::indicator {{
+            width:16px; height:16px;
+            border-radius:4px;
+            border:1px solid {COLORS['border']};
+            background:{COLORS['card_bg']};
+        }}
+        QCheckBox::indicator:hover {{ border-color:{COLORS['accent']}; }}
+        QCheckBox::indicator:checked {{
+            background:{COLORS['accent']};
+            border-color:{COLORS['accent']};
+        }}
+        QCheckBox::indicator:disabled {{
+            background:{COLORS['border']};
+            border-color:{COLORS['border']};
+        }}
+    """
+
+
+def _row_qss() -> str:
+    return f"""
+        QFrame#avRow {{
+            background:{COLORS['frame_bg']};
+            border:1px solid {COLORS['border']};
+            border-radius:8px;
+        }}
+        QFrame#avRow:hover {{ border-color:{COLORS['accent']}; }}
+    """
+
+
+def _make_scroll_page():
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    scroll.setStyleSheet("""
+        QScrollArea{background:transparent;border:none;}
+        QScrollArea>QWidget>QWidget{background:transparent;}
+    """)
+    inner = QWidget()
+    inner.setStyleSheet(f"background:{COLORS['app_bg']};")
+    col = QVBoxLayout(inner)
+    col.setContentsMargins(20, 20, 20, 20)
+    col.setSpacing(12)
+    return scroll, inner, col
+
+
+def _make_list_panel(title: str, empty_text: str):
+    panel = _mk_panel("avListPanel")
+    lay = QVBoxLayout(panel)
+    lay.setContentsMargins(10, 10, 10, 10)
+    lay.setSpacing(6)
+
+    header, hdr_lbl, hdr_row = _section_header(title)
+    count_chip = _chip("0", "muted")
+    hdr_row.addWidget(count_chip)
+    lay.addWidget(header)
+
+    list_frame = QFrame()
+    list_frame.setStyleSheet("background:transparent;border:none;")
+    list_col = QVBoxLayout(list_frame)
+    list_col.setContentsMargins(0, 0, 0, 0)
+    list_col.setSpacing(6)
+
+    empty = QLabel(empty_text)
+    empty.setFont(font(12))
+    empty.setAlignment(Qt.AlignCenter)
+    empty.setMinimumHeight(56)
+    empty.setStyleSheet(_lbl_qss("text_muted"))
+    list_col.addWidget(empty)
+
+    lay.addWidget(list_frame)
+    return panel, hdr_lbl, count_chip, list_frame, list_col, empty
+
+
 class _FilePicker(QWidget):
     def __init__(self, label: str, placeholder: str = "", parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background:transparent;")
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(4)
 
         self._lbl = QLabel(label)
         self._lbl.setFont(font(11, "bold"))
-        self._lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        self._lbl.setStyleSheet(_lbl_qss("text_secondary"))
         col.addWidget(self._lbl)
 
         row = QHBoxLayout()
+        row.setSpacing(6)
         self.entry = QLineEdit()
         self.entry.setPlaceholderText(placeholder)
         self.entry.setReadOnly(True)
         self.entry.setFixedHeight(34)
         self.entry.setFont(font(12))
-        self.entry.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:none;
-                border-radius:7px;
-                padding:4px 8px;
-            }}
-            QLineEdit:read-only {{ color:{COLORS['text_secondary']}; }}
-        """)
-        row.addWidget(self.entry)
+        self.entry.setStyleSheet(_entry_qss())
+        row.addWidget(self.entry, 1)
 
-        self.btn = QPushButton(t("add_vehicles.browse_btn", default="Browse"))
-        self.btn.setFont(font(11, "bold"))
+        self.btn = _mk_outline_btn(t("add_vehicles.browse_btn", default="Browse"))
         self.btn.setFixedSize(90, 34)
-        self.btn.setCursor(Qt.PointingHandCursor)
-        self.btn.setStyleSheet(f"""
-            QPushButton {{
-                background:{COLORS['accent']};
-                color:{COLORS['accent_text']};
-                border:none; border-radius:7px;
-            }}
-            QPushButton:hover {{ background:{COLORS['accent_hover']}; }}
-            QPushButton:pressed {{ background:{COLORS['accent_dim']}; }}
-        """)
         row.addWidget(self.btn)
         col.addLayout(row)
 
@@ -181,30 +366,20 @@ class _FilePicker(QWidget):
 class _EntryField(QWidget):
     def __init__(self, label: str, placeholder: str = "", parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background:transparent;")
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(4)
 
         self._lbl = QLabel(label)
         self._lbl.setFont(font(11, "bold"))
-        self._lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        self._lbl.setStyleSheet(_lbl_qss("text_secondary"))
         col.addWidget(self._lbl)
 
         self.entry = QLineEdit()
         self.entry.setPlaceholderText(placeholder)
         self.entry.setFixedHeight(34)
-        self.entry.setFont(font(13))
-        self.entry.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:none;
-                border-radius:7px;
-                padding:4px 8px;
-                selection-background-color:{COLORS['accent']};
-            }}
-        """)
+        self.entry.setFont(font(12))
+        self.entry.setStyleSheet(_entry_qss())
         col.addWidget(self.entry)
 
     def set_label(self, text: str):       self._lbl.setText(text)
@@ -213,17 +388,13 @@ class _EntryField(QWidget):
     def clear(self):                      self.entry.clear()
 
 
-class _DiscoveredVehicleRow(QFrame):
-    def __init__(self, vehicle: DiscoveredVehicle, parent=None):
+class _DiscoveredRow(QFrame):
+    def __init__(self, item, badge_text: str, badge_width: int,
+                 folder_hint: str = "", show_img: bool = False, parent=None):
         super().__init__(parent)
-        self.vehicle = vehicle
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:8px;
-            }}
-        """)
+        self._item = item
+        self.setObjectName("avRow")
+        self.setStyleSheet(_row_qss())
         self.setFixedHeight(52)
 
         row = QHBoxLayout(self)
@@ -231,177 +402,45 @@ class _DiscoveredVehicleRow(QFrame):
         row.setSpacing(10)
 
         self._chk = QCheckBox()
-        self._chk.setChecked(vehicle.ready)
-        self._chk.setEnabled(vehicle.ready)
-        self._chk.setStyleSheet(f"""
-            QCheckBox::indicator {{
-                width:18px; height:18px;
-                border-radius:4px;
-                border:2px solid {COLORS['border']};
-                background:{COLORS['frame_bg']};
-            }}
-            QCheckBox::indicator:checked {{
-                background:{COLORS['accent']};
-                border-color:{COLORS['accent']};
-            }}
-        """)
+        self._chk.setChecked(item.ready)
+        self._chk.setEnabled(item.ready)
+        self._chk.setStyleSheet(_checkbox_qss())
         row.addWidget(self._chk)
 
-        carid_lbl = QLabel(vehicle.carid)
-        carid_lbl.setFont(font(10, "bold"))
-        carid_lbl.setStyleSheet(f"""
-            color:{COLORS['accent']};
-            background:{COLORS['frame_bg']};
-            border:none;
-            border-radius:5px;
-            padding:2px 7px;
-        """)
-        carid_lbl.setFixedWidth(110)
-        carid_lbl.setAlignment(Qt.AlignCenter)
-        row.addWidget(carid_lbl)
+        badge = _chip(badge_text, "accent")
+        badge.setFixedWidth(badge_width)
+        badge.setFixedHeight(22)
+        row.addWidget(badge)
 
-        self._name_edit = QLineEdit(vehicle.display_name)
+        self._name_edit = QLineEdit(item.display_name)
         self._name_edit.setFont(font(12))
-        self._name_edit.setFixedHeight(30)
-        self._name_edit.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:none;
-                border-radius:6px;
-                padding:2px 8px;
-            }}
-        """)
+        self._name_edit.setFixedHeight(32)
+        self._name_edit.setStyleSheet(_entry_qss(12, "card_bg"))
         row.addWidget(self._name_edit, 1)
 
-        status_row = QHBoxLayout()
-        status_row.setSpacing(4)
+        if folder_hint:
+            hint = QLabel(folder_hint)
+            hint.setFont(font(10))
+            hint.setStyleSheet(_lbl_qss("text_muted"))
+            row.addWidget(hint)
 
-        def _chip(text: str, ok: bool) -> QLabel:
-            lbl = QLabel(text)
-            lbl.setFont(font(10, "bold"))
-            clr = COLORS.get("success", "#4ade80") if ok else COLORS.get("error", "#f87171")
-            dim = COLORS.get("success_dim", "#166534") if ok else COLORS.get("error_dim", "#7f1d1d")
-            lbl.setStyleSheet(f"""
-                color:{clr};
-                background:{dim};
-                border:none;
-                border-radius:4px;
-                padding:1px 6px;
-            """)
-            return lbl
+        chips = QHBoxLayout()
+        chips.setSpacing(4)
+        chips.addWidget(_chip("JSON",  "ok" if item.json_path  else "bad"))
+        chips.addWidget(_chip("JBEAM", "ok" if item.jbeam_path else "bad"))
+        if show_img:
+            chips.addWidget(_chip("IMG", "ok" if item.image_path else "bad"))
+        row.addLayout(chips)
 
-        status_row.addWidget(_chip("JSON",  bool(vehicle.json_path)))
-        status_row.addWidget(_chip("JBEAM", bool(vehicle.jbeam_path)))
-        status_row.addWidget(_chip("IMG",   bool(vehicle.image_path)))
-        row.addLayout(status_row)
-
-        if not vehicle.ready:
-            warn_lbl = QLabel("⚠")
-            warn_lbl.setFont(font(14))
-            warn_lbl.setStyleSheet(f"color:{COLORS.get('warning', '#facc15')};background:transparent;")
-            warn_lbl.setToolTip("\n".join(vehicle.warnings))
-            row.addWidget(warn_lbl)
-
-    @property
-    def is_checked(self) -> bool:
-        return self._chk.isChecked()
-
-    @property
-    def display_name(self) -> str:
-        return self._name_edit.text().strip() or self.vehicle.display_name
-
-
-class _DiscoveredVariantRow(QFrame):
-    def __init__(self, variant: DiscoveredVariant, parent=None):
-        super().__init__(parent)
-        self.variant = variant
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:8px;
-            }}
-        """)
-        self.setFixedHeight(52)
-
-        row = QHBoxLayout(self)
-        row.setContentsMargins(10, 6, 10, 6)
-        row.setSpacing(10)
-
-        self._chk = QCheckBox()
-        self._chk.setChecked(variant.ready)
-        self._chk.setEnabled(variant.ready)
-        self._chk.setStyleSheet(f"""
-            QCheckBox::indicator {{
-                width:18px; height:18px;
-                border-radius:4px;
-                border:2px solid {COLORS['border']};
-                background:{COLORS['frame_bg']};
-            }}
-            QCheckBox::indicator:checked {{
-                background:{COLORS['accent']};
-                border-color:{COLORS['accent']};
-            }}
-        """)
-        row.addWidget(self._chk)
-
-        badge_lbl = QLabel(f"{variant.carid}  +  {variant.suffix}")
-        badge_lbl.setFont(font(10, "bold"))
-        badge_lbl.setStyleSheet(f"""
-            color:{COLORS['accent']};
-            background:{COLORS['frame_bg']};
-            border:none;
-            border-radius:5px;
-            padding:2px 7px;
-        """)
-        badge_lbl.setFixedWidth(160)
-        badge_lbl.setAlignment(Qt.AlignCenter)
-        row.addWidget(badge_lbl)
-
-        self._name_edit = QLineEdit(variant.display_name)
-        self._name_edit.setFont(font(12))
-        self._name_edit.setFixedHeight(30)
-        self._name_edit.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['frame_bg']};
-                color:{COLORS['text']};
-                border:none;
-                border-radius:6px;
-                padding:2px 8px;
-            }}
-        """)
-        row.addWidget(self._name_edit, 1)
-
-        folder_lbl = QLabel(f"SKINNAME_{variant.suffix}/")
-        folder_lbl.setFont(font(10))
-        folder_lbl.setStyleSheet(
-            f"color:{COLORS['text_muted']};background:transparent;border:none;"
-        )
-        row.addWidget(folder_lbl)
-
-        def _chip(text: str, ok: bool) -> QLabel:
-            lbl = QLabel(text)
-            lbl.setFont(font(10, "bold"))
-            clr = COLORS.get("success", "#4ade80") if ok else COLORS.get("error", "#f87171")
-            dim = COLORS.get("success_dim", "#166534") if ok else COLORS.get("error_dim", "#7f1d1d")
-            lbl.setStyleSheet(f"color:{clr};background:{dim};border:none;border-radius:4px;padding:1px 6px;")
-            return lbl
-
-        status_row = QHBoxLayout()
-        status_row.setSpacing(4)
-        status_row.addWidget(_chip("JSON",  bool(variant.json_path)))
-        status_row.addWidget(_chip("JBEAM", bool(variant.jbeam_path)))
-        row.addLayout(status_row)
-
-        if not variant.ready:
-            warn_lbl = QLabel("⚠")
-            warn_lbl.setFont(font(14))
-            warn_lbl.setStyleSheet(
-                f"color:{COLORS.get('warning','#facc15')};background:transparent;"
+        if not item.ready:
+            warn = QLabel("⚠")
+            warn.setFont(font(14))
+            warn.setStyleSheet(
+                f"QLabel {{ color:{COLORS.get('warning', '#facc15')};"
+                f"background:transparent;border:none; }}"
             )
-            warn_lbl.setToolTip("\n".join(variant.warnings))
-            row.addWidget(warn_lbl)
+            warn.setToolTip("\n".join(item.warnings))
+            row.addWidget(warn)
 
     @property
     def is_checked(self) -> bool:
@@ -409,7 +448,22 @@ class _DiscoveredVariantRow(QFrame):
 
     @property
     def display_name(self) -> str:
-        return self._name_edit.text().strip() or self.variant.display_name
+        return self._name_edit.text().strip() or self._item.display_name
+
+
+class _DiscoveredVehicleRow(_DiscoveredRow):
+    def __init__(self, vehicle: "DiscoveredVehicle", parent=None):
+        super().__init__(vehicle, vehicle.carid, 110, show_img=True, parent=parent)
+        self.vehicle = vehicle
+
+
+class _DiscoveredVariantRow(_DiscoveredRow):
+    def __init__(self, variant: "DiscoveredVariant", parent=None):
+        super().__init__(
+            variant, f"{variant.carid}  +  {variant.suffix}", 160,
+            folder_hint=f"SKINNAME_{variant.suffix}/", parent=parent,
+        )
+        self.variant = variant
 
 
 class _ScanWorker(QThread):
@@ -450,6 +504,12 @@ class _ImportWorker(QThread):
                 skipped += 1
         self.all_finished.emit(added, skipped)
 
+    @staticmethod
+    def _remember_mod(item) -> None:
+        src = getattr(item, "source_path", None)
+        if src and _mod_locations is not None:
+            _mod_locations.register(item.carid, src)
+
     def _process(self, item, display_name: str) -> bool:
         try:
             if self._mode == "vehicles":
@@ -465,6 +525,7 @@ class _ImportWorker(QThread):
                 )
                 if ok:
                     _copy_uv_maps_to_images(item.carid, getattr(item, "uv_map_paths", []))
+                    self._remember_mod(item)
                 return ok
             else:
                 existing = load_added_variants_json() if _BACKEND_OK else {}
@@ -480,6 +541,7 @@ class _ImportWorker(QThread):
                 )
                 if ok:
                     _copy_uv_maps_to_images(item.carid, getattr(item, "uv_map_paths", []))
+                    self._remember_mod(item)
                 return ok
         except Exception as e:
             import traceback
@@ -506,52 +568,34 @@ class _SmartImportCard(QFrame):
         self._dot_timer.timeout.connect(self._tick_dots)
         self._dot_count = 0
 
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:12px;
-            }}
-        """)
-        drop_shadow(self)
+        self.setObjectName("avPanel")
+        self.setStyleSheet(_panel_qss("avPanel"))
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(20, 18, 20, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(10, 10, 10, 12)
+        root.setSpacing(8)
 
-        title_text = (
-            t("add_vehicles.smart_import_title_vehicles", default="🔍  Auto-Import Vehicles from Mod")
-            if mode == "vehicles"
-            else t("add_vehicles.smart_import_title_variants", default="🔍  Auto-Import Variants from Mod")
-        )
-        self._title_lbl = QLabel(title_text)
-        self._title_lbl.setFont(font(15, "bold"))
-        self._title_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
-        root.addWidget(self._title_lbl)
+        header, self._title_lbl, _ = _section_header(self._title_text())
+        root.addWidget(header)
 
-        sub_text = (
-            t("add_vehicles.smart_import_subtitle_vehicles",
-              default="Select a mod folder or ZIP — BeamSkin Studio will find the vehicles automatically.")
-            if mode == "vehicles"
-            else t("add_vehicles.smart_import_subtitle_variants",
-                   default="Select a mod folder or ZIP — BeamSkin Studio will detect body variants automatically.")
-        )
-        self._sub_lbl = QLabel(sub_text)
+        self._sub_lbl = QLabel(self._subtitle_text())
         self._sub_lbl.setFont(font(11))
         self._sub_lbl.setWordWrap(True)
-        self._sub_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        self._sub_lbl.setContentsMargins(8, 0, 8, 0)
+        self._sub_lbl.setStyleSheet(_lbl_qss("text_secondary"))
         root.addWidget(self._sub_lbl)
 
         browse_row = QHBoxLayout()
+        browse_row.setContentsMargins(8, 4, 8, 0)
         browse_row.setSpacing(8)
 
-        self._btn_folder = _mk_action_btn(t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"))
-        self._btn_folder.setFixedHeight(38)
+        self._btn_folder = _mk_action_btn(
+            t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"), height=38)
         self._btn_folder.clicked.connect(self._browse_folder)
         browse_row.addWidget(self._btn_folder)
 
-        self._btn_zip = _mk_action_btn(t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"))
-        self._btn_zip.setFixedHeight(38)
+        self._btn_zip = _mk_outline_btn(
+            t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"), height=38, font_size=12)
         self._btn_zip.clicked.connect(self._browse_zip)
         browse_row.addWidget(self._btn_zip)
 
@@ -559,24 +603,29 @@ class _SmartImportCard(QFrame):
         root.addLayout(browse_row)
 
         self._active_scan_frame = QFrame()
-        self._active_scan_frame.setStyleSheet(
-            f"background:{COLORS['frame_bg']};border:none;border-radius:8px;"
-        )
+        self._active_scan_frame.setObjectName("avScan")
+        self._active_scan_frame.setStyleSheet(f"""
+            QFrame#avScan {{
+                background:{COLORS['frame_bg']};
+                border:1px solid {COLORS['accent']};
+                border-radius:8px;
+            }}
+        """)
         self._active_scan_frame.setVisible(False)
         active_row = QHBoxLayout(self._active_scan_frame)
         active_row.setContentsMargins(10, 7, 10, 7)
         active_row.setSpacing(8)
         self._active_scan_icon = QLabel("🔍")
         self._active_scan_icon.setFont(font(13))
-        self._active_scan_icon.setStyleSheet("background:transparent;")
+        self._active_scan_icon.setStyleSheet(_lbl_qss())
         active_row.addWidget(self._active_scan_icon)
         self._active_scan_name = QLabel("")
         self._active_scan_name.setFont(font(12, "bold"))
-        self._active_scan_name.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        self._active_scan_name.setStyleSheet(_lbl_qss())
         active_row.addWidget(self._active_scan_name, 1)
         self._active_scan_dots = QLabel("")
         self._active_scan_dots.setFont(font(11))
-        self._active_scan_dots.setStyleSheet(f"color:{COLORS['accent']};background:transparent;")
+        self._active_scan_dots.setStyleSheet(_lbl_qss("accent"))
         self._active_scan_dots.setFixedWidth(30)
         active_row.addWidget(self._active_scan_dots)
         root.addWidget(self._active_scan_frame)
@@ -588,7 +637,6 @@ class _SmartImportCard(QFrame):
         _queue_outer.setSpacing(4)
 
         _queue_inner = QWidget()
-        _queue_inner.setStyleSheet("background:transparent;")
         self._queue_col = QVBoxLayout(_queue_inner)
         self._queue_col.setContentsMargins(0, 2, 0, 2)
         self._queue_col.setSpacing(4)
@@ -603,12 +651,13 @@ class _SmartImportCard(QFrame):
         self._status_lbl = QLabel("")
         self._status_lbl.setFont(font(11))
         self._status_lbl.setWordWrap(True)
-        self._status_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        self._status_lbl.setContentsMargins(8, 0, 8, 0)
+        self._status_lbl.setStyleSheet(_lbl_qss("text_secondary"))
         self._status_lbl.setVisible(False)
         root.addWidget(self._status_lbl)
 
         self._list_frame = QFrame()
-        self._list_frame.setStyleSheet("background:transparent;")
+        self._list_frame.setStyleSheet("background:transparent;border:none;")
         self._list_col   = QVBoxLayout(self._list_frame)
         self._list_col.setContentsMargins(0, 0, 0, 0)
         self._list_col.setSpacing(6)
@@ -616,24 +665,36 @@ class _SmartImportCard(QFrame):
         root.addWidget(self._list_frame)
 
         btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(8, 0, 8, 0)
         btn_row.setSpacing(8)
 
-        self._select_all_btn = GhostButton(t("add_vehicles.select_all_btn", default="Select All"))
-        self._select_all_btn.setFixedHeight(34)
+        self._select_all_btn = _mk_outline_btn(
+            t("add_vehicles.select_all_btn", default="Select All"))
         self._select_all_btn.clicked.connect(self._select_all)
         self._select_all_btn.setVisible(False)
         btn_row.addWidget(self._select_all_btn)
 
         btn_row.addStretch()
 
-        self._add_btn = _mk_action_btn(t("add_vehicles.add_checked_btn", default="Add Checked"))
-        self._add_btn.setFixedHeight(38)
+        self._add_btn = _mk_action_btn(
+            t("add_vehicles.add_checked_btn", default="Add Checked"), height=38)
         self._add_btn.clicked.connect(self._on_add_checked)
         self._add_btn.setVisible(False)
         btn_row.addWidget(self._add_btn)
 
         root.addLayout(btn_row)
 
+    def _title_text(self) -> str:
+        if self._mode == "vehicles":
+            return t("add_vehicles.smart_import_title_vehicles", default="🔍  Auto-Import Vehicles from Mod")
+        return t("add_vehicles.smart_import_title_variants", default="🔍  Auto-Import Variants from Mod")
+
+    def _subtitle_text(self) -> str:
+        if self._mode == "vehicles":
+            return t("add_vehicles.smart_import_subtitle_vehicles",
+                     default="Select a mod folder or ZIP — BeamSkin Studio will find the vehicles automatically.")
+        return t("add_vehicles.smart_import_subtitle_variants",
+                 default="Select a mod folder or ZIP — BeamSkin Studio will detect body variants automatically.")
 
     def _browse_folder(self):
         path = QFileDialog.getExistingDirectory(
@@ -657,9 +718,8 @@ class _SmartImportCard(QFrame):
 
     def _make_queue_row(self, path: str, status: str = "queued") -> QFrame:
         frame = QFrame()
-        frame.setStyleSheet(
-            f"background:{COLORS['frame_bg']};border:none;border-radius:7px;"
-        )
+        frame.setObjectName("avRow")
+        frame.setStyleSheet(_row_qss())
         frame.setFixedHeight(34)
         hl = QHBoxLayout(frame)
         hl.setContentsMargins(10, 0, 10, 0)
@@ -667,15 +727,12 @@ class _SmartImportCard(QFrame):
 
         name_lbl = QLabel(os.path.basename(path))
         name_lbl.setFont(font(11))
-        name_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};background:transparent;")
+        name_lbl.setStyleSheet(_lbl_qss("text_secondary"))
         name_lbl.setToolTip(path)
         hl.addWidget(name_lbl, 1)
 
-        chip = QLabel()
-        chip.setFont(font(10, "bold"))
+        chip = _chip("", "muted")
         chip.setFixedHeight(20)
-        chip.setContentsMargins(6, 1, 6, 1)
-        chip.setAlignment(Qt.AlignCenter)
         frame._chip = chip
         hl.addWidget(chip)
 
@@ -684,39 +741,16 @@ class _SmartImportCard(QFrame):
 
     def _set_queue_chip(self, frame: QFrame, status: str):
         chip = frame._chip
-        if status == "queued":
-            chip.setText(t("add_vehicles.chip_queued"))
-            chip.setStyleSheet(
-                f"color:{COLORS['text_muted']};background:{COLORS['border']};"
-                f"border:none;border-radius:4px;"
-            )
-        elif status == "scanning":
-            chip.setText(t("add_vehicles.chip_scanning"))
-            chip.setStyleSheet(
-                f"color:{COLORS['accent']};background:{COLORS.get('accent_dim', COLORS['frame_bg'])};"
-                f"border:none;border-radius:4px;"
-            )
-        elif status == "done":
-            chip.setText(t("add_vehicles.chip_done"))
-            chip.setStyleSheet(
-                f"color:{COLORS.get('success', '#4ade80')};"
-                f"background:{COLORS.get('success_dim', '#166534')};"
-                f"border:none;border-radius:4px;"
-            )
-        elif status == "failed":
-            chip.setText(t("add_vehicles.chip_failed"))
-            chip.setStyleSheet(
-                f"color:{COLORS.get('error', '#f87171')};"
-                f"background:{COLORS.get('error_dim', '#7f1d1d')};"
-                f"border:none;border-radius:4px;"
-            )
-        elif status == "empty":
-            chip.setText(t("add_vehicles.chip_empty"))
-            chip.setStyleSheet(
-                f"color:{COLORS.get('warning', '#facc15')};"
-                f"background:{COLORS.get('warning_dim', COLORS['border'])};"
-                f"border:none;border-radius:4px;"
-            )
+        kinds = {
+            "queued":   ("add_vehicles.chip_queued",   "muted"),
+            "scanning": ("add_vehicles.chip_scanning", "accent"),
+            "done":     ("add_vehicles.chip_done",     "ok"),
+            "failed":   ("add_vehicles.chip_failed",   "bad"),
+            "empty":    ("add_vehicles.chip_empty",    "warn"),
+        }
+        key, kind = kinds[status]
+        chip.setText(t(key))
+        _restyle_chip(chip, kind)
 
     def _build_queue_panel(self, paths: List[str]):
         for w in list(self._queue_rows.values()):
@@ -734,7 +768,7 @@ class _SmartImportCard(QFrame):
             self._queue_hdr = None
         self._queue_hdr = QLabel(t("add_vehicles.queue_header"))
         self._queue_hdr.setFont(font(10, "bold"))
-        self._queue_hdr.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
+        self._queue_hdr.setStyleSheet(_lbl_qss("text_muted"))
         self._queue_frame.layout().insertWidget(0, self._queue_hdr)
 
         for p in paths:
@@ -828,6 +862,8 @@ class _SmartImportCard(QFrame):
             self._temp_dirs.append(tmp)
 
         items     = vehicles if self._mode == "vehicles" else variants
+        for _it in items:
+            _it.source_path = path
         mod_label = os.path.basename(path)
         found     = len(items)
 
@@ -994,7 +1030,9 @@ class _SmartImportCard(QFrame):
         if ok and row_index < len(self._rows):
             row = self._rows[row_index]
             row.setEnabled(False)
-            row.setStyleSheet(row.styleSheet() + " opacity: 0.4;")
+            effect = QGraphicsOpacityEffect(row)
+            effect.setOpacity(0.4)
+            row.setGraphicsEffect(effect)
 
     def _on_import_finished(self, added: int, skipped: int):
         self._btn_folder.setEnabled(True)
@@ -1059,24 +1097,8 @@ class _SmartImportCard(QFrame):
 
 
     def retranslate_ui(self):
-        if self._mode == "vehicles":
-            self._title_lbl.setText(
-                t("add_vehicles.smart_import_title_vehicles",
-                  default="🔍  Auto-Import Vehicles from Mod")
-            )
-            self._sub_lbl.setText(
-                t("add_vehicles.smart_import_subtitle_vehicles",
-                  default="Select a mod folder or ZIP — BeamSkin Studio will find the vehicles automatically.")
-            )
-        else:
-            self._title_lbl.setText(
-                t("add_vehicles.smart_import_title_variants",
-                  default="🔍  Auto-Import Variants from Mod")
-            )
-            self._sub_lbl.setText(
-                t("add_vehicles.smart_import_subtitle_variants",
-                  default="Select a mod folder or ZIP — BeamSkin Studio will detect body variants automatically.")
-            )
+        self._title_lbl.setText(self._title_text().upper())
+        self._sub_lbl.setText(self._subtitle_text())
         self._btn_folder.setText(t("add_vehicles.browse_folder_btn", default="📁  Browse Folder"))
         self._btn_zip.setText(t("add_vehicles.browse_zip_btn", default="📦  Browse ZIP"))
         self._select_all_btn.setText(t("add_vehicles.select_all_btn", default="Select All"))
@@ -1084,91 +1106,71 @@ class _SmartImportCard(QFrame):
             self._add_btn.setText(t("add_vehicles.add_checked_btn", default="Add Checked"))
 
 
-class _VehicleListCard(QFrame):
+class _ListCard(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("avRow")
+        self.setStyleSheet(_row_qss())
+        self.setFixedHeight(46)
+        self._row = QHBoxLayout(self)
+        self._row.setContentsMargins(12, 0, 8, 0)
+        self._row.setSpacing(8)
+
+    def _add_delete_btn(self):
+        self._del_btn = _mk_action_btn(
+            t("add_vehicles.delete_btn", default="Delete"), "error", height=28, font_size=11)
+        self._del_btn.setFixedWidth(75)
+        self._row.addWidget(self._del_btn)
+
+    def retranslate_ui(self):
+        self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
+
+
+class _VehicleListCard(_ListCard):
     delete_requested = Signal(str)
 
     def __init__(self, carid: str, carname: str, parent=None):
         super().__init__(parent)
         self.carid   = carid
         self.carname = carname
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:8px;
-            }}
-        """)
-        self.setFixedHeight(46)
-
-        row = QHBoxLayout(self)
-        row.setContentsMargins(12, 0, 8, 0)
-        row.setSpacing(8)
 
         name_lbl = QLabel(
             f"<b>{carname}</b>  "
             f"<span style='color:{COLORS['text_secondary']}'>{carid}</span>"
         )
         name_lbl.setFont(font(12))
-        name_lbl.setStyleSheet(
-            "background:transparent;border:none;color:" + COLORS['text'] + ";"
-        )
-        row.addWidget(name_lbl, 1)
+        name_lbl.setStyleSheet(_lbl_qss())
+        self._row.addWidget(name_lbl, 1)
 
-        self._del_btn = _mk_action_btn(t("add_vehicles.delete_btn", default="Delete"), "error")
-        self._del_btn.setFixedWidth(75)
+        self._add_delete_btn()
         self._del_btn.clicked.connect(lambda: self.delete_requested.emit(self.carid))
-        row.addWidget(self._del_btn)
-
-    def retranslate_ui(self):
-        self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
 
 
-class _VariantListCard(QFrame):
+class _VariantListCard(_ListCard):
     delete_requested = Signal(str, str)
 
     def __init__(self, carid: str, suffix: str, parent=None):
         super().__init__(parent)
         self.carid  = carid
         self.suffix = suffix
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:8px;
-            }}
-        """)
-        self.setFixedHeight(46)
-
-        row = QHBoxLayout(self)
-        row.setContentsMargins(12, 0, 8, 0)
-        row.setSpacing(8)
 
         label = QLabel(
             f"<b>{carid}</b>  "
             f"<span style='color:{COLORS['accent']}'>+ {suffix}</span>"
         )
         label.setFont(font(12))
-        label.setStyleSheet(
-            "background:transparent;border:none;color:" + COLORS['text'] + ";"
-        )
-        row.addWidget(label, 1)
+        label.setStyleSheet(_lbl_qss())
+        self._row.addWidget(label, 1)
 
         folder_lbl = QLabel(f"SKINNAME{suffix.upper()}")
         folder_lbl.setFont(font(10))
-        folder_lbl.setStyleSheet(
-            f"color:{COLORS['text_muted']};background:transparent;border:none;"
-        )
-        row.addWidget(folder_lbl)
+        folder_lbl.setStyleSheet(_lbl_qss("text_muted"))
+        self._row.addWidget(folder_lbl)
 
-        self._del_btn = _mk_action_btn(t("add_vehicles.delete_btn", default="Delete"), "error")
-        self._del_btn.setFixedWidth(75)
+        self._add_delete_btn()
         self._del_btn.clicked.connect(
             lambda: self.delete_requested.emit(self.carid, self.suffix)
         )
-        row.addWidget(self._del_btn)
-
-    def retranslate_ui(self):
-        self._del_btn.setText(t("add_vehicles.delete_btn", default="Delete"))
 
 
 class _ManualEntryCard(QFrame):
@@ -1179,58 +1181,32 @@ class _ManualEntryCard(QFrame):
         self._mode     = mode
         self._expanded = False
 
-        self.setStyleSheet(f"""
-            QFrame {{
-                background:{COLORS['card_bg']};
-                border:none;
-                border-radius:12px;
-            }}
-        """)
-        drop_shadow(self)
+        self.setObjectName("avPanel")
+        self.setStyleSheet(_panel_qss("avPanel"))
 
         self._root_col = QVBoxLayout(self)
-        self._root_col.setContentsMargins(20, 14, 20, 14)
-        self._root_col.setSpacing(10)
+        self._root_col.setContentsMargins(10, 10, 10, 10)
+        self._root_col.setSpacing(8)
 
-        toggle_row = QHBoxLayout()
-        _plain_label = (
-            t("add_vehicles.manual_entry_text", default="Manual Entry")
-            if mode == "vehicle"
-            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
-        )
-        self._toggle_lbl = QLabel(f"＋  {_plain_label}")
-        self._toggle_lbl.setFont(font(13, "bold"))
-        self._toggle_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;"
-        )
-        toggle_row.addWidget(self._toggle_lbl)
-        toggle_row.addStretch()
+        header, self._toggle_lbl, hdr_row = _section_header(self._plain_label())
+        header.setCursor(Qt.PointingHandCursor)
+        header.mousePressEvent = lambda _e: self._toggle()
 
-        self._toggle_btn = QPushButton(t("add_vehicles.expand", default="Expand"))
-        self._toggle_btn.setFont(font(11))
-        self._toggle_btn.setFixedHeight(28)
-        self._toggle_btn.setCursor(Qt.PointingHandCursor)
-        self._toggle_btn.setStyleSheet(f"""
-            QPushButton {{
-                background:transparent;
-                color:{COLORS['accent']};
-                border:none;
-            }}
-            QPushButton:hover {{ color:{COLORS['accent_hover']}; }}
-        """)
+        self._toggle_btn = _mk_outline_btn(t("add_vehicles.expand", default="Expand"), height=28)
         self._toggle_btn.clicked.connect(self._toggle)
-        toggle_row.addWidget(self._toggle_btn)
-        self._root_col.addLayout(toggle_row)
+        hdr_row.addWidget(self._toggle_btn)
+        self._root_col.addWidget(header)
 
         self._body = QWidget()
-        self._body.setStyleSheet("background:transparent;")
         body_col = QVBoxLayout(self._body)
-        body_col.setContentsMargins(0, 4, 0, 0)
+        body_col.setContentsMargins(8, 0, 8, 4)
         body_col.setSpacing(10)
         self._body.setVisible(False)
+        body_col.addWidget(_divider())
 
         if mode == "vehicle":
             id_row = QHBoxLayout()
+            id_row.setSpacing(10)
             self._carid_field   = _EntryField(
                 t("add_vehicles.vehicle_id_label", default="Vehicle ID"),
                 t("add_vehicles.vehicle_id_placeholder", default="e.g. pickup"),
@@ -1244,6 +1220,7 @@ class _ManualEntryCard(QFrame):
             body_col.addLayout(id_row)
         else:
             id_row = QHBoxLayout()
+            id_row.setSpacing(10)
             self._carid_field  = _EntryField(
                 t("add_vehicles.vehicle_id_label", default="Vehicle ID"),
                 t("add_vehicles.vehicle_id_placeholder", default="e.g. pickup"),
@@ -1258,9 +1235,7 @@ class _ManualEntryCard(QFrame):
 
             self._preview_lbl = QLabel("")
             self._preview_lbl.setFont(font(11))
-            self._preview_lbl.setStyleSheet(
-                f"color:{COLORS['text_muted']};background:transparent;"
-            )
+            self._preview_lbl.setStyleSheet(_lbl_qss("text_muted"))
             body_col.addWidget(self._preview_lbl)
             self._carid_field.entry.textChanged.connect(self._update_preview)
             self._suffix_field.entry.textChanged.connect(self._update_preview)
@@ -1310,13 +1285,16 @@ class _ManualEntryCard(QFrame):
             if mode == "vehicle"
             else t("add_vehicles.variants_add_btn", default="Add Variant")
         )
-        self._add_btn = _mk_action_btn(label)
-        self._add_btn.setFixedHeight(40)
+        self._add_btn = _mk_action_btn(label, height=40, font_size=13)
         self._add_btn.clicked.connect(self._on_submit)
         body_col.addWidget(self._add_btn)
 
         self._root_col.addWidget(self._body)
 
+    def _plain_label(self) -> str:
+        if self._mode == "vehicle":
+            return t("add_vehicles.manual_entry_text", default="Manual Entry")
+        return t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
 
     def _toggle(self):
         self._expanded = not self._expanded
@@ -1325,14 +1303,6 @@ class _ManualEntryCard(QFrame):
             t("add_vehicles.collapse", default="Collapse") if self._expanded
             else t("add_vehicles.expand", default="Expand")
         )
-        sym = "－" if self._expanded else "＋"
-        plain = (
-            t("add_vehicles.manual_entry_text", default="Manual Entry")
-            if self._mode == "vehicle"
-            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
-        )
-        self._toggle_lbl.setText(f"{sym}  {plain}")
-
 
     def _browse_file(self, picker: _FilePicker, file_filter: str):
         path, _ = QFileDialog.getOpenFileName(
@@ -1364,7 +1334,7 @@ class _ManualEntryCard(QFrame):
             self.submitted.emit(carid, carname, json_, jbeam_, img_)
         else:
             suffix = self._suffix_field.text().lower()
-            self.submitted.emit(carid, suffix, json_, jbeam_, img_, )
+            self.submitted.emit(carid, suffix, json_, jbeam_, img_)
 
     def clear_fields(self):
         self._carid_field.clear()
@@ -1379,13 +1349,7 @@ class _ManualEntryCard(QFrame):
             self._uv_picker.clear()
 
     def retranslate_ui(self):
-        sym = "－" if self._expanded else "＋"
-        plain = (
-            t("add_vehicles.manual_entry_text", default="Manual Entry")
-            if self._mode == "vehicle"
-            else t("add_vehicles.manual_variant_text", default="Manual Variant Entry")
-        )
-        self._toggle_lbl.setText(f"{sym}  {plain}")
+        self._toggle_lbl.setText(self._plain_label().upper())
         self._toggle_btn.setText(
             t("add_vehicles.collapse", default="Collapse") if self._expanded
             else t("add_vehicles.expand", default="Expand")
@@ -1422,20 +1386,10 @@ class _VehiclesTab(QWidget):
 
     def __init__(self, notify_fn, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(f"background:{COLORS['app_bg']};")
         self._notify = notify_fn
         self._cards: List[_VehicleListCard] = []
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea{background:transparent;border:none;}")
-
-        inner = QWidget()
-        inner.setStyleSheet(f"background:{COLORS['app_bg']};")
-        col = QVBoxLayout(inner)
-        col.setContentsMargins(20, 20, 20, 20)
-        col.setSpacing(16)
+        scroll, inner, col = _make_scroll_page()
 
         self._smart_card = _SmartImportCard(notify_fn, mode="vehicles", parent=inner)
         self._smart_card.items_added.connect(self._on_items_added)
@@ -1445,23 +1399,12 @@ class _VehiclesTab(QWidget):
         self._manual_card.submitted.connect(self._on_manual_submit)
         col.addWidget(self._manual_card)
 
-        self._list_hdr = QLabel(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
-        self._list_hdr.setFont(font(14, "bold"))
-        self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
-        col.addWidget(self._list_hdr)
-
-        self._list_frame = QFrame()
-        self._list_frame.setStyleSheet("background:transparent;")
-        self._list_col = QVBoxLayout(self._list_frame)
-        self._list_col.setContentsMargins(0, 0, 0, 0)
-        self._list_col.setSpacing(6)
-        col.addWidget(self._list_frame)
-
-        self._empty_lbl = QLabel(t("add_vehicles.no_vehicles", default="No custom vehicles added yet."))
-        self._empty_lbl.setFont(font(12))
-        self._empty_lbl.setAlignment(Qt.AlignCenter)
-        self._empty_lbl.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
-        self._list_col.addWidget(self._empty_lbl)
+        (panel, self._list_hdr, self._count_chip,
+         self._list_frame, self._list_col, self._empty_lbl) = _make_list_panel(
+            t("add_vehicles.vehicles_added_header", default="Added Vehicles"),
+            t("add_vehicles.no_vehicles", default="No custom vehicles added yet."),
+        )
+        col.addWidget(panel)
 
         col.addStretch()
         scroll.setWidget(inner)
@@ -1471,7 +1414,6 @@ class _VehiclesTab(QWidget):
         root.addWidget(scroll)
 
         self._reload_list()
-
 
     def _on_items_added(self):
         self._reload_list()
@@ -1532,6 +1474,8 @@ class _VehiclesTab(QWidget):
     def _on_delete(self, carid: str):
         ok = delete_custom_vehicle(carid) if _BACKEND_OK else False
         if ok:
+            if _mod_locations is not None:
+                _mod_locations.forget(carid)
             self._notify(
                 t("add_vehicles.notification.vehicle_deleted_id",
                   carid=carid, default=f"Deleted '{carid}'."),
@@ -1553,6 +1497,8 @@ class _VehiclesTab(QWidget):
         self._cards.clear()
 
         vehicles = load_added_vehicles_json() if _BACKEND_OK else {}
+        self._count_chip.setText(str(len(vehicles)))
+        _restyle_chip(self._count_chip, "accent" if vehicles else "muted")
 
         if not vehicles:
             self._empty_lbl.setVisible(True)
@@ -1566,9 +1512,8 @@ class _VehiclesTab(QWidget):
             self._cards.append(card)
             fade_in(card, 150)
 
-
     def retranslate_ui(self):
-        self._list_hdr.setText(t("add_vehicles.vehicles_added_header", default="Added Vehicles"))
+        self._list_hdr.setText(t("add_vehicles.vehicles_added_header", default="Added Vehicles").upper())
         self._empty_lbl.setText(t("add_vehicles.no_vehicles", default="No custom vehicles added yet."))
         self._smart_card.retranslate_ui()
         self._manual_card.retranslate_ui()
@@ -1586,31 +1531,22 @@ class _VariantsTab(QWidget):
 
     def __init__(self, notify_fn, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(f"background:{COLORS['app_bg']};")
         self._notify = notify_fn
         self._cards: List[_VariantListCard] = []
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea{background:transparent;border:none;}")
+        scroll, inner, col = _make_scroll_page()
 
-        inner = QWidget()
-        inner.setStyleSheet(f"background:{COLORS['app_bg']};")
-        col = QVBoxLayout(inner)
-        col.setContentsMargins(20, 20, 20, 20)
-        col.setSpacing(16)
-
-        self._info_lbl = QLabel(t("add_vehicles.variants_info_banner", SUFFIX="_box",
-                                   default="Variants add extra body types to an existing vehicle."))
+        self._info_lbl = QLabel(self._info_text())
         self._info_lbl.setWordWrap(True)
-        self._info_lbl.setFont(font(11))
+        self._info_lbl.setFont(font(12))
         self._info_lbl.setStyleSheet(f"""
-            color:{COLORS['text']};
-            background:{COLORS['frame_bg']};
-            border:none;
-            border-radius:8px;
-            padding:10px 14px;
+            QLabel {{
+                background:{COLORS['frame_bg']};
+                color:{COLORS['text']};
+                border:1px solid {COLORS['accent']};
+                border-radius:8px;
+                padding:8px 12px;
+            }}
         """)
         col.addWidget(self._info_lbl)
 
@@ -1622,23 +1558,12 @@ class _VariantsTab(QWidget):
         self._manual_card.submitted.connect(self._on_manual_submit)
         col.addWidget(self._manual_card)
 
-        self._list_hdr = QLabel(t("add_vehicles.variants_added_header", default="Added Variants"))
-        self._list_hdr.setFont(font(14, "bold"))
-        self._list_hdr.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
-        col.addWidget(self._list_hdr)
-
-        self._list_frame = QFrame()
-        self._list_frame.setStyleSheet("background:transparent;")
-        self._list_col = QVBoxLayout(self._list_frame)
-        self._list_col.setContentsMargins(0, 0, 0, 0)
-        self._list_col.setSpacing(6)
-        col.addWidget(self._list_frame)
-
-        self._empty_lbl = QLabel(t("add_vehicles.variants_no_variants", default="No custom variants added yet."))
-        self._empty_lbl.setFont(font(12))
-        self._empty_lbl.setAlignment(Qt.AlignCenter)
-        self._empty_lbl.setStyleSheet(f"color:{COLORS['text_muted']};background:transparent;")
-        self._list_col.addWidget(self._empty_lbl)
+        (panel, self._list_hdr, self._count_chip,
+         self._list_frame, self._list_col, self._empty_lbl) = _make_list_panel(
+            t("add_vehicles.variants_added_header", default="Added Variants"),
+            t("add_vehicles.variants_no_variants", default="No custom variants added yet."),
+        )
+        col.addWidget(panel)
 
         col.addStretch()
         scroll.setWidget(inner)
@@ -1649,6 +1574,10 @@ class _VariantsTab(QWidget):
 
         self._reload_list()
 
+    @staticmethod
+    def _info_text() -> str:
+        return t("add_vehicles.variants_info_banner", SUFFIX="_box",
+                 default="Variants add extra body types to an existing vehicle.")
 
     def _on_items_added(self):
         self._reload_list()
@@ -1730,6 +1659,8 @@ class _VariantsTab(QWidget):
         self._cards.clear()
 
         variants = load_added_variants_json() if _BACKEND_OK else {}
+        self._count_chip.setText(str(len(variants)))
+        _restyle_chip(self._count_chip, "accent" if variants else "muted")
 
         if not variants:
             self._empty_lbl.setVisible(True)
@@ -1745,11 +1676,9 @@ class _VariantsTab(QWidget):
             self._cards.append(card)
             fade_in(card, 150)
 
-
     def retranslate_ui(self):
-        self._info_lbl.setText(t("add_vehicles.variants_info_banner", SUFFIX="_box",
-                                  default="Variants add extra body types to an existing vehicle."))
-        self._list_hdr.setText(t("add_vehicles.variants_added_header", default="Added Variants"))
+        self._info_lbl.setText(self._info_text())
+        self._list_hdr.setText(t("add_vehicles.variants_added_header", default="Added Variants").upper())
         self._empty_lbl.setText(t("add_vehicles.variants_no_variants", default="No custom variants added yet."))
         self._smart_card.retranslate_ui()
         self._manual_card.retranslate_ui()
@@ -1767,6 +1696,47 @@ def load_added_vehicles_at_startup():
             load_added_vehicles_json()
     except Exception as _exc:
         print(f"[WARNING] load_added_vehicles_at_startup: {type(_exc).__name__}: {_exc}")
+
+
+class _TabPill(QPushButton):
+    def __init__(self, text: str, parent=None):
+        super().__init__(text, parent)
+        self.setCheckable(True)
+        self.setAutoExclusive(True)
+        self.setFont(font(13, "bold"))
+        self.setMinimumHeight(36)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color:{COLORS['card_hover']};
+                color:{COLORS['text']};
+                border-radius:8px;
+                border:none;
+                padding:6px 16px;
+                font-size:13px;
+            }}
+            QPushButton:hover {{
+                background-color:{COLORS['card_bg']};
+            }}
+            QPushButton:checked {{
+                background-color:{COLORS['accent']};
+                color:{COLORS['accent_text']};
+                font-weight:bold;
+            }}
+            QPushButton:checked:hover {{
+                background-color:{COLORS['accent_hover']};
+            }}
+        """)
+        self._lock_width(text)
+
+    def _lock_width(self, text: str):
+        metrics = QFontMetrics(font(13, "bold"))
+        self.setFixedWidth(max(metrics.horizontalAdvance(text) + 40, 90))
+
+    def set_label(self, text: str):
+        self.setText(text)
+        self._lock_width(text)
 
 
 class AddVehiclesTab(QWidget):
@@ -1788,59 +1758,53 @@ class AddVehiclesTab(QWidget):
         root.setSpacing(0)
 
         hdr_frame = QFrame()
-        hdr_frame.setStyleSheet(f"background:{COLORS['frame_bg']};border:none;")
+        hdr_frame.setObjectName("avTopbar")
         hdr_frame.setFixedHeight(60)
+        hdr_frame.setStyleSheet(f"""
+            QFrame#avTopbar {{
+                background-color:{COLORS.get('topbar_bg', COLORS['frame_bg'])};
+                border-bottom:1px solid {COLORS['border']};
+            }}
+        """)
         hdr_row = QHBoxLayout(hdr_frame)
-        hdr_row.setContentsMargins(24, 0, 24, 0)
+        hdr_row.setContentsMargins(20, 0, 20, 0)
+        hdr_row.setSpacing(8)
 
         self._title = QLabel(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
         self._title.setFont(font(18, "bold"))
-        self._title.setStyleSheet(f"color:{COLORS['text']};background:transparent;")
+        self._title.setStyleSheet(_lbl_qss())
         hdr_row.addWidget(self._title)
         hdr_row.addStretch()
+
+        self._pill_vehicles = _TabPill(t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._pill_variants = _TabPill(t("add_vehicles.tab_variants", default="Variants"))
+        hdr_row.addWidget(self._pill_vehicles)
+        hdr_row.addWidget(self._pill_variants)
         root.addWidget(hdr_frame)
 
-        self._tabs = QTabWidget()
-        self._tabs.setStyleSheet(f"""
-            QTabWidget::pane {{
-                border: none;
-                background: {COLORS['app_bg']};
-            }}
-            QTabBar::tab {{
-                background: {COLORS['frame_bg']};
-                color: {COLORS['text_secondary']};
-                border: none;
-                padding: 8px 24px;
-                font-size: 13px;
-                font-weight: bold;
-            }}
-            QTabBar::tab:selected {{
-                background: {COLORS['app_bg']};
-                color: {COLORS['accent']};
-            }}
-            QTabBar::tab:hover:!selected {{
-                background: {COLORS['card_hover']};
-                color: {COLORS['text']};
-            }}
-        """)
+        self._stack = QStackedWidget()
+        self._stack.setStyleSheet(f"background:{COLORS['app_bg']};")
 
         self._vehicles_tab = _VehiclesTab(self._notify, self)
         self._variants_tab = _VariantsTab(self._notify, self)
+        self._stack.addWidget(self._vehicles_tab)
+        self._stack.addWidget(self._variants_tab)
 
-        self._tabs.addTab(self._vehicles_tab, t("add_vehicles.tab_vehicles", default="Vehicles"))
-        self._tabs.addTab(self._variants_tab, t("add_vehicles.tab_variants", default="Variants"))
+        self._pill_vehicles.clicked.connect(lambda: self._stack.setCurrentIndex(0))
+        self._pill_variants.clicked.connect(lambda: self._stack.setCurrentIndex(1))
+        self._pill_vehicles.setChecked(True)
 
         self._vehicles_tab.vehicle_added.connect(self._on_list_changed)
         self._vehicles_tab.vehicle_deleted.connect(self._on_list_changed)
         self._variants_tab.variant_added.connect(self._on_list_changed)
         self._variants_tab.variant_deleted.connect(self._on_list_changed)
 
-        root.addWidget(self._tabs)
+        root.addWidget(self._stack, 1)
 
     def retranslate_ui(self):
         self._title.setText(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
-        self._tabs.setTabText(0, t("add_vehicles.tab_vehicles", default="Vehicles"))
-        self._tabs.setTabText(1, t("add_vehicles.tab_variants", default="Variants"))
+        self._pill_vehicles.set_label(t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._pill_variants.set_label(t("add_vehicles.tab_variants", default="Variants"))
         self._vehicles_tab.retranslate_ui()
         self._variants_tab.retranslate_ui()
 
@@ -1856,7 +1820,7 @@ class AddVehiclesTab(QWidget):
 
     def refresh_ui(self):
         self._title.setText(t("add_vehicles.page_title", default="Add Vehicles & Variants"))
-        self._tabs.setTabText(0, t("add_vehicles.tab_vehicles", default="Vehicles"))
-        self._tabs.setTabText(1, t("add_vehicles.tab_variants", default="Variants"))
+        self._pill_vehicles.set_label(t("add_vehicles.tab_vehicles", default="Vehicles"))
+        self._pill_variants.set_label(t("add_vehicles.tab_variants", default="Variants"))
         self._vehicles_tab.refresh_ui()
         self._variants_tab.refresh_ui()

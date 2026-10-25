@@ -15,6 +15,7 @@ VEHICLE_IDS = {
     "etk800": "ETK 800 Series",
     "etkc": "ETK K Series",
     "etki": "ETK I Series",
+    "eu_trailers": "FPU Box Trailer",
     "fullsize": "Gavril Grand Marshal",
     "hopper": "Ibishu Hopper",
     "lansdale": "Soliad Lansdale",
@@ -25,6 +26,7 @@ VEHICLE_IDS = {
     "md_series": "Gavril MD-Series",
     "midtruck": "Autobello Stambecco",
     "nine": "Bruckell Nine",
+    "percheron": "Cherrier Percheron",
     "pessima": "Older Ibishu Pessima",
     "pickup": "Gavril D Series",
     "pigeon": "Ibishu Pigeon",
@@ -45,6 +47,7 @@ VEHICLE_IDS = {
 
 SINGLE_LAYER_VARIANTS = {
     "vivace:ardente": True,
+    "eu_trailers:s": True,
 }
 
 
@@ -72,3 +75,14 @@ def get_rebadges_for(base_carid: str) -> dict:
 def is_rebadge_suffix(base_carid: str, suffix: str) -> bool:
     key = f"{base_carid.lower()}:{suffix.strip().lower()}"
     return key in REBADGE_VEHICLES
+
+
+VARIANT_LABELS = {
+    "eu_trailers:": "3-Axle Semi",
+    "eu_trailers:s": "2-Axle Drawbar",
+}
+
+
+def get_variant_label(carid: str, suffix: str, default: str) -> str:
+    key = f"{carid.lower()}:{(suffix or '').strip().lower()}"
+    return VARIANT_LABELS.get(key, default)

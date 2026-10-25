@@ -1,0 +1,20 @@
+{
+  "domElement": "<beam-skin-studio-part-exporter></beam-skin-studio-part-exporter>",
+  "name": "BeamSkin Studio - Vehicle Parts Exporter",
+  "types": ["ui.apps.categories.vehicle_info"],
+  "description": "Export active vehicle parts and mesh names for BeamSkin Studio previews.",
+  "css": {
+    "bottom": "20px",
+    "left": "20px",
+    "height": "600px",
+    "width": "400px"
+  },
+  "preserveAspectRatio": true,
+  "author": "BeamSkin Studio",
+  "version": "1.0",
+  "directive": "beamSkinStudioPartExporter",
+  "vue": true,
+  "category": "Vehicle",
+  "isAuxiliary": false,
+  "interactive": "yes"
+}

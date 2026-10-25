@@ -1,0 +1,20 @@
+{
+  "Author": "Author",
+  "Brand": "Cherrier",
+  "Country": "France",
+  "Derby Class": "Heavy Truck",
+  "Description": "Description",
+  "Name": "Percheron",
+  "Type": "Truck",
+  "Region": "europe",
+  "Years": {
+    "max": 2004,
+    "min": 2000
+  },
+  "defaultPaintName1": "gris_argent",
+  "default_pc": "none",
+  "paintCollections": [
+    "percheron_basic",
+    "percheron_metallic"
+  ]
+}

@@ -1,0 +1,753 @@
+Folder PATH listing
+Volume serial number is 7E57-46CB
+C:.
+|   Beamskin_studio.bat
+|   beamskin_studio.sh
+|   BeamSkin_Studio.spec
+|   BeamSkin_Studio_offline.spec
+|   install.bat
+|   install_linux.sh
+|   LICENSE
+|   main.py
+|   output.txt
+|   pyi_rth_beamskin.py
+|   README.md
+|   requirements.txt
+|   version.txt
+|   version_info.txt
+|   
++---beamskin_studio_exporter_mod
+|   |   README.md
+|   |   
+|   +---lua
+|   |   \---ge
+|   |       \---extensions
+|   |               beamSkinStudioPartExporter.lua
+|   |               
+|   \---ui
+|       \---modules
+|           \---apps
+|               \---beamSkinStudioPartExporter
+|                       app.json
+|                       app.vue
+|                       
++---core
+|   |   add_vehicles.py
+|   |   changelog.py
+|   |   colorable_ops.py
+|   |   config.py
+|   |   exterior_parts.py
+|   |   file_ops.py
+|   |   legacy_migration.py
+|   |   localization.py
+|   |   mod_scanner.py
+|   |   project_registry.py
+|   |   settings.py
+|   |   updater.py
+|   |   __init__.py
+|   |   
+|   +---localization
+|   |   |   ADDING_LANGUAGES.md
+|   |   |   __init__.py
+|   |   |   
+|   |   +---languages
+|   |   |       en_gb.json
+|   |   |       en_us.json
+|   |   |       es.json
+|   |   |       pt.json
+|   |   |       sv.json
+|   |   |       zh.json
+|   |   |       
+|   |   \---__pycache__
+|   |           __init__.cpython-311.pyc
+|   |           
+|   +---model_preview
+|   |   |   beamng_parts.py
+|   |   |   dae_geometry.py
+|   |   |   dae_search.py
+|   |   |   exporter_mod.py
+|   |   |   game_placements.py
+|   |   |   jbeam_reader.py
+|   |   |   material.py
+|   |   |   placement.py
+|   |   |   preview_jobs.py
+|   |   |   renderers.py
+|   |   |   sources.py
+|   |   |   store.py
+|   |   |   variants.py
+|   |   |   vehicle_fs.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           beamng_parts.cpython-311.pyc
+|   |           dae_geometry.cpython-311.pyc
+|   |           dae_search.cpython-311.pyc
+|   |           game_placements.cpython-311.pyc
+|   |           jbeam_reader.cpython-311.pyc
+|   |           material.cpython-311.pyc
+|   |           placement.cpython-311.pyc
+|   |           preview_jobs.cpython-311.pyc
+|   |           renderers.cpython-311.pyc
+|   |           sources.cpython-311.pyc
+|   |           store.cpython-311.pyc
+|   |           variants.cpython-311.pyc
+|   |           vehicle_fs.cpython-311.pyc
+|   |           __init__.cpython-311.pyc
+|   |           
+|   +---uv_exporter
+|   |   |   auto_select.py
+|   |   |   car_models.py
+|   |   |   dae_parser.py
+|   |   |   loader.py
+|   |   |   mesh_data.py
+|   |   |   mod_locations.py
+|   |   |   rasterizer.py
+|   |   |   selection_store.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           auto_select.cpython-311.pyc
+|   |           car_models.cpython-311.pyc
+|   |           dae_parser.cpython-311.pyc
+|   |           mesh_data.cpython-311.pyc
+|   |           mod_locations.cpython-311.pyc
+|   |           rasterizer.cpython-311.pyc
+|   |           selection_store.cpython-311.pyc
+|   |           __init__.cpython-311.pyc
+|   |           
+|   \---__pycache__
+|           add_vehicles.cpython-311.pyc
+|           changelog.cpython-311.pyc
+|           colorable_ops.cpython-311.pyc
+|           config.cpython-311.pyc
+|           exterior_parts.cpython-311.pyc
+|           file_ops.cpython-311.pyc
+|           legacy_migration.cpython-311.pyc
+|           mod_scanner.cpython-311.pyc
+|           project_registry.cpython-311.pyc
+|           settings.cpython-311.pyc
+|           updater.cpython-311.pyc
+|           __init__.cpython-311.pyc
+|           
++---gui
+|   |   confirmation_dialog.py
+|   |   icon_helper.py
+|   |   main_window.py
+|   |   state.py
+|   |   theme.py
+|   |   widgets.py
+|   |   __init__.py
+|   |   
+|   +---components
+|   |   |   account_settings_overlay.py
+|   |   |   auth_overlay.py
+|   |   |   changelog_dialog.py
+|   |   |   connection_dialog.py
+|   |   |   dialogs.py
+|   |   |   dialog_kit.py
+|   |   |   language_dialog.py
+|   |   |   legacy_migration_dialog.py
+|   |   |   model_preview_panel.py
+|   |   |   model_viewport.py
+|   |   |   navigation.py
+|   |   |   path_configuration.py
+|   |   |   preview.py
+|   |   |   project_browser.py
+|   |   |   setup_wizard.py
+|   |   |   uv_exporter_widgets.py
+|   |   |   viewport_common.py
+|   |   |   wgpu_viewport.py
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           changelog_dialog.cpython-311.pyc
+|   |           connection_dialog.cpython-311.pyc
+|   |           dialogs.cpython-311.pyc
+|   |           dialog_kit.cpython-311.pyc
+|   |           legacy_migration_dialog.cpython-311.pyc
+|   |           model_preview_panel.cpython-311.pyc
+|   |           navigation.cpython-311.pyc
+|   |           path_configuration.cpython-311.pyc
+|   |           preview.cpython-311.pyc
+|   |           project_browser.cpython-311.pyc
+|   |           uv_exporter_widgets.cpython-311.pyc
+|   |           viewport_common.cpython-311.pyc
+|   |           wgpu_viewport.cpython-311.pyc
+|   |           __init__.cpython-311.pyc
+|   |           
+|   +---Icons
+|   |       BeamSkin_Studio.ico
+|   |       BeamSkin_Studio_Black.png
+|   |       beamSkin_studio_logo.png
+|   |       BeamSkin_Studio_White.png
+|   |       discord_logo_black.png
+|   |       discord_logo_white.png
+|   |       Font.txt
+|   |       Patreon_Logo.png
+|   |       paypal_logo.png
+|   |       paypal_P_logo.png
+|   |       Swish_logo.png
+|   |       
+|   +---images
+|   |   +---common
+|   |   |   \---imagepreview
+|   |   |           MissingTexture.jpg
+|   |   |           
+|   |   +---guide
+|   |   |       Basecolormap.png
+|   |   |       colorpalettemap.png
+|   |   |       poliskombi_retro_mask.data.png
+|   |   |       reflectivebase.png
+|   |   |       reflectivered.png
+|   |   |       
+|   |   \---vehicles
+|   |       +---atv
+|   |       |       default.jpg
+|   |       |       
+|   |       +---autobello
+|   |       |       default.jpg
+|   |       |       
+|   |       +---barstow
+|   |       |       default.jpg
+|   |       |       
+|   |       +---bastion
+|   |       |       default.jpg
+|   |       |       
+|   |       +---bluebuck
+|   |       |       default.jpg
+|   |       |       
+|   |       +---bolide
+|   |       |       default.jpg
+|   |       |       
+|   |       +---burnside
+|   |       |       default.jpg
+|   |       |       
+|   |       +---bx
+|   |       |       default.jpg
+|   |       |       
+|   |       +---citybus
+|   |       |       default.jpg
+|   |       |       
+|   |       +---covet
+|   |       |       default.jpg
+|   |       |       
+|   |       +---dryvan
+|   |       |       default.jpg
+|   |       |       
+|   |       +---dumptruck
+|   |       |       default.jpg
+|   |       |       
+|   |       +---etk800
+|   |       |       default.jpg
+|   |       |       
+|   |       +---etkc
+|   |       |       default.jpg
+|   |       |       
+|   |       +---etki
+|   |       |       default.jpg
+|   |       |       
+|   |       +---eu_trailers
+|   |       |       default.jpg
+|   |       |       defaults.jpg
+|   |       |       
+|   |       +---fullsize
+|   |       |       default.jpg
+|   |       |       
+|   |       +---hopper
+|   |       |       default.jpg
+|   |       |       
+|   |       +---lansdale
+|   |       |       default.jpg
+|   |       |       
+|   |       +---legran
+|   |       |       default.jpg
+|   |       |       
+|   |       +---md_series
+|   |       |       ambulance.jpg
+|   |       |       armor.jpg
+|   |       |       box.jpg
+|   |       |       bus.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---midsize
+|   |       |       default.jpg
+|   |       |       
+|   |       +---midtruck
+|   |       |       ambulance.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---miramar
+|   |       |       default.jpg
+|   |       |       
+|   |       +---moonhawk
+|   |       |       default.jpg
+|   |       |       
+|   |       +---nine
+|   |       |       default.jpg
+|   |       |       
+|   |       +---percheron
+|   |       |       default.jpg
+|   |       |       defaultbox.jpg
+|   |       |       
+|   |       +---pessima
+|   |       |       default.jpg
+|   |       |       
+|   |       +---pickup
+|   |       |       ambulance.jpg
+|   |       |       box.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---pigeon
+|   |       |       default.jpg
+|   |       |       
+|   |       +---racetruck
+|   |       |       default.jpg
+|   |       |       
+|   |       +---roamer
+|   |       |       default.jpg
+|   |       |       
+|   |       +---rockbouncer
+|   |       |       default.jpg
+|   |       |       
+|   |       +---sbr
+|   |       |       default.jpg
+|   |       |       
+|   |       +---scintilla
+|   |       |       default.jpg
+|   |       |       
+|   |       +---sunburst2
+|   |       |       default.jpg
+|   |       |       
+|   |       +---us_semi
+|   |       |       cargobox.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---utv
+|   |       |       default.jpg
+|   |       |       
+|   |       +---van
+|   |       |       ambulance.jpg
+|   |       |       box.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---vivace
+|   |       |       ardente.jpg
+|   |       |       default.jpg
+|   |       |       
+|   |       +---wendover
+|   |       |       default.jpg
+|   |       |       
+|   |       +---wigeon
+|   |       |       default.jpg
+|   |       |       
+|   |       \---wl40
+|   |               default.jpg
+|   |               
+|   +---tabs
+|   |   |   about.py
+|   |   |   add_vehicles_tab.py
+|   |   |   car_list.py
+|   |   |   generator.py
+|   |   |   howto.py
+|   |   |   online_tab.py
+|   |   |   settings_tab.py
+|   |   |   uv_exporter.py
+|   |   |   
+|   |   \---__pycache__
+|   |           about.cpython-311.pyc
+|   |           add_vehicles_tab.cpython-311.pyc
+|   |           car_list.cpython-311.pyc
+|   |           generator.cpython-311.pyc
+|   |           howto.cpython-311.pyc
+|   |           online_tab.cpython-311.pyc
+|   |           settings_tab.cpython-311.pyc
+|   |           uv_exporter.cpython-311.pyc
+|   |           
+|   \---__pycache__
+|           confirmation_dialog.cpython-311.pyc
+|           icon_helper.cpython-311.pyc
+|           main_window.cpython-311.pyc
+|           state.cpython-311.pyc
+|           theme.cpython-311.pyc
+|           widgets.cpython-311.pyc
+|           __init__.cpython-311.pyc
+|           
++---launchers-scripts
+|       launcher.py
+|       quick_launcher.py
+|       
++---tools
+|       clear_cache.bat
+|       
++---utils
+|   |   account_api.py
+|   |   api_http.py
+|   |   config_helper.py
+|   |   connection.py
+|   |   debug.py
+|   |   file_logger.py
+|   |   file_ops.py
+|   |   single_instance.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           account_api.cpython-311.pyc
+|           api_http.cpython-311.pyc
+|           config_helper.cpython-311.pyc
+|           connection.cpython-311.pyc
+|           debug.cpython-311.pyc
+|           file_logger.cpython-311.pyc
+|           file_ops.cpython-311.pyc
+|           single_instance.cpython-311.pyc
+|           __init__.cpython-311.pyc
+|           
+\---vehicles
+    |   carconfigs.txt
+    |   
+    +---atv
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           atv.jbeam
+    |           materials.json
+    |           
+    +---autobello
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           autobello.jbeam
+    |           materials.json
+    |           
+    +---barstow
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           barstow.jbeam
+    |           materials.json
+    |           
+    +---bastion
+    |   |   info_skinname.json
+    |   |   
+    |   \---SKINNAME
+    |           bastion.jbeam
+    |           skin.materials.json
+    |           
+    +---bluebuck
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           bluebuck.jbeam
+    |           materials.json
+    |           
+    +---bolide
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           bolide.jbeam
+    |           skin.materials.json
+    |           
+    +---burnside
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           burnside.jbeam
+    |           materials.json
+    |           
+    +---bx
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           bx.jbeam
+    |           materials.json
+    |           
+    +---citybus
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           citybus.jbeam
+    |           materials.json
+    |           
+    +---covet
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           covet.jbeam
+    |           materials.json
+    |           
+    +---dryvan
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           dryvan.jbeam
+    |           skin.materials.json
+    |           
+    +---dumptruck
+    |   \---SKINNAME
+    |           dumptruck.jbeam
+    |           skin.materials.json
+    |           
+    +---etk800
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           etk800.jbeam
+    |           materials.json
+    |           
+    +---etkc
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           etkc.jbeam
+    |           skin.materials.json
+    |           
+    +---etki
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           etki.jbeam
+    |           materials.json
+    |           
+    +---eu_trailers
+    |   +---SKINNAME
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   \---SKINNAMES
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---fullsize
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           fullsize.jbeam
+    |           materials.json
+    |           
+    +---hopper
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           hopper.jbeam
+    |           materials.json
+    |           
+    +---lansdale
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---legran
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           legran.jbeam
+    |           materials.json
+    |           
+    +---md_series
+    |   |   info_skinname.json
+    |   |   
+    |   +---skinname
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   +---skinnameambulance
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   +---skinnamearmor
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   +---skinnamebox
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   \---skinnamebus
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---midsize
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           midsize.jbeam
+    |           skin.materials.json
+    |           
+    +---midtruck
+    |   |   info_SKINNAME.json
+    |   |   
+    |   +---skinname
+    |   |       materials.json
+    |   |       midtruck.jbeam
+    |   |       
+    |   \---skinnameambulance
+    |           midtruck.jbeam
+    |           skin.materials.json
+    |           
+    +---miramar
+    |   |   info_skinname.json
+    |   |   
+    |   \---SKINNAME
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---moonhawk
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           moonhawk.jbeam
+    |           
+    +---nine
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---percheron
+    |   |   info_SKINNAME.json
+    |   |   
+    |   +---SKINNAME
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   \---SKINNAMEBOX
+    |           skin.materials.json
+    |           skin_box.jbeam
+    |           
+    +---pessima
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           pessima.jbeam
+    |           
+    +---pickup
+    |   |   info_SKINNAME.json
+    |   |   
+    |   +---SKINNAME
+    |   |       materials.json
+    |   |       pickup.jbeam
+    |   |       
+    |   +---SKINNAMEAMBULANCE
+    |   |       materials.json
+    |   |       van.jbeam
+    |   |       
+    |   \---SKINNAMEBOX
+    |           materials.json
+    |           pickup.jbeam
+    |           
+    +---pigeon
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           pigeon.jbeam
+    |           
+    +---racetruck
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           materials.json
+    |           racetruck.jbeam
+    |           
+    +---roamer
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           roamer.jbeam
+    |           
+    +---rockbouncer
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           materials.json
+    |           rockbouncer.jbeam
+    |           
+    +---sbr
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           sbr.jbeam
+    |           
+    +---scintilla
+    |   |   info_skinname.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           scintilla.jbeam
+    |           
+    +---sunburst2
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           skin.jbeam
+    |           
+    +---us_semi
+    |   |   info_skinname.json
+    |   |   
+    |   +---skinname
+    |   |       skin.jbeam
+    |   |       skin.materials.json
+    |   |       
+    |   \---skinnamecargobox
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---utv
+    |   |   info_skinname.json
+    |   |   
+    |   \---skinname
+    |           skin.jbeam
+    |           skin.materials.json
+    |           
+    +---van
+    |   |   info_SKINNAME.json
+    |   |   
+    |   +---SKINNAME
+    |   |       materials.json
+    |   |       van.jbeam
+    |   |       
+    |   +---SKINNAMEAMBULANCE
+    |   |       materials.json
+    |   |       van.jbeam
+    |   |       
+    |   \---SKINNAMEBOX
+    |           materials.json
+    |           van.jbeam
+    |           
+    +---vivace
+    |   |   info_SKINNAME.json
+    |   |   
+    |   +---SKINNAME
+    |   |       materials.json
+    |   |       vivace.jbeam
+    |   |       
+    |   \---SKINNAMEARDENTE
+    |           ardente_skins.jbeam
+    |           materials.json
+    |           
+    +---wendover
+    |   |   info_SKINNAME.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           wendover.jbeam
+    |           
+    +---wigeon
+    |   |   info_skinname.json
+    |   |   
+    |   \---SKINNAME
+    |           materials.json
+    |           wigeon.jbeam
+    |           
+    \---wl40
+        \---SKINNAME
+                skin.materials.json
+                wl40_skin.jbeam
+                

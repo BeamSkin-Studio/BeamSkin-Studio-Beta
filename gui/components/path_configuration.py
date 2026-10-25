@@ -2,13 +2,17 @@ from __future__ import annotations
 import os, platform
 from typing import Callable, Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QLineEdit, QVBoxLayout,
-    QHBoxLayout, QFileDialog,
+    QHBoxLayout, QFileDialog, QPushButton,
 )
 
 from gui.theme   import COLORS, font
 from gui.widgets import AnimButton, HSeparator
+from gui.components.dialog_kit import (
+    section_header, input_qss, outline_qss, lbl_qss, divider,
+)
 
 try:
     from core.localization import t
@@ -97,39 +101,46 @@ class PathConfigurationSection(QFrame):
         self.setStyleSheet(f"""
             #pathConfigSection {{
                 background-color: {COLORS['card_bg']};
-                border-radius: 12px;
-                border: none;
+                border-radius: 10px;
+                border: 1px solid {COLORS['border']};
             }}
         """)
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(16)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(12)
 
         hdr_row = QHBoxLayout()
-        self._hdr_lbl = QLabel(t("settings.beamng_paths"))
-        self._hdr_lbl.setFont(font(17, "bold"))
-        self._hdr_lbl.setStyleSheet(f"color:{COLORS['text']};background:transparent;border:none;")
+        marker = QFrame()
+        marker.setFixedSize(3, 16)
+        marker.setStyleSheet(f"background:{COLORS['accent']};border:none;border-radius:1px;")
+        hdr_row.addWidget(marker)
+        hdr_row.addSpacing(8)
+        self._hdr_lbl = QLabel(t("settings.beamng_paths").upper())
+        self._hdr_lbl.setFont(font(12, "bold"))
+        self._hdr_lbl.setStyleSheet(lbl_qss())
         hdr_row.addWidget(self._hdr_lbl, 1)
 
         platform_emoji = {"Windows": "🪟", "Linux": "🐧", "Darwin": "🍎"}.get(
             self.system, "💻"
         )
         plat_lbl = QLabel(f"{platform_emoji} {self.system}")
-        plat_lbl.setFont(font(12))
+        plat_lbl.setFont(font(10))
         plat_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};background:transparent;border:none;"
+            f"color:{COLORS['accent']};"
+            f"background:{COLORS.get('accent_dim', COLORS['frame_bg'])};"
+            "border:none;border-radius:4px;padding:2px 9px;"
         )
         hdr_row.addWidget(plat_lbl)
         root.addLayout(hdr_row)
 
         self._desc_lbl = QLabel(t("settings.beamng_paths_desc"))
-        self._desc_lbl.setFont(font(13))
+        self._desc_lbl.setFont(font(12))
         self._desc_lbl.setWordWrap(True)
         self._desc_lbl.setStyleSheet(
             f"color:{COLORS['text_secondary']};background:transparent;border:none;"
         )
         root.addWidget(self._desc_lbl)
-        root.addWidget(HSeparator())
+        root.addWidget(divider())
 
         root.addWidget(self._path_row(
             label=t("settings.beamng_install"),
@@ -215,12 +226,13 @@ class PathConfigurationSection(QFrame):
         row_frame.setStyleSheet(f"""
             #pathRow {{
                 background-color: {COLORS['frame_bg']};
-                border-radius: 10px;
-                border: none;
+                border-radius: 8px;
+                border: 1px solid {COLORS['border']};
             }}
+            #pathRow:hover {{ border-color: {COLORS['accent']}; }}
         """)
         inner = QVBoxLayout(row_frame)
-        inner.setContentsMargins(16, 14, 16, 14)
+        inner.setContentsMargins(14, 12, 14, 12)
         inner.setSpacing(8)
 
         lbl = QLabel(label)
@@ -240,24 +252,13 @@ class PathConfigurationSection(QFrame):
         entry = QLineEdit()
         entry.setMinimumHeight(34)
         entry.setFont(font(12))
-        entry.setStyleSheet(f"""
-            QLineEdit {{
-                background:{COLORS['card_bg']};
-                color:{COLORS['text']};
-                border:1px solid {COLORS['border']};
-                border-radius:7px;
-                padding:4px 10px;
-                font-size:12px;
-            }}
-            QLineEdit:focus {{ border-color:{COLORS['border_focus']}; }}
-        """)
+        entry.setStyleSheet(input_qss())
         entry_row.addWidget(entry, 1)
 
-        btn = AnimButton(
-            t("common.browse"),
-            fg=COLORS["accent"], fg_hover=COLORS["accent_hover"],
-            font_size=12, bold=True, padding="6px 14px",
-        )
+        btn = QPushButton(t("common.browse"))
+        btn.setFont(font(12, "bold"))
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(outline_qss())
         btn.setFixedHeight(34)
         btn.clicked.connect(browse_cb)
         entry_row.addWidget(btn)
@@ -284,12 +285,13 @@ class PathConfigurationSection(QFrame):
         row_frame.setStyleSheet(f"""
             #pathRow {{
                 background-color: {COLORS['frame_bg']};
-                border-radius: 10px;
-                border: none;
+                border-radius: 8px;
+                border: 1px solid {COLORS['border']};
             }}
+            #pathRow:hover {{ border-color: {COLORS['accent']}; }}
         """)
         inner = QVBoxLayout(row_frame)
-        inner.setContentsMargins(16, 14, 16, 14)
+        inner.setContentsMargins(14, 12, 14, 12)
         inner.setSpacing(8)
 
         lbl = QLabel(self._txt_data_folder())
@@ -377,7 +379,7 @@ class PathConfigurationSection(QFrame):
 
 
     def refresh_ui(self):
-        self._hdr_lbl.setText(t("settings.beamng_paths"))
+        self._hdr_lbl.setText(t("settings.beamng_paths").upper())
         self._desc_lbl.setText(t("settings.beamng_paths_desc"))
 
         self._beamng_row_label.setText(t("settings.beamng_install"))

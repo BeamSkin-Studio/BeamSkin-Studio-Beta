@@ -357,6 +357,7 @@ _DEFAULT_SETTINGS = {
     "texture_previews_enabled": True,
     "file_logging_enabled": False,
     "file_logging_append": False,
+    "preview_renderer": "auto",
 }
 
 app_settings: dict = dict(_DEFAULT_SETTINGS)
@@ -472,4 +473,16 @@ def is_file_logging_append() -> bool:
 def set_file_logging_append(append: bool):
     print(f"[DEBUG] set_file_logging_append: {bool(append)}")
     app_settings["file_logging_append"] = bool(append)
+    save_settings()
+
+
+def get_preview_renderer() -> str:
+    value = str(app_settings.get("preview_renderer", "auto") or "auto")
+    print(f"[DEBUG] get_preview_renderer: {value!r}")
+    return value
+
+
+def set_preview_renderer(value: str):
+    print(f"[DEBUG] set_preview_renderer: {value!r}")
+    app_settings["preview_renderer"] = str(value or "auto")
     save_settings()

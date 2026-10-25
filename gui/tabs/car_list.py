@@ -157,7 +157,11 @@ def _get_variant_images(carid: str) -> List[Tuple[str, str]]:
         stem_l = stem.lower()
         if any(stem_l == suf or stem_l.endswith(f"_{suf}") for suf in rebadge_suffixes):
             continue
-        label = "Default" if stem_l == "default" else stem.replace("_", " ").title()
+        if stem_l == "default":
+            label = "Default"
+        else:
+            base = stem[7:].lstrip("_") if stem_l.startswith("default") and len(stem) > 7 else stem
+            label = base.replace("_", " ").title() or "Default"
         entries.append((label, os.path.join(vehicle_dir, fn)))
     entries.sort(key=lambda x: (x[0] != "Default", x[0].lower()))
     return entries
@@ -170,7 +174,7 @@ def _get_rebadge_images(carid: str, suffix: str) -> List[Tuple[str, str]]:
         if not os.path.isdir(vehicle_dir):
             return []
     suf_l = suffix.lower()
-    candidates = [f"{suf_l}", f"default_{suf_l}"]
+    candidates = [f"{suf_l}", f"default_{suf_l}", f"default{suf_l}"]
     for fn in sorted(os.listdir(vehicle_dir)):
         if not fn.lower().endswith((".jpg", ".jpeg", ".png")):
             continue
@@ -178,31 +182,6 @@ def _get_rebadge_images(carid: str, suffix: str) -> List[Tuple[str, str]]:
         if stem_l in candidates:
             return [("Default", os.path.join(vehicle_dir, fn))]
     return []
-
-
-_BUILTIN_VEHICLES: List[Tuple[str, str]] = [
-    ("autobello", "Autobello Piccolina"), ("atv", "FPU Wydra"),
-    ("barstow", "Gavril Barstow"), ("bastion", "Bruckell Bastion"),
-    ("bluebuck", "Gavril Bluebuck"), ("bolide", "Civetta Bolide"),
-    ("burnside", "Burnside Special"), ("covet", "Ibishu Covet"),
-    ("citybus", "Wentward DT40L"), ("bx", "Ibishu BX-Series"),
-    ("dryvan", "Dry Van Trailer"), ("dumptruck", "Hirochi HT-55"),
-    ("etk800", "ETK 800 Series"), ("etkc", "ETK K Series"),
-    ("etki", "ETK I Series"), ("fullsize", "Gavril Grand Marshal"),
-    ("hopper", "Ibishu Hopper"), ("lansdale", "Soliad Lansdale"),
-    ("legran", "Bruckell Legran"), ("midsize", "Newer Ibishu Pessima"),
-    ("miramar", "Ibishu Miramar"), ("moonhawk", "Bruckell Moonhawk"),
-    ("md_series", "Gavril MD-Series"), ("midtruck", "Autobello Stambecco"),
-    ("nine", "Bruckell Nine"), ("pessima", "Older Ibishu Pessima"),
-    ("pickup", "Gavril D Series"), ("pigeon", "Ibishu Pigeon"),
-    ("racetruck", "SP Dunekicker"), ("roamer", "Gavril Roamer"),
-    ("rockbouncer", "SP Rockbasher"), ("sbr", "Hirochi SBR4"),
-    ("scintilla", "Civetta Scintilla"), ("sunburst2", "Hirochi Sunburst"),
-    ("us_semi", "Gavril T Series"), ("utv", "Hirochi Aurata"),
-    ("van", "Gavril H Series"), ("vivace", "Cherrier FCV"),
-    ("wendover", "Soliad Wendover"), ("wigeon", "Ibishu Wigeon"),
-    ("wl40", "Hirochi WL-40"),
-]
 
 
 class _UVSelectDialog(QDialog):
@@ -583,11 +562,11 @@ class CarListTab(QWidget):
             def get_rebadges_for(_c):
                 return {}
 
-        base_vehicles: List[Tuple[str, str, bool]] = []
-        for carid, name in _BUILTIN_VEHICLES:
-            base_vehicles.append((carid, name, False))
-        for carid, name in state.added_vehicles.items():
-            base_vehicles.append((carid, name, True))
+        merged_vehicles = {**state.vehicle_ids, **state.added_vehicles}
+        base_vehicles: List[Tuple[str, str, bool]] = [
+            (carid, name, carid in state.added_vehicles)
+            for carid, name in merged_vehicles.items()
+        ]
 
         all_vehicles: List[Tuple[str, str, bool, str]] = [
             (carid, name, dev_added, "") for carid, name, dev_added in base_vehicles
@@ -818,6 +797,14 @@ class CarListTab(QWidget):
                 )
                 btn_row.addWidget(uv_btn)
 
+        uvx_btn = self._mk_btn(
+            t("car_list.uv_template", default="UV Template"),
+            lambda _, c=carid, n=name, v=variant_suffix: self._open_uv_exporter(c, n, v),
+            "secondary",
+            compact=True,
+        )
+        btn_row.addWidget(uvx_btn)
+
         copy_btn = self._mk_btn(
             t("car_list.copy_id"),
             lambda _, c=carid: self._copy_carid(c),
@@ -1021,6 +1008,15 @@ class CarListTab(QWidget):
                 )
                 btn_row.addWidget(uv_btn)
 
+        uvx_btn = self._mk_btn(
+            t("car_list.uv_template", default="UV Template"),
+            lambda _, c=carid, n=name, card=card, v=variant_suffix: self._open_uv_exporter(
+                c, n, self._card_variant(card, v)),
+            "secondary",
+            compact=True,
+        )
+        btn_row.addWidget(uvx_btn)
+
         copy_btn = self._mk_btn(
             t("car_list.copy_id"),
             lambda _, c=carid: self._copy_carid(c),
@@ -1140,6 +1136,30 @@ class CarListTab(QWidget):
         QApplication.clipboard().setText(carid)
         self._notify(t("car_list.copied_to_clipboard", carid=carid), "success", 2000)
         print(f"[DEBUG] Car ID '{carid}' copied to clipboard")
+
+    @staticmethod
+    def _card_variant(card, suffix: str = "") -> str:
+        if suffix:
+            return suffix
+        try:
+            label = card._variants[card._variant_idx][0]
+        except (AttributeError, IndexError, TypeError):
+            return ""
+        return "" if label.lower() == "default" else label.lower().replace(" ", "_")
+
+    def _open_uv_exporter(self, carid: str, name: str = "", variant: str = ""):
+        mw = self.window()
+        tab = getattr(mw, "tabs", {}).get("uv_exporter")
+        if tab is None or not hasattr(tab, "load_for_car"):
+            self._notify("UV Exporter tab is not available.", "error", 4000)
+            return
+        topbar = getattr(mw, "topbar", None)
+        if topbar is not None:
+            topbar.view_changed.emit("uv_exporter")
+        try:
+            tab.load_for_car(carid, name, variant=variant)
+        except TypeError:
+            tab.load_for_car(carid, name)
 
     def _get_local_uv_map(self, carid: str):
         uv_paths = _get_local_uv_map_paths(carid)
